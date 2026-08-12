@@ -991,29 +991,29 @@ function ContextDrawer({ drawer,setDrawer,open,setOpen,update }: any) {
     {drawer==="Attachments"&&<><DrawerFile update={update} name="2025 Grant Agreement.pdf" meta="1.8 MB · Linked to entity understanding"/><DrawerFile update={update} name="Accounting Policy Handbook.pdf" meta="Client upload · In review"/><button className="secondary-btn full" onClick={()=>update({},"policy-handbook-addendum.pdf attached (simulated)")}><UploadCloud/>Attach evidence</button></>}
   </div></aside> }
 
-type TourStep = { title: string; text: string; route?: string };
+type TourStep = { title: string; text: string; route?: string; cta?: string };
 const TOUR_STEPS: TourStep[] = [
-  { title: "Welcome to AssureAudit", text: "A quick look at what's live in this prototype — click Next and it'll take you there as you go." },
-  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", route: "/dashboard" },
-  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", route: "/engagements" },
-  { title: "New engagement — starts from a signed letter", text: "Click \"New engagement\" here. It starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", route: "/engagements" },
-  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", route: "/engagements" },
-  { title: "Edit Engagement", text: "Click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", route: "/engagement/bbawc" },
-  { title: "My Account", text: "This top bar is on every screen. Click your avatar, then \"My account,\" for a daily-digest toggle and two-factor authentication." },
-  { title: "Fiscal year switcher", text: "The \"FY 2025\" control up there is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back." },
-  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log" },
-  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning" },
+  { title: "Welcome to AssureAudit", text: "A quick look at what's live in this prototype and where to find it." },
+  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", route: "/dashboard", cta: "Go to Dashboard" },
+  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", route: "/engagements", cta: "Go to Engagements" },
+  { title: "New engagement — starts from a signed letter", text: "On the Engagements page, click \"New engagement.\" It starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", route: "/engagements", cta: "Go to Engagements" },
+  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", route: "/engagements", cta: "Go to Engagements" },
+  { title: "Edit Engagement", text: "Open an engagement, then click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", route: "/engagement/bbawc", cta: "Go to the engagement" },
+  { title: "My Account", text: "Click your avatar in the top bar, then \"My account,\" for a daily-digest toggle and two-factor authentication." },
+  { title: "Fiscal year switcher", text: "The \"FY 2025\" control in the top bar is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back." },
+  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log", cta: "Go to Firm audit log" },
+  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning", cta: "Open the workflow" },
 ];
 function GuidedTour({ navigate, close }: { navigate: (p: string) => void; close: () => void }) {
   const [step, setStep] = useState(0);
   const current = TOUR_STEPS[step];
   const isLast = step === TOUR_STEPS.length - 1;
-  useEffect(() => { if (current.route) navigate(current.route); }, [step]);
   return <div className="tour-float">
     <div className="tour-float-head"><span className="tour-progress">Step {step + 1} of {TOUR_STEPS.length}</span><button className="icon-btn" onClick={close}><X/></button></div>
     <h3>{current.title}</h3>
     <p className="tour-text">{current.text}</p>
     <div className="tour-dots">{TOUR_STEPS.map((_, i) => <i key={i} className={i === step ? "active" : ""}/>)}</div>
+    {current.route && <button className="secondary-btn tour-go" onClick={() => navigate(current.route!)}>{current.cta} <ArrowRight size={15}/></button>}
     <div className="tour-nav">
       <button className="secondary-btn" onClick={close}>Close</button>
       <div className="tour-nav-right">
