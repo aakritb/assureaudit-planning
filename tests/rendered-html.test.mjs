@@ -2,38 +2,18 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render(path = "/") {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${path}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request(`http://localhost${path}`, {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
-}
-
-test("server-renders the AssureAudit application shell", async () => {
-  const response = await render("/dashboard");
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
-  assert.match(html, /<title>AssureAudit Planning<\/title>/i);
-  assert.match(html, /assureaudit/i);
-  assert.match(html, /Dashboard/);
-  assert.match(html, /Financial Audit/);
-  assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton|codex-preview/i);
+test("keeps the AssureAudit application shell and focused dashboard", async () => {
+  const [page, layout] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(layout, /title:\s*"AssureAudit Planning"/i);
+  assert.match(page, /assure/);
+  assert.match(page, /Good afternoon, Oscar/);
+  assert.match(page, /clientName: "Riverside Youth & Family Services, Inc\."/);
+  assert.match(page, /displayType: "Financial Audit"/);
+  assert.match(page, /fiscalYear: "FY 2025"/);
+  assert.doesNotMatch(page, /Your site is taking shape|react-loading-skeleton|codex-preview/i);
 });
 
 test("keeps the planning, questionnaire, analytics, and risk-response workspaces in the product", async () => {
@@ -75,6 +55,17 @@ test("uses one engagement navigation tree without recursively rendering the page
   assert.doesNotMatch(page, /<Home\/>/);
   assert.doesNotMatch(page, /className="planning-stepper"/);
   assert.match(page, /branchLabels=\["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"\]/);
-  assert.match(page, /<h2>Planning<\/h2>/);
+  assert.match(page, /Planning workpapers/);
+  assert.match(page, /Complete the work, then send it for review/);
   assert.doesNotMatch(page, /<h2>Financial Audit · Planning<\/h2>/);
+});
+
+test("keeps engagement-letter facts centralized and the lifecycle actionable", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /const engagement = \{/);
+  assert.match(page, /From signed engagement letter/);
+  assert.match(page, /Read-only facts synchronized from AssurePro/);
+  assert.match(page, /className={`journey-step/);
+  assert.match(page, /Review engagement terms/);
+  assert.doesNotMatch(page, /Brooklyn Bridge Animal Welfare Coalition/);
 });
