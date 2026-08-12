@@ -331,7 +331,7 @@ export default function Home() {
 function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { path: string; navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; mobileNav: boolean; setMobileNav: (v: boolean) => void }) {
   const inEngagement=path.startsWith("/engagement/"); const inPlanning=path.includes("/planning"); const active=path.split("/").pop()||"overview"; const branchLabels=["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"]; const phases=getPhases(state);
   return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`} style={{transform: mobileNav ? "none" : undefined}}>
-    <div className="brand"><div className="brand-mark">A</div><div><strong>assure</strong><span>audit</span></div><button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
+    <div className="brand"><svg className="brand-mark" width="26" height="26" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4L45 40C45 40 41 44 36 44H24V4Z" fill="#6D55DC"/><path d="M24 4L3 40C3 40 7 44 12 44H24V4Z" fill="#9689F2"/><path d="M17.5 44L24 32.5L30.5 44H17.5Z" fill="#fff"/></svg><div><strong>assure</strong><span>audit</span></div><button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
     <nav>
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button>
@@ -991,29 +991,29 @@ function ContextDrawer({ drawer,setDrawer,open,setOpen,update }: any) {
     {drawer==="Attachments"&&<><DrawerFile update={update} name="2025 Grant Agreement.pdf" meta="1.8 MB · Linked to entity understanding"/><DrawerFile update={update} name="Accounting Policy Handbook.pdf" meta="Client upload · In review"/><button className="secondary-btn full" onClick={()=>update({},"policy-handbook-addendum.pdf attached (simulated)")}><UploadCloud/>Attach evidence</button></>}
   </div></aside> }
 
-type TourStep = { title: string; text: string; route?: string; cta?: string };
+type TourStep = { title: string; text: string; route?: string };
 const TOUR_STEPS: TourStep[] = [
-  { title: "Welcome to AssureAudit", text: "A quick look at what's live in this prototype and where to find it." },
-  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", route: "/dashboard", cta: "Go to Dashboard" },
-  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", route: "/engagements", cta: "Go to Engagements" },
-  { title: "New engagement — starts from a signed letter", text: "On the Engagements page, click \"New engagement.\" It starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", route: "/engagements", cta: "Go to Engagements" },
-  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", route: "/engagements", cta: "Go to Engagements" },
-  { title: "Edit Engagement", text: "Open an engagement, then click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", route: "/engagement/bbawc", cta: "Go to the engagement" },
-  { title: "My Account", text: "Click your avatar in the top bar, then \"My account,\" for a daily-digest toggle and two-factor authentication." },
-  { title: "Fiscal year switcher", text: "The \"FY 2025\" control in the top bar is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back." },
-  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log", cta: "Go to Firm audit log" },
-  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning", cta: "Open the workflow" },
+  { title: "Welcome to AssureAudit", text: "A quick look at what's live in this prototype — click Next and it'll take you there as you go." },
+  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", route: "/dashboard" },
+  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", route: "/engagements" },
+  { title: "New engagement — starts from a signed letter", text: "Click \"New engagement\" here. It starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", route: "/engagements" },
+  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", route: "/engagements" },
+  { title: "Edit Engagement", text: "Click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", route: "/engagement/bbawc" },
+  { title: "My Account", text: "This top bar is on every screen. Click your avatar, then \"My account,\" for a daily-digest toggle and two-factor authentication." },
+  { title: "Fiscal year switcher", text: "The \"FY 2025\" control up there is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back." },
+  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log" },
+  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning" },
 ];
 function GuidedTour({ navigate, close }: { navigate: (p: string) => void; close: () => void }) {
   const [step, setStep] = useState(0);
   const current = TOUR_STEPS[step];
   const isLast = step === TOUR_STEPS.length - 1;
+  useEffect(() => { if (current.route) navigate(current.route); }, [step]);
   return <div className="tour-float">
     <div className="tour-float-head"><span className="tour-progress">Step {step + 1} of {TOUR_STEPS.length}</span><button className="icon-btn" onClick={close}><X/></button></div>
     <h3>{current.title}</h3>
     <p className="tour-text">{current.text}</p>
     <div className="tour-dots">{TOUR_STEPS.map((_, i) => <i key={i} className={i === step ? "active" : ""}/>)}</div>
-    {current.route && <button className="secondary-btn tour-go" onClick={() => navigate(current.route!)}>{current.cta} <ArrowRight size={15}/></button>}
     <div className="tour-nav">
       <button className="secondary-btn" onClick={close}>Close</button>
       <div className="tour-nav-right">
@@ -1039,7 +1039,7 @@ function ClientPortal({ state,update,onExit }: {state:DemoState;update:(p:Partia
   const counts={All:requests.length,"To do":requests.filter(r=>bucketOf(r.status)==="To do").length,Submitted:requests.filter(r=>bucketOf(r.status)==="Submitted").length,Done:requests.filter(r=>bucketOf(r.status)==="Done").length};
   const visibleRequests=requests.filter(r=>statusFilter==="All"||bucketOf(r.status)===statusFilter);
   const dueSoon=requests.filter(r=>bucketOf(r.status)==="To do");
-  return <div className="client-portal"><header className="client-top"><div className="brand white"><div className="brand-mark">A</div><div><strong>assure</strong><span>audit</span></div><em>Client Portal</em></div><div className="client-actions"><button onClick={()=>update({},"Help center opened (simulated) — support articles for the Client Portal")}><BookOpen/>Help</button><div className="topbar-popover"><button onClick={()=>setNotifOpen(!notifOpen)}><Bell/>{dueSoon.length>0&&<i className="portal-notif-dot"/>}</button>{notifOpen&&<div className="dropdown-menu notif-menu">
+  return <div className="client-portal"><header className="client-top"><div className="brand white"><svg className="brand-mark" width="26" height="26" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4L45 40C45 40 41 44 36 44H24V4Z" fill="#6D55DC"/><path d="M24 4L3 40C3 40 7 44 12 44H24V4Z" fill="#9689F2"/><path d="M17.5 44L24 32.5L30.5 44H17.5Z" fill="#fff"/></svg><div><strong>assure</strong><span>audit</span></div><em>Client Portal</em></div><div className="client-actions"><button onClick={()=>update({},"Help center opened (simulated) — support articles for the Client Portal")}><BookOpen/>Help</button><div className="topbar-popover"><button onClick={()=>setNotifOpen(!notifOpen)}><Bell/>{dueSoon.length>0&&<i className="portal-notif-dot"/>}</button>{notifOpen&&<div className="dropdown-menu notif-menu">
         <div className="dropdown-head"><strong>Notifications</strong><span>{dueSoon.length} request{dueSoon.length===1?"":"s"} need action</span></div>
         {dueSoon.length===0?<div className="dropdown-empty">Nothing needs action right now.</div>:dueSoon.map(r=><button key={r.title} className="dropdown-item" onClick={()=>{setNotifOpen(false);openRequest(r.title)}}><AlertCircle size={14}/><span>{r.title} · Due {r.due}</span></button>)}
       </div>}</div><div className="avatar">DC</div><button className="secondary-btn" onClick={onExit}>Return to firm demo</button></div></header><main><div className="client-welcome"><div><p className="eyebrow">{engagement.displayType} · {engagement.fiscalYear}</p><h1>Planning Requests</h1><p>{engagement.clientName} · Requested by CF Joseph CPA PC</p></div><div className="portal-progress"><div><strong>{requests.filter(r=>r.status==="Done").length} of {requests.length}</strong><span>requests complete</span></div><div className="progress-line"><i style={{width:`${requests.filter(r=>r.status==="Done").length/requests.length*100}%`}}/></div></div></div>
