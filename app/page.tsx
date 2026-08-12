@@ -59,6 +59,7 @@ type DemoState = {
   customProcedures: ProcedureItem[];
   flaggedForReview: boolean;
   reconciliationRows: ReconRow[];
+  viewYear: number;
 };
 
 const defaultState: DemoState = {
@@ -76,6 +77,7 @@ const defaultState: DemoState = {
     { account: "Accrued payroll", tb: "$94,600", gl: "$89,100", variance: "$5,500", status: "Resolved", owner: "M. Kapoor" },
     { account: "Net assets released", tb: "($210,000)", gl: "($206,200)", variance: "($3,800)", status: "Accepted", owner: "J. Alvarez" },
   ],
+  viewYear: 2025,
 };
 
 const engagement = {
@@ -122,7 +124,7 @@ function getPhases(state: DemoState) {
   const dataDone = state.controlTotals !== "Fail" && state.mapped >= 100;
   const foundationDone = acceptanceReady(state) && state.independenceOutstanding === 0;
   const publishBlockers = (state.controlTotals === "Fail" ? 1 : 0) + (state.responseGap ? 1 : 0) + (state.mapped < 100 ? 1 : 0) + (declined ? 1 : 0);
-  return [
+  const phases = [
     { title: "Engagement Foundation", status: (declined ? "Declined" : foundationDone ? "Complete" : "In Progress") as StepState, route: "setup", detail: declined ? "Engagement declined — planning does not proceed" : foundationDone ? "4 of 4 steps complete" : !acceptanceReady(state) ? "Safeguards rationale required before proceeding" : `3 of 4 steps complete · ${state.independenceOutstanding} independence confirmation${state.independenceOutstanding === 1 ? "" : "s"} outstanding` },
     { title: "Data Foundation", status: (declined ? "Not Started" : dataDone ? "Complete" : "Needs Attention") as StepState, route: "data", detail: declined ? "Blocked — engagement was declined" : state.controlTotals === "Fail" ? "Control totals do not balance" : dataDone ? "All accounts mapped" : "4 accounts need review" },
     { title: "Entity & Controls", status: (declined ? "Not Started" : state.questionnaireStatus === "Validated" ? "Complete" : "In Progress") as StepState, route: "entity-controls", detail: declined ? "Blocked — engagement was declined" : state.questionnaireStatus === "Validated" ? "11 of 11 areas validated" : "7 of 11 areas validated" },
@@ -131,6 +133,10 @@ function getPhases(state: DemoState) {
     { title: "Audit Response", status: (declined ? "Not Started" : state.responseGap ? "Needs Attention" : "Complete") as StepState, route: "responses", detail: declined ? "Blocked — engagement was declined" : state.responseGap ? "1 risk needs coverage" : "All risks covered" },
     { title: "Publish & Approval", status: (declined ? "Not Started" : state.locked ? "Locked" : publishBlockers > 0 ? "Not Started" : "In Progress") as StepState, route: "publish", detail: declined ? "Blocked — engagement declined; cannot be published" : state.locked ? "Approved and locked" : `${publishBlockers} checks remaining` },
   ];
+  // Reopening flags the downstream phases stale everywhere (sidebar, dashboard stepper, review),
+  // so this must live here rather than as a one-off override in any single consumer.
+  const staleRoutes = ["materiality", "risks", "responses", "publish"];
+  return state.reopened ? phases.map(p => staleRoutes.includes(p.route) ? { ...p, status: "Stale" as StepState, detail: "Reopened — requires re-review after the upstream change" } : p) : phases;
 }
 
 // Single source of truth for "% complete" everywhere it's shown (sidebar, dashboard, engagement home).
@@ -265,7 +271,7 @@ export default function Home() {
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} /> : <Dashboard navigate={navigate} state={state} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} /> : <Dashboard navigate={navigate} state={state} update={update} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
@@ -281,7 +287,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
-      {inEngagement&&<><p className="nav-label branch-label">Current engagement</p><button className="engagement-branch" onClick={()=>navigate("/engagement/bbawc")}><span className="avatar square">25</span><span><strong>FY 2025 engagement</strong><small>Period end · Dec 31</small></span><ChevronDown/></button><div className="branch-progress" title={`Planning ${planningProgressPct(state)}% complete`}><i style={{width:`${100-planningProgressPct(state)}%`}}/></div><div className="nav-branch"><button className={!inPlanning?"active":""} onClick={()=>navigate("/engagement/bbawc")}><HomeIcon/><span>Overview</span></button><button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>navigate("/engagement/bbawc/planning")}><ClipboardCheck/><span>Planning</span><ChevronDown/></button>{inPlanning&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Overview</span><b>{planningProgressPct(state)}%</b></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)}><i className={statusClass(state.reopened&&["materiality","risks","responses","publish"].includes(phase.route)?"Stale":phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}<button onClick={()=>{if(state.locked){navigate("/engagement/bbawc")}else{update({},"Fieldwork unlocks once Planning is Approved & Locked.")}}}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting becomes available after Fieldwork. It is out of scope for this Planning demo.")}><FileCheck2/><span>Reporting</span></button><button onClick={()=>{navigate("/engagement/bbawc/planning/data");update({},"Documents live in Data Foundation — showing the Trial Balance, General Ledger and client uploads")}}><FolderOpen/><span>Documents</span></button></div></>}
+      {inEngagement&&<><p className="nav-label branch-label">Current engagement</p><button className="engagement-branch" onClick={()=>navigate("/engagement/bbawc")}><span className="avatar square">25</span><span><strong>FY 2025 engagement</strong><small>Period end · Dec 31</small></span><ChevronDown/></button><div className="branch-progress" title={`Planning ${planningProgressPct(state)}% complete`}><i style={{width:`${100-planningProgressPct(state)}%`}}/></div><div className="nav-branch"><button className={!inPlanning?"active":""} onClick={()=>navigate("/engagement/bbawc")}><HomeIcon/><span>Overview</span></button><button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>navigate("/engagement/bbawc/planning")}><ClipboardCheck/><span>Planning</span><ChevronDown/></button>{inPlanning&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Overview</span><b>{planningProgressPct(state)}%</b></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}<button onClick={()=>{if(state.locked){navigate("/engagement/bbawc")}else{update({},"Fieldwork unlocks once Planning is Approved & Locked.")}}}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting becomes available after Fieldwork. It is out of scope for this Planning demo.")}><FileCheck2/><span>Reporting</span></button><button onClick={()=>{navigate("/engagement/bbawc/planning/data");update({},"Documents live in Data Foundation — showing the Trial Balance, General Ledger and client uploads")}}><FolderOpen/><span>Documents</span></button></div></>}
       <p className="nav-label practice">Practice</p><button className="nav-item" onClick={()=>navigate("/engagements")}><Users/><span>Clients</span></button><button className="nav-item" onClick={()=>update({},"The firm audit log aggregates every engagement — this demo models one engagement's trail. See Audit Trail.")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>Baldeep Singh Chhabra · Partner</span></div></div>
@@ -292,21 +298,19 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(2025);
   const currentCalendarYear = new Date().getFullYear();
   const latestFiscalYear = Math.max(currentCalendarYear, 2025);
   const fiscalYears = Array.from({ length: latestFiscalYear - 2023 + 1 }, (_, i) => latestFiscalYear - i);
   const items = attentionItems(state);
   return <header className="topbar">
     <button className="icon-btn hamburger" onClick={onMenu}><Menu size={20}/></button>
-    <button className="client-select" onClick={() => navigate("/engagements")}><Building2 size={16}/>{engagement.clientName}</button>
     <div className="top-actions">
       <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "QuickBooks connection tested successfully" : "QuickBooks reconnected safely")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "QuickBooks connected" : "Reconnect QuickBooks"}</button>
       <div className="topbar-popover">
-        <button className="year-select" aria-expanded={yearOpen} onClick={() => { setYearOpen(!yearOpen); setNotifOpen(false); setProfileOpen(false); }}><CalendarDays size={16}/><span>FY {selectedYear}</span><ChevronDown size={14}/></button>
+        <button className="year-select" aria-expanded={yearOpen} onClick={() => { setYearOpen(!yearOpen); setNotifOpen(false); setProfileOpen(false); }}><CalendarDays size={16}/><span>FY {state.viewYear}</span><ChevronDown size={14}/></button>
         {yearOpen && <div className="dropdown-menu year-menu">
           <div className="dropdown-head"><strong>Fiscal year</strong></div>
-          {fiscalYears.map(y => <button key={y} className="dropdown-item" onClick={() => { setYearOpen(false); setSelectedYear(y); update({}, y === 2025 ? `Viewing FY ${y}` : `Switched to FY ${y} — this prototype's engagement data is seeded for FY 2025 only; other years are shown for navigation only`); }}><CalendarDays size={14}/><span>FY {y}{y === currentCalendarYear ? " · Current" : ""}</span>{y === selectedYear && <Check size={14}/>}</button>)}
+          {fiscalYears.map(y => <button key={y} className="dropdown-item" onClick={() => { setYearOpen(false); update({ viewYear: y }, y === 2025 ? "Back to FY 2025" : `Viewing FY ${y} — no engagements on record for this period`); }}><CalendarDays size={14}/><span>FY {y}{y === currentCalendarYear ? " · Current" : ""}</span>{y === state.viewYear && <Check size={14}/>}</button>)}
         </div>}
       </div>
       <div className="topbar-popover">
@@ -347,11 +351,23 @@ function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoStat
   </div>;
 }
 
-function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
+function Dashboard({ navigate, state, update }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void }) {
   const pct=planningProgressPct(state); const next=nextOpenPhase(state); const items=attentionItems(state); const declined=state.acceptanceDecision==="decline";
   const phases=getPhases(state); const current=next||phases[phases.length-1];
   const lockedPhases=phases.map(p=>({title:p.title,status:"Locked"}));
   const isAdmin=state.role==="Firm Administrator"||state.role==="Partner"||state.role==="Manager";
+  const viewingOtherYear=state.viewYear!==2025;
+  if(viewingOtherYear)return <div className="page dashboard-page dashboard-refined">
+    <div className="page-heading"><div><p className="eyebrow">Tuesday, August 12</p><h1>Good afternoon, Oscar</h1><p>Viewing FY {state.viewYear}.</p></div><button className="secondary-btn" onClick={() => navigate("/engagements")}>All engagements <ArrowRight size={16}/></button></div>
+    <section className="section-card">
+      <div className="empty-state">
+        <CalendarDays/>
+        <strong>No engagements for FY {state.viewYear}</strong>
+        <p>This prototype only has engagement data for FY 2025. Every real screen — Dashboard, Engagements, Planning — reflects FY 2025 regardless of what's selected here.</p>
+        <button className="primary-btn" style={{marginTop:14}} onClick={()=>update({viewYear:2025},"Back to FY 2025")}>Return to FY 2025 <ArrowRight size={16}/></button>
+      </div>
+    </section>
+  </div>;
   return <div className="page dashboard-page dashboard-refined">
     <div className="page-heading"><div><p className="eyebrow">Tuesday, August 12</p><h1>Good afternoon, Oscar</h1><p>{isAdmin?"Here is exactly where every engagement stands in the audit lifecycle.":"Here is the one engagement that needs your attention today."}</p></div><button className="secondary-btn" onClick={() => navigate("/engagements")}>All engagements <ArrowRight size={16}/></button></div>
     {isAdmin&&<div className="portfolio-stats"><Metric label="Engagements" value="2" detail={`${declined?"1 declined":"1 in progress"} · 1 approved & locked`}/><Metric label="Need attention" value={String(items.length)} detail={items.length?items[0]:"Nothing blocking review"}/><Metric label="Planning progress" value={`${pct}%`} detail={`${engagement.shortName} · ${current.title}`}/></div>}
@@ -394,6 +410,9 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
     { name: engagement.clientName, planning: bbawcPlanning, live: true },
     { name: "Harbor Community Foundation", planning: "Approved", live: false },
   ].filter(r => statusFilter === "All" || r.planning === statusFilter);
+  if(state.viewYear!==2025)return <div className="page"><div className="page-heading"><div><p className="eyebrow">Clients</p><h1>Engagements</h1><p>Viewing FY {state.viewYear}.</p></div></div>
+    <section className="section-card"><div className="empty-state"><CalendarDays/><strong>No engagements for FY {state.viewYear}</strong><p>This prototype only has engagement data for FY 2025.</p><button className="primary-btn" style={{marginTop:14}} onClick={()=>update({viewYear:2025},"Back to FY 2025")}>Return to FY 2025 <ArrowRight size={16}/></button></div></section>
+  </div>;
   return <div className="page"><div className="page-heading"><div><p className="eyebrow">Clients</p><h1>Engagements</h1><p>Current and prior-period assurance engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
     <div className="table-card"><div className="table-toolbar"><div className="search"><Search/><input placeholder="Search engagements"/></div><div className="topbar-popover"><button className={`filter-btn ${statusFilter !== "All" ? "active" : ""}`} onClick={() => setFilterOpen(!filterOpen)}><Filter/>Filters{statusFilter !== "All" && <i className="filter-badge"/>}</button>{filterOpen && <div className="dropdown-menu filter-menu">
         <div className="dropdown-head"><strong>Planning status</strong></div>
