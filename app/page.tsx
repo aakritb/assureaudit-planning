@@ -291,22 +291,33 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
 function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; navigate: (p: string) => void; onMenu: () => void; demoOpen: boolean; setDemoOpen: (v: boolean) => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [yearOpen, setYearOpen] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(2025);
+  const currentCalendarYear = new Date().getFullYear();
+  const latestFiscalYear = Math.max(currentCalendarYear, 2025);
+  const fiscalYears = Array.from({ length: latestFiscalYear - 2023 + 1 }, (_, i) => latestFiscalYear - i);
   const items = attentionItems(state);
   return <header className="topbar">
     <button className="icon-btn hamburger" onClick={onMenu}><Menu size={20}/></button>
-    <span className="topbar-context">{engagement.fiscalYear} · {engagement.displayType}</span>
+    <button className="client-select" onClick={() => navigate("/engagements")}><Building2 size={16}/>{engagement.clientName}</button>
     <div className="top-actions">
       <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "QuickBooks connection tested successfully" : "QuickBooks reconnected safely")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "QuickBooks connected" : "Reconnect QuickBooks"}</button>
-      <span className="year-select"><CalendarDays size={16}/><span>FY 2025</span></span>
       <div className="topbar-popover">
-        <button className="icon-btn notification" aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}><Bell size={18}/>{items.length > 0 && <i/>}</button>
+        <button className="year-select" aria-expanded={yearOpen} onClick={() => { setYearOpen(!yearOpen); setNotifOpen(false); setProfileOpen(false); }}><CalendarDays size={16}/><span>FY {selectedYear}</span><ChevronDown size={14}/></button>
+        {yearOpen && <div className="dropdown-menu year-menu">
+          <div className="dropdown-head"><strong>Fiscal year</strong></div>
+          {fiscalYears.map(y => <button key={y} className="dropdown-item" onClick={() => { setYearOpen(false); setSelectedYear(y); update({}, y === 2025 ? `Viewing FY ${y}` : `Switched to FY ${y} — this prototype's engagement data is seeded for FY 2025 only; other years are shown for navigation only`); }}><CalendarDays size={14}/><span>FY {y}{y === currentCalendarYear ? " · Current" : ""}</span>{y === selectedYear && <Check size={14}/>}</button>)}
+        </div>}
+      </div>
+      <div className="topbar-popover">
+        <button className="icon-btn notification" aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); setYearOpen(false); }}><Bell size={18}/>{items.length > 0 && <i/>}</button>
         {notifOpen && <div className="dropdown-menu notif-menu">
           <div className="dropdown-head"><strong>Notifications</strong><span>{items.length} open item{items.length === 1 ? "" : "s"}</span></div>
           {items.length === 0 ? <div className="dropdown-empty">Nothing needs attention right now.</div> : items.map((it, i) => <button key={i} className="dropdown-item" onClick={() => { setNotifOpen(false); navigate("/engagement/bbawc/planning"); }}><AlertCircle size={14}/><span>{it}</span></button>)}
         </div>}
       </div>
       <div className="topbar-popover">
-        <button className="avatar" aria-label="Open user profile" aria-expanded={profileOpen} title={state.role} onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}>OO</button>
+        <button className="avatar" aria-label="Open user profile" aria-expanded={profileOpen} title={state.role} onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); setYearOpen(false); }}>OO</button>
         {profileOpen && <div className="dropdown-menu profile-menu">
           <div className="dropdown-head"><strong>Oscar Owner</strong><span>Viewing as {state.role}</span></div>
           <button className="dropdown-item" onClick={() => { setProfileOpen(false); setDemoOpen(!demoOpen); }}><SlidersHorizontal size={14}/><span>Switch role</span></button>
@@ -338,8 +349,12 @@ function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoStat
 
 function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
   const pct=planningProgressPct(state); const next=nextOpenPhase(state); const items=attentionItems(state); const declined=state.acceptanceDecision==="decline";
+  const phases=getPhases(state); const current=next||phases[phases.length-1];
+  const lockedPhases=phases.map(p=>({title:p.title,status:"Locked"}));
+  const isAdmin=state.role==="Firm Administrator"||state.role==="Partner"||state.role==="Manager";
   return <div className="page dashboard-page dashboard-refined">
-    <div className="page-heading"><div><p className="eyebrow">Tuesday, August 12</p><h1>Good afternoon, Oscar</h1><p>Here is the one engagement that needs your attention today.</p></div><button className="secondary-btn" onClick={() => navigate("/engagements")}>All engagements <ArrowRight size={16}/></button></div>
+    <div className="page-heading"><div><p className="eyebrow">Tuesday, August 12</p><h1>Good afternoon, Oscar</h1><p>{isAdmin?"Here is exactly where every engagement stands in the audit lifecycle.":"Here is the one engagement that needs your attention today."}</p></div><button className="secondary-btn" onClick={() => navigate("/engagements")}>All engagements <ArrowRight size={16}/></button></div>
+    {isAdmin&&<div className="portfolio-stats"><Metric label="Engagements" value="2" detail={`${declined?"1 declined":"1 in progress"} · 1 approved & locked`}/><Metric label="Need attention" value={String(items.length)} detail={items.length?items[0]:"Nothing blocking review"}/><Metric label="Planning progress" value={`${pct}%`} detail={`${engagement.shortName} · ${current.title}`}/></div>}
     <div className="dashboard-focus-grid">
       <section className="focus-engagement">
         <div className="focus-engagement-head"><div className="avatar square">{engagement.initials}</div><div><span className="eyebrow">{engagement.displayType} · {engagement.fiscalYear}</span><h2>{engagement.clientName}</h2><p>Period ended {engagement.periodEnd}</p></div><span className={`status-pill ${declined?"danger":"progress"}`}>{declined?"Declined":state.planningStatus}</span></div>
@@ -348,6 +363,22 @@ function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: 
       </section>
       <aside className="today-panel"><div className="section-title"><div><p className="eyebrow">Today</p><h2>Review queue</h2></div><span>{items.length}</span></div>{items.length?items.slice(0,3).map((item,i)=><button key={item} onClick={()=>navigate("/engagement/bbawc/planning")}><i className={i===0?"red":"amber"}>{i===0?<AlertCircle/>:<Clock3/>}</i><span><strong>{item}</strong><small>{engagement.shortName} · Planning</small></span><ChevronRight/></button>):<div className="today-empty"><CheckCircle2/><strong>You are caught up</strong><span>No planning items need attention.</span></div>}</aside>
     </div>
+    <section className="section-card portfolio-card"><div className="section-title"><div><h2>Engagement portfolio</h2><p>Every engagement and exactly which audit-lifecycle stage it's on.</p></div><button className="secondary-btn" onClick={()=>navigate("/engagements")}>View all <ArrowRight size={16}/></button></div>
+      <div className="portfolio-list">
+        <button className="portfolio-row" onClick={()=>navigate(declined?"/engagement/bbawc/planning/setup":"/engagement/bbawc/planning")}>
+          <div className="portfolio-id"><div className="avatar square">{engagement.initials}</div><div><strong>{engagement.clientName}</strong><span>{engagement.displayType} · {engagement.fiscalYear}</span></div></div>
+          <PhaseStepper phases={phases}/>
+          <div className="portfolio-stage"><strong>{current.title}</strong><span className={`status-pill ${statusClass(current.status)}`}>{current.status}</span></div>
+          <ChevronRight/>
+        </button>
+        <button className="portfolio-row" onClick={()=>navigate("/engagements")}>
+          <div className="portfolio-id"><div className="avatar square muted">HC</div><div><strong>Harbor Community Foundation</strong><span>Financial Audit · FY 2025</span></div></div>
+          <PhaseStepper phases={lockedPhases}/>
+          <div className="portfolio-stage"><strong>Publish &amp; Approval</strong><span className="status-pill approved">Approved &amp; locked</span></div>
+          <ChevronRight/>
+        </button>
+      </div>
+    </section>
     <section className="dashboard-quick"><button onClick={()=>navigate("/engagement/bbawc")}><LayoutDashboard/><span><strong>Engagement overview</strong><small>Progress, requests and timeline</small></span><ArrowRight/></button><button onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><History/><span><strong>Recent activity</strong><small>Audit trail and review history</small></span><ArrowRight/></button><button onClick={()=>navigate("/engagements")}><BriefcaseBusiness/><span><strong>Engagements</strong><small>Search current and prior periods</small></span><ArrowRight/></button></section>
   </div>;
 }
@@ -936,6 +967,7 @@ function ReopenModal({update,close}:{update:(p:Partial<DemoState>,m?:string)=>vo
 
 function statusClass(s:string){ if(["Complete","Approved","Done","Validated","Resolved"].includes(s))return"approved";if(["Needs Attention","In Progress","In Review","Clarification Needed","Review","Client Responded","Investigate"].includes(s))return s==="In Progress"||s==="Client Responded"?"progress":"warning";if(["Access Not Granted","Returned","Stale","Declined"].includes(s))return"danger";if(s==="Sent to Client")return"progress";return"neutral" }
 function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>}
+function PhaseStepper({phases}:{phases:{title:string;status:string}[]}){return <div className="phase-stepper">{phases.map((p,i)=>{const tone=(p.status==="Complete"||p.status==="Locked"||p.status==="Approved")?"done":(p.status==="Needs Attention"||p.status==="Declined"||p.status==="Stale")?"attention":p.status==="Not Started"?"upcoming":"active";return <span key={p.title} className={`phase-dot ${tone}`} title={`${p.title} — ${p.status}`}>{tone==="done"?<Check size={11}/>:i+1}</span>})}</div>}
 function Banner({tone,title,text,action,onAction}:{tone:string;title:string;text:string;action?:string;onAction?:()=>void}){return <div className={`banner ${tone}`}>{tone==="danger"?<AlertCircle/>:tone==="warning"?<AlertTriangle/>:tone==="success"?<CheckCircle2/>:<Info/>}<div><strong>{title}</strong><span>{text}</span></div>{action&&<button onClick={onAction}>{action}<ArrowRight/></button>}</div>}
 function Field({label,required,children}:{label:string;required?:boolean;children:React.ReactNode}){return <label className="field"><span>{label}{required&&<em>*</em>}</span>{children}</label>}
 function FormSection({title,subtitle,children,update}:{title:string;subtitle:string;children:React.ReactNode;update?:(p:Partial<DemoState>,m?:string)=>void}){return <section className="form-section"><div className="section-title"><div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-btn" onClick={()=>update?.({},`More options for "${title}" (history, print, and export)`)}><MoreHorizontal/></button></div>{children}</section>}
