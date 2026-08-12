@@ -68,6 +68,7 @@ type DemoState = {
   archiveDate: string;
   notifyDaily: boolean;
   twoFactorEnabled: boolean;
+  auditLog: { time: string; actor: string; action: string }[];
 };
 
 const defaultState: DemoState = {
@@ -98,6 +99,7 @@ const defaultState: DemoState = {
   archiveDate: "2026-06-30",
   notifyDaily: true,
   twoFactorEnabled: false,
+  auditLog: [],
 };
 
 const engagement = {
@@ -276,7 +278,13 @@ export default function Home() {
   const navigate = (next: string) => {
     window.history.pushState({}, "", next); setPath(next); setMobileNav(false); window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const update = (patch: Partial<DemoState>, message?: string) => { setState(s => ({ ...s, ...patch })); if (message) setToast(message); };
+  const update = (patch: Partial<DemoState>, message?: string) => {
+    setState(s => ({
+      ...s, ...patch,
+      ...(message ? { auditLog: [{ time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }), actor: "Oscar Owner", action: message }, ...s.auditLog].slice(0, 200) } : {}),
+    }));
+    if (message) setToast(message);
+  };
   const isClient = state.role === "Client Contact";
 
   if (isClient || path.startsWith("/client-portal")) {
@@ -291,7 +299,7 @@ export default function Home() {
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
@@ -308,7 +316,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       <button className={`nav-item ${path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
       {inEngagement&&<><p className="nav-label branch-label">Current engagement</p><button className="engagement-branch" onClick={()=>navigate("/engagement/bbawc")}><span className="avatar square">25</span><span><strong>FY 2025 engagement</strong><small>Period end · Dec 31</small></span><ChevronDown/></button><div className="branch-progress" title={`Planning ${planningProgressPct(state)}% complete`}><i style={{width:`${100-planningProgressPct(state)}%`}}/></div><div className="nav-branch"><button className={!inPlanning?"active":""} onClick={()=>navigate("/engagement/bbawc")}><HomeIcon/><span>Overview</span></button><button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>navigate("/engagement/bbawc/planning")}><ClipboardCheck/><span>Planning</span><ChevronDown/></button>{inPlanning&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Overview</span><b>{planningProgressPct(state)}%</b></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}<button onClick={()=>{if(state.locked){navigate("/engagement/bbawc")}else{update({},"Fieldwork unlocks once Planning is Approved & Locked.")}}}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting becomes available after Fieldwork. It is out of scope for this Planning demo.")}><FileCheck2/><span>Reporting</span></button><button onClick={()=>{navigate("/engagement/bbawc/planning/data");update({},"Documents live in Data Foundation — showing the Trial Balance, General Ledger and client uploads")}}><FolderOpen/><span>Documents</span></button></div></>}
-      <p className="nav-label practice">Practice</p><button className="nav-item" onClick={()=>navigate("/engagements")}><Users/><span>Clients</span></button><button className="nav-item" onClick={()=>update({},"The firm audit log aggregates every engagement — this demo models one engagement's trail. See Audit Trail.")}><History/><span>Firm audit log</span></button>
+      <p className="nav-label practice">Practice</p><button className={`nav-item ${path==="/engagements"?"active":""}`} onClick={()=>navigate("/engagements")}><Users/><span>Clients</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>Baldeep Singh Chhabra · Partner</span></div></div>
   </aside>;
@@ -491,7 +499,7 @@ function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawe
         {activeView === "responses" && <ResponsesView state={state} update={update}/>} 
         {activeView === "publish" && <PublishView state={state} update={update} navigate={navigate}/>} 
         {activeView === "review" && <ReviewView state={state} update={update}/>} 
-        {activeView === "audit-trail" && <AuditTrail update={update}/>}
+        {activeView === "audit-trail" && <AuditTrail state={state} update={update}/>}
       </div>
     </section>
     <ContextDrawer drawer={drawer} setDrawer={setDrawer} open={drawerOpen} setOpen={setDrawerOpen} update={update}/>
@@ -805,7 +813,43 @@ function ReviewView({ state, update }: { state:DemoState; update:(p:Partial<Demo
   </div>;
 }
 
-function AuditTrail({ update }: { update:(p:Partial<DemoState>,m?:string)=>void }) { const events=[["2:42 PM","Jasmine Alvarez","Updated materiality percentage","2.0% → 2.5%","Aligned to nonprofit firm guidance"],["2:31 PM","AssureAudit Connector","Synchronized General Ledger","1,204 transactions","QuickBooks Online"],["1:58 PM","Meera Kapoor","Resolved review note","Entity understanding","Source evidence linked"],["11:16 AM","Jasmine Alvarez","Accepted reconciliation variance","$12,000","Timing difference in restricted grant receipt"],["Aug 10","System","Published Engagement Variables","Version 1","5 variables created"],["Aug 9","Oscar Owner","Completed fraud discussion","4 participants","Meeting record attached"]]; return <div className="content-pad"><div className="section-title"><div><h2>Complete audit trail</h2><p>UTC storage with firm-local display. Every override, acceptance and approval is retained.</p></div><button className="secondary-btn" onClick={()=>update({},"Audit trail exported as audit-trail.pdf")}><Download/>Export log</button></div><div className="audit-timeline">{events.map((e,i)=><div key={i}><i className={i<2?"current":""}/><span>{e[0]}</span><div><strong>{e[2]}</strong><p><b>{e[1]}</b> · {e[3]}</p><small>Rationale: {e[4]}</small></div></div>)}</div></div> }
+type AuditEntry = { time: string; actor: string; title: string; detail?: string; rationale?: string };
+// Historical baseline for each engagement — merged with the live, real-time state.auditLog feed
+// (appended by every update() call that carries a toast message) so both the per-engagement
+// Audit Trail and the firm-wide Firm Audit Log show the same real activity, not a static mock.
+const RIVERSIDE_AUDIT_SEED: AuditEntry[] = [
+  { time: "2:42 PM", actor: "Jasmine Alvarez", title: "Updated materiality percentage", detail: "2.0% → 2.5%", rationale: "Aligned to nonprofit firm guidance" },
+  { time: "2:31 PM", actor: "AssureAudit Connector", title: "Synchronized General Ledger", detail: "1,204 transactions", rationale: "QuickBooks Online" },
+  { time: "1:58 PM", actor: "Meera Kapoor", title: "Resolved review note", detail: "Entity understanding", rationale: "Source evidence linked" },
+  { time: "11:16 AM", actor: "Jasmine Alvarez", title: "Accepted reconciliation variance", detail: "$12,000", rationale: "Timing difference in restricted grant receipt" },
+  { time: "Aug 10", actor: "System", title: "Published Engagement Variables", detail: "Version 1", rationale: "5 variables created" },
+  { time: "Aug 9", actor: "Oscar Owner", title: "Completed fraud discussion", detail: "4 participants", rationale: "Meeting record attached" },
+];
+const HARBOR_AUDIT_SEED: AuditEntry[] = [
+  { time: "Jul 28", actor: "Meera Kapoor", title: "Partner approval recorded", detail: "Planning approved & locked" },
+  { time: "Jul 20", actor: "Rohan Patel", title: "Published final materiality", detail: "$85,000 overall" },
+  { time: "Jul 2", actor: "System", title: "Engagement letter signed", detail: "FY2025 audit engagement", rationale: "Synced from AssurePro" },
+];
+function AuditRow({ entry, live, engagementLabel }: { entry: AuditEntry; live: boolean; engagementLabel?: string }) {
+  return <div><i className={live ? "current" : ""}/><span>{entry.time}</span><div><strong>{entry.title}</strong><p><b>{entry.actor}</b>{engagementLabel ? ` · ${engagementLabel}` : ""}{entry.detail ? ` · ${entry.detail}` : ""}</p>{entry.rationale && <small>Rationale: {entry.rationale}</small>}</div></div>;
+}
+function AuditTrail({ state, update }: { state: DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+  const liveEntries: AuditEntry[] = state.auditLog.map(e => ({ time: e.time, actor: e.actor, title: e.action }));
+  const events = [...liveEntries, ...RIVERSIDE_AUDIT_SEED];
+  return <div className="content-pad"><div className="section-title"><div><h2>Complete audit trail</h2><p>UTC storage with firm-local display. Every override, acceptance and approval is retained.</p></div><button className="secondary-btn" onClick={()=>update({},"Audit trail exported as audit-trail.pdf")}><Download/>Export log</button></div><div className="audit-timeline">{events.map((e,i)=><AuditRow key={i} entry={e} live={i<liveEntries.length}/>)}</div></div>;
+}
+function FirmAuditLog({ state, update }: { state: DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+  const liveEntries: AuditEntry[] = state.auditLog.map(e => ({ time: e.time, actor: e.actor, title: e.action }));
+  const rows: { entry: AuditEntry; live: boolean; engagementLabel: string }[] = [
+    ...liveEntries.map(entry => ({ entry, live: true, engagementLabel: engagement.shortName })),
+    ...RIVERSIDE_AUDIT_SEED.map(entry => ({ entry, live: false, engagementLabel: engagement.shortName })),
+    ...HARBOR_AUDIT_SEED.map(entry => ({ entry, live: false, engagementLabel: "Harbor Community Foundation" })),
+  ];
+  return <div className="page">
+    <div className="page-heading"><div><p className="eyebrow">Practice</p><h1>Firm audit log</h1><p>Every override, acceptance and approval across engagements, aggregated in real time.</p></div><button className="secondary-btn" onClick={()=>update({},"Firm audit log exported as firm-audit-log.pdf")}><Download/>Export log</button></div>
+    <div className="audit-timeline">{rows.map((r,i)=><AuditRow key={i} entry={r.entry} live={r.live} engagementLabel={r.engagementLabel}/>)}</div>
+  </div>;
+}
 
 function PlanningManager({state,update,navigate}:{state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;navigate:(p:string)=>void}) {
   const [selected,setSelected]=useState<string|null>(null);
@@ -954,7 +998,6 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
     role, user: DEFAULT_ASSIGNEES[i], due: addDays(new Date(), DEFAULT_DUE_WEEKS[i] * 7),
   })));
   const setAssignment = (i: number, patch: Partial<WizardAssignment>) => setAssignments(a => a.map((row, idx) => idx === i ? { ...row, ...patch } : row));
-  const learnMore = (text: string) => update({}, text);
   const selectLetter = (value: string) => {
     if (value === "manual") { setManualEntry(true); setClient(""); setEngagementType("Financial Audit"); setPeriodStart(""); setPeriodEnd(""); return; }
     const letter = SIGNED_LETTERS.find(l => l.client === value)!;
@@ -984,18 +1027,15 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
         <div className="wizard-panel">
           <h3>Key Engagement Details</h3>
           <p>Content, risk posture and chart of accounts for this engagement.</p>
-          <Field label="Workpapers Content Pack">
+          <Field label="Workpapers Content Pack" info="Content packs bundle firm methodology, questionnaires and standard workprograms for an engagement type.">
             <select value={contentPack} onChange={e => setContentPack(e.target.value)}>{CONTENT_PACKS.map(p => <option key={p}>{p}</option>)}</select>
-            <button type="button" className="wizard-learn" onClick={() => learnMore("Content packs bundle firm methodology, questionnaires and standard workprograms for an engagement type.")}>Learn more</button>
           </Field>
-          <Field label="Entity Risk Level">
+          <Field label="Entity Risk Level" info="Entity risk level guides staffing, supervision and the persuasiveness of evidence required across Planning.">
             <select value={entityRiskLevel} onChange={e => setEntityRiskLevel(e.target.value)}>{["Low", "Normal", "Elevated", "High"].map(l => <option key={l}>{l}</option>)}</select>
-            <button type="button" className="wizard-learn" onClick={() => learnMore("Entity risk level guides staffing, supervision and the persuasiveness of evidence required across Planning.")}>Learn more</button>
           </Field>
           <Field label="Initial Engagement"><select value={initialEngagement} onChange={e => setInitialEngagement(e.target.value)}><option>No</option><option>Yes</option></select></Field>
-          <Field label="Chart of Accounts">
+          <Field label="Chart of Accounts" info="The Chart of Accounts template maps standard financial statement areas used later in Data Foundation account mapping.">
             <select value={coaTemplate} onChange={e => setCoaTemplate(e.target.value)}>{COA_TEMPLATES.map(c => <option key={c}>{c}</option>)}</select>
-            <button type="button" className="wizard-learn" onClick={() => learnMore("The Chart of Accounts template maps standard financial statement areas used later in Data Foundation account mapping.")}>Learn more</button>
           </Field>
           <Field label="Archive date"><input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)}/></Field>
           <label className="checkbox-row"><input type="checkbox" checked={linkPriorYear} onChange={e => setLinkPriorYear(e.target.checked)}/><span>Link prior year engagement — carry forward structure, mapping and methodology as editable drafts</span></label>
@@ -1121,10 +1161,11 @@ function statusClass(s:string){ if(["Complete","Approved","Done","Validated","Re
 function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>}
 function PhaseStepper({phases}:{phases:{title:string;status:string}[]}){return <div className="phase-stepper">{phases.map((p,i)=>{const tone=(p.status==="Complete"||p.status==="Locked"||p.status==="Approved")?"done":(p.status==="Needs Attention"||p.status==="Declined"||p.status==="Stale")?"attention":p.status==="Not Started"?"upcoming":"active";return <span key={p.title} className={`phase-dot ${tone}`} title={`${p.title} — ${p.status}`}>{tone==="done"?<Check size={11}/>:i+1}</span>})}</div>}
 function Banner({tone,title,text,action,onAction}:{tone:string;title:string;text:string;action?:string;onAction?:()=>void}){return <div className={`banner ${tone}`}>{tone==="danger"?<AlertCircle/>:tone==="warning"?<AlertTriangle/>:tone==="success"?<CheckCircle2/>:<Info/>}<div><strong>{title}</strong><span>{text}</span></div>{action&&<button onClick={onAction}>{action}<ArrowRight/></button>}</div>}
-function Field({label,required,children}:{label:string;required?:boolean;children:React.ReactNode}){return <label className="field"><span>{label}{required&&<em>*</em>}</span>{children}</label>}
+function Field({label,required,info,children}:{label:string;required?:boolean;info?:string;children:React.ReactNode}){return <label className="field"><span>{label}{required&&<em>*</em>}{info&&<HelpTip text={info}/>}</span>{children}</label>}
 function FormSection({title,subtitle,children,update}:{title:string;subtitle:string;children:React.ReactNode;update?:(p:Partial<DemoState>,m?:string)=>void}){return <section className="form-section"><div className="section-title"><div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-btn" onClick={()=>update?.({},`More options for "${title}" (history, print, and export)`)}><MoreHorizontal/></button></div>{children}</section>}
 function MaterialityCardTitle({title,help,standard}:{title:string;help:string;standard:string}){return <div className="materiality-card-title"><h2>{title}</h2><InfoTip title={title} text={help} standard={standard}/></div>}
 function InfoTip({title,text,standard}:{title:string;text:string;standard:string}){return <span className="info-tip" tabIndex={0} aria-label={`${title}. ${text} Reference: ${standard}`}><Info aria-hidden="true"/><span className="info-popover" role="tooltip"><strong>Audit perspective</strong><p>{text}</p><small>{standard}</small></span></span>}
+function HelpTip({text}:{text:string}){return <span className="info-tip" tabIndex={0} aria-label={text}><Info aria-hidden="true"/><span className="info-popover" role="tooltip"><p style={{margin:0}}>{text}</p></span></span>}
 function StickyActions({update,onComplete,completed}:{update:(p:Partial<DemoState>,m?:string)=>void;onComplete?:()=>void;completed?:boolean}){return <div className="sticky-action-bar"><span><Check size={16}/>Autosaved just now</span><button className="secondary-btn" onClick={()=>update({},"Draft saved")}>Save draft</button><button className="primary-btn" disabled={!!completed} onClick={()=>onComplete?onComplete():update({},"Step completed and saved to the audit trail")}>{completed?<><Check size={16}/>Completed</>:"Complete step"}</button></div>}
 function CheckRow({title,detail,checked=false}:{title:string;detail:string;checked?:boolean}){const [on,setOn]=useState(checked);return <label className="check-row"><input type="checkbox" checked={on} onChange={e=>setOn(e.target.checked)}/><i>{on&&<Check/>}</i><span><strong>{title}</strong><small>{detail}</small></span>{on&&<span className="status-pill approved">Complete</span>}</label>}
 function Member({name,role,status,update}:{name:string;role:string;status:string;update?:(p:Partial<DemoState>,m?:string)=>void}){return <div className="member-row"><div className="person-avatar violet">{name.split(" ").map(n=>n[0]).join("")}</div><div><strong>{name}</strong><span>{role}</span></div><span className={`status-pill ${status==="Confirmed"?"approved":"warning"}`}>{status}</span>{status==="Pending"&&<button className="secondary-btn" onClick={()=>update?.({},`Independence confirmation reminder sent to ${name}`)}>Send reminder</button>}</div>}
