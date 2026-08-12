@@ -22,6 +22,9 @@ type StepState = "Complete" | "In Progress" | "Needs Attention" | "Not Started" 
 type RiskItem = { id: number; title: string; fsa: string; assertion: string; likelihood: string; magnitude: string; level: string; significant: boolean; fraud: boolean; balance: string; driver: string; response: string };
 type ProcedureItem = { title: string; risk: string; type: string; assignee: string; due: string; status: string };
 type ReconRow = { account: string; tb: string; gl: string; variance: string; status: string; owner: string };
+type EngagementTeamRole = "Junior" | "Senior" | "Manager" | "Engagement Leader" | "Engagement Quality Reviewer";
+type TeamMember = { id: string; name: string; initials: string; email: string; role: EngagementTeamRole; specialty?: string; status: "Active" | "Pending" | "Guest" };
+type ClientContact = { name: string; email: string; role: string; lastLogin: string; twoFA: boolean };
 
 type DemoState = {
   role: Role;
@@ -60,6 +63,11 @@ type DemoState = {
   flaggedForReview: boolean;
   reconciliationRows: ReconRow[];
   viewYear: number;
+  teamMembers: TeamMember[];
+  clientContacts: ClientContact[];
+  archiveDate: string;
+  notifyDaily: boolean;
+  twoFactorEnabled: boolean;
 };
 
 const defaultState: DemoState = {
@@ -78,6 +86,18 @@ const defaultState: DemoState = {
     { account: "Net assets released", tb: "($210,000)", gl: "($206,200)", variance: "($3,800)", status: "Accepted", owner: "J. Alvarez" },
   ],
   viewYear: 2025,
+  teamMembers: [
+    { id: "JA", name: "Jasmine Alvarez", initials: "JA", email: "jasmine.alvarez@cfjosephcpa.com", role: "Senior", status: "Active" },
+    { id: "MK", name: "Meera Kapoor", initials: "MK", email: "meera.kapoor@cfjosephcpa.com", role: "Manager", status: "Active" },
+    { id: "OO", name: "Oscar Owner", initials: "OO", email: "oscar.owner@cfjosephcpa.com", role: "Engagement Leader", status: "Active" },
+    { id: "LC", name: "Leo Chen", initials: "LC", email: "leo.chen@cfjosephcpa.com", role: "Senior", specialty: "Tax specialist", status: "Pending" },
+  ],
+  clientContacts: [
+    { name: "Dana Collins", email: "dana.collins@riversideyfs.org", role: "Controller", lastLogin: "2 days ago", twoFA: true },
+  ],
+  archiveDate: "2026-06-30",
+  notifyDaily: true,
+  twoFactorEnabled: false,
 };
 
 const engagement = {
@@ -271,7 +291,7 @@ export default function Home() {
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} /> : <Dashboard navigate={navigate} state={state} update={update} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
@@ -298,11 +318,12 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const currentCalendarYear = new Date().getFullYear();
   const latestFiscalYear = Math.max(currentCalendarYear, 2025);
   const fiscalYears = Array.from({ length: latestFiscalYear - 2023 + 1 }, (_, i) => latestFiscalYear - i);
   const items = attentionItems(state);
-  return <header className="topbar">
+  return <><header className="topbar">
     <button className="icon-btn hamburger" onClick={onMenu}><Menu size={20}/></button>
     <div className="top-actions">
       <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "QuickBooks connection tested successfully" : "QuickBooks reconnected safely")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "QuickBooks connected" : "Reconnect QuickBooks"}</button>
@@ -324,12 +345,15 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
         <button className="avatar" aria-label="Open user profile" aria-expanded={profileOpen} title={state.role} onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); setYearOpen(false); }}>OO</button>
         {profileOpen && <div className="dropdown-menu profile-menu">
           <div className="dropdown-head"><strong>Oscar Owner</strong><span>Viewing as {state.role}</span></div>
+          <button className="dropdown-item" onClick={() => { setProfileOpen(false); setAccountOpen(true); }}><UserRound size={14}/><span>My account</span></button>
           <button className="dropdown-item" onClick={() => { setProfileOpen(false); setDemoOpen(!demoOpen); }}><SlidersHorizontal size={14}/><span>Switch role</span></button>
           <button className="dropdown-item" onClick={() => { setProfileOpen(false); update({}, "Signed out (simulated) — this is a demo, no session was ended"); }}><LockKeyhole size={14}/><span>Sign out</span></button>
         </div>}
       </div>
     </div>
-  </header>;
+  </header>
+  {accountOpen && <MyAccountModal state={state} update={update} close={() => setAccountOpen(false)}/>}
+  </>;
 }
 
 function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoState }) {
@@ -401,6 +425,7 @@ function Dashboard({ navigate, state, update }: { navigate: (p: string) => void;
 
 function Engagements({ navigate, update, state }: { navigate: (p: string) => void; update: (p: Partial<DemoState>, m?: string) => void; state: DemoState }) {
   const [newOpen, setNewOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"All" | "In Progress" | "Approved" | "Declined">("All");
   const bbawcPlanning = state.acceptanceDecision === "decline" ? "Declined" : state.locked ? "Approved" : "In Progress";
@@ -420,15 +445,18 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
       </div>}</div></div>
       <table><thead><tr><th>Client</th><th>Engagement</th><th>Period</th><th>Planning</th><th>Assigned team</th><th></th></tr></thead><tbody>
         {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--muted)" }}>No engagements match this filter.</td></tr>}
-        {rows.map(r => r.live ? <tr key={r.name}><td><strong>{r.name}</strong><span>Nonprofit</span></td><td>Financial Audit</td><td>Dec 31, 2025</td><td><span className={`status-pill ${bbawcPillClass}`}>{bbawcPlanning}</span><StatusCountBadges compact complete={bbawcCounts.complete} inProgress={bbawcCounts.inProgress} attention={bbawcCounts.attention}/></td><td><div className="avatar-stack"><i>JA</i><i>MK</i><i>OO</i></div></td><td><button className="icon-btn" onClick={() => navigate("/engagement/bbawc")}><ChevronRight/></button></td></tr>
+        {rows.map(r => r.live ? <tr key={r.name}><td><strong>{r.name}</strong><span>Nonprofit</span></td><td>Financial Audit</td><td>Dec 31, 2025</td><td><span className={`status-pill ${bbawcPillClass}`}>{bbawcPlanning}</span><StatusCountBadges compact complete={bbawcCounts.complete} inProgress={bbawcCounts.inProgress} attention={bbawcCounts.attention}/></td><td><button className="avatar-stack as-button" title="Manage engagement team" onClick={() => setTeamOpen(true)}>{state.teamMembers.slice(0, 4).map(m => <i key={m.id}>{m.initials}</i>)}</button></td><td><button className="icon-btn" onClick={() => navigate("/engagement/bbawc")}><ChevronRight/></button></td></tr>
           : <tr key={r.name}><td><strong>{r.name}</strong><span>Nonprofit</span></td><td>Financial Audit</td><td>Jun 30, 2025</td><td><span className="status-pill approved">Approved</span></td><td><div className="avatar-stack"><i>RP</i><i>MK</i></div></td><td><button className="icon-btn" onClick={() => update({}, `This demo includes one fully wired engagement — ${engagement.clientName}.`)}><ChevronRight/></button></td></tr>)}
       </tbody></table>
     </div>
     {newOpen && <NewEngagementWizard onClose={() => setNewOpen(false)} update={update}/>}
+    {teamOpen && <EngagementTeamModal state={state} update={update} close={() => setTeamOpen(false)}/>}
   </div>;
 }
 
-function EngagementHome({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
+function EngagementHome({ navigate, state, update }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
   const phases = getPhases(state); const declined = state.acceptanceDecision === "decline"; const foundationDone = phases[0].status === "Complete"; const dataDone = phases[1].status === "Complete"; const pct=planningProgressPct(state); const blockers=attentionItems(state).length; const riskList=allRisks(state); const highRiskCount=riskList.filter(r=>r.level==="High").length;
   const journey=[
     {title:"Acceptance",detail:declined?"Engagement declined":foundationDone?"Accepted · Aug 4":"2 confirmations pending",date:"Aug 4",state:declined?"danger":foundationDone?"complete":"current",route:"setup",progress:foundationDone?100:75},
@@ -438,10 +466,12 @@ function EngagementHome({ navigate, state }: { navigate: (p: string) => void; st
     {title:"Reporting",detail:"Begins after fieldwork",date:"Apr 30",state:"locked",route:"planning",progress:0},
   ];
   return <div className="page engagement-overview"><div className="breadcrumbs"><button onClick={() => navigate("/dashboard")}>Dashboard</button><ChevronRight/><span>{engagement.displayType}</span></div>
-    <div className="engagement-hero"><div><span className={`status-pill ${declined?"danger":"progress"}`}>{declined?"Declined":state.planningStatus}</span><h1>{engagement.clientName}</h1><p>{engagement.displayType} · Period ended {engagement.periodEnd} · {engagement.accountingSystem}</p></div><button className="primary-btn" onClick={() => navigate("/engagement/bbawc/planning")}>Open Planning <ArrowRight/></button></div>
+    <div className="engagement-hero"><div><span className={`status-pill ${declined?"danger":"progress"}`}>{declined?"Declined":state.planningStatus}</span><h1>{engagement.clientName}<button className="icon-btn" title="Edit engagement" onClick={()=>setEditOpen(true)}><Pencil size={14}/></button></h1><p>{engagement.displayType} · Period ended {engagement.periodEnd} · {engagement.accountingSystem}</p></div><div className="hero-actions"><button className="avatar-stack as-button" title="Manage engagement team" onClick={()=>setTeamOpen(true)}>{state.teamMembers.slice(0,4).map(m=><i key={m.id}>{m.initials}</i>)}</button><button className="primary-btn" onClick={() => navigate("/engagement/bbawc/planning")}>Open Planning <ArrowRight/></button></div></div>
     <div className="summary-grid"><Metric label="Planning progress" value={`${pct}%`} detail={blockers===0?"No blockers":`${blockers} blocker${blockers===1?"":"s"}`}/><Metric label="Client requests" value={`${state.completedRequests} / 6`} detail={`${Math.max(6-state.completedRequests,0)} outstanding`}/><Metric label="Assessed risks" value={String(riskList.length)} detail={`${highRiskCount} high risk`}/><Metric label="Fieldwork" value={state.locked ? "Unlocked" : "Locked"} detail={state.locked ? "Ready to begin" : "Approve Planning first"}/></div>
     <div className="engagement-overview-grid"><section className="section-card engagement-journey"><div className="section-title"><div><p className="eyebrow">Engagement lifecycle</p><h2>From acceptance to reporting</h2><p>Dates, current status and the next available action.</p></div><button className="text-link" onClick={() => navigate("/engagement/bbawc/planning/audit-trail")}>View audit trail <ArrowRight/></button></div><div className="journey-track">{journey.map((step,i)=><button key={step.title} className={`journey-step ${step.state}`} disabled={step.state==="locked"} onClick={()=>navigate(`/engagement/bbawc/${step.route==="planning"?"planning":`planning/${step.route}`}`)}><span className="journey-marker">{step.state==="complete"?<Check/>:step.state==="danger"?<AlertCircle/>:step.state==="locked"?<LockKeyhole/>:<span>{i+1}</span>}</span><span className="journey-copy"><small>{step.date}</small><strong>{step.title}</strong><em>{step.detail}</em><i><b style={{width:`${step.progress}%`}}/></i></span><ChevronRight/></button>)}</div></section>
-      <section className="section-card engagement-facts"><div className="section-title"><div><p className="eyebrow">From signed engagement letter</p><h2>Engagement details</h2><p>Read-only facts synchronized from AssurePro.</p></div><span className="source-badge"><CheckCircle2/>Synced</span></div><dl><div><dt>Engagement type</dt><dd>{engagement.engagementType}</dd></div><div><dt>Reporting framework</dt><dd>{engagement.reportingFramework}</dd></div><div><dt>Entity type</dt><dd>{engagement.entityType}</dd></div><div><dt>Service scope</dt><dd>{engagement.serviceScope}</dd></div><div><dt>Period covered</dt><dd>{engagement.periodStart} – {engagement.periodEnd}</dd></div><div><dt>Reporting deadline</dt><dd>{engagement.reportingDeadline}</dd></div><div><dt>Engagement letter</dt><dd>{engagement.engagementLetter}</dd></div><div><dt>Locations in scope</dt><dd>{engagement.locations}</dd></div><div><dt>Engagement partner</dt><dd>{engagement.partner}</dd></div><div><dt>Engagement manager</dt><dd>{engagement.manager}</dd></div></dl><button className="secondary-btn full" onClick={()=>navigate("/engagement/bbawc/planning/setup")}>Review engagement terms <ArrowRight/></button></section></div>
+      <section className="section-card engagement-facts"><div className="section-title"><div><p className="eyebrow">From signed engagement letter</p><h2>Engagement details</h2><p>Read-only facts synchronized from AssurePro.</p></div><span className="source-badge"><CheckCircle2/>Synced</span></div><dl><div><dt>Engagement type</dt><dd>{engagement.engagementType}</dd></div><div><dt>Reporting framework</dt><dd>{engagement.reportingFramework}</dd></div><div><dt>Entity type</dt><dd>{engagement.entityType}</dd></div><div><dt>Service scope</dt><dd>{engagement.serviceScope}</dd></div><div><dt>Period covered</dt><dd>{engagement.periodStart} – {engagement.periodEnd}</dd></div><div><dt>Reporting deadline</dt><dd>{engagement.reportingDeadline}</dd></div><div><dt>Engagement letter</dt><dd>{engagement.engagementLetter}</dd></div><div><dt>Locations in scope</dt><dd>{engagement.locations}</dd></div><div><dt>Engagement partner</dt><dd>{engagement.partner}</dd></div><div><dt>Engagement manager</dt><dd>{engagement.manager}</dd></div><div><dt>Archive date</dt><dd>{state.archiveDate}</dd></div></dl><div className="detail-actions"><button className="secondary-btn" onClick={()=>setTeamOpen(true)}><Users size={15}/>Manage team</button><button className="secondary-btn" onClick={()=>navigate("/engagement/bbawc/planning/setup")}>Review engagement terms <ArrowRight/></button></div></section></div>
+    {editOpen && <EditEngagementModal state={state} update={update} close={()=>setEditOpen(false)}/>}
+    {teamOpen && <EngagementTeamModal state={state} update={update} close={()=>setTeamOpen(false)}/>}
   </div>;
 }
 
@@ -903,11 +933,19 @@ function WizardSteps({step}:{step:1|2}) {
     <div className={`wizard-step ${step===2?"active":""}`}><div className="wizard-step-circle">2</div><div className="wizard-step-label"><strong>Review & Confirm</strong><span>Step 2</span></div></div>
   </div>;
 }
+const SIGNED_LETTERS = [
+  { client: "Riverside Youth & Family Services, Inc.", signedOn: "Aug 4, 2025", type: "Financial Audit", periodStart: "2025-01-01", periodEnd: "2025-12-31" },
+  { client: "Harbor Community Foundation", signedOn: "Jul 2, 2025", type: "Financial Audit", periodStart: "2024-07-01", periodEnd: "2025-06-30" },
+];
 function NewEngagementWizard({ onClose, update }: { onClose: () => void; update: (p: Partial<DemoState>, m?: string) => void }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [client, setClient] = useState("");
-  const [engagementType, setEngagementType] = useState("Financial Audit");
-  const [periodEnd, setPeriodEnd] = useState("");
+  const [manualEntry, setManualEntry] = useState(false);
+  const [client, setClient] = useState(SIGNED_LETTERS[0].client);
+  const [engagementType, setEngagementType] = useState(SIGNED_LETTERS[0].type);
+  const [periodStart, setPeriodStart] = useState(SIGNED_LETTERS[0].periodStart);
+  const [periodEnd, setPeriodEnd] = useState(SIGNED_LETTERS[0].periodEnd);
+  const [linkPriorYear, setLinkPriorYear] = useState(false);
+  const [archiveDate, setArchiveDate] = useState("");
   const [contentPack, setContentPack] = useState(CONTENT_PACKS[0]);
   const [entityRiskLevel, setEntityRiskLevel] = useState("Normal");
   const [initialEngagement, setInitialEngagement] = useState("No");
@@ -917,14 +955,31 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
   })));
   const setAssignment = (i: number, patch: Partial<WizardAssignment>) => setAssignments(a => a.map((row, idx) => idx === i ? { ...row, ...patch } : row));
   const learnMore = (text: string) => update({}, text);
+  const selectLetter = (value: string) => {
+    if (value === "manual") { setManualEntry(true); setClient(""); setEngagementType("Financial Audit"); setPeriodStart(""); setPeriodEnd(""); return; }
+    const letter = SIGNED_LETTERS.find(l => l.client === value)!;
+    setManualEntry(false); setClient(letter.client); setEngagementType(letter.type); setPeriodStart(letter.periodStart); setPeriodEnd(letter.periodEnd);
+  };
   const canContinue = client.trim().length > 0 && periodEnd.trim().length > 0;
-  const create = () => { onClose(); update({}, `"${client}" created — this demo scopes fully wired functionality to ${engagement.clientName}.`); };
+  const create = () => {
+    onClose();
+    const isLive = client === engagement.clientName;
+    const patch: Partial<DemoState> = isLive ? { ...(linkPriorYear ? { rolledForward: true } : {}), ...(archiveDate ? { archiveDate } : {}) } : {};
+    update(patch, `"${client}" created ${manualEntry ? "without a linked engagement letter" : "from its signed AssurePro engagement letter"} — this demo scopes fully wired functionality to ${engagement.clientName}.`.replace(/\.\.$/, "."));
+  };
   return <div className="modal-backdrop"><div className="modal wizard-modal">
     <div className="modal-head"><div><h2>New engagement</h2><p>This prototype simulates engagement creation — no record is actually created.</p></div><button className="icon-btn" onClick={onClose}><X/></button></div>
     <WizardSteps step={step}/>
     {step === 1 ? <>
-      <Field label="Client name" required><input value={client} onChange={e => setClient(e.target.value)} placeholder="e.g. Riverside Youth Alliance"/></Field>
-      <div className="form-grid"><Field label="Engagement type"><select value={engagementType} onChange={e => setEngagementType(e.target.value)}><option>Financial Audit</option><option>EBP Audit</option><option>Fund Audit</option><option>NFP Audit</option><option>Government Audit</option></select></Field><Field label="Period end" required><input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)}/></Field></div>
+      <Field label="Signed engagement letter" required>
+        <select value={manualEntry ? "manual" : client} onChange={e => selectLetter(e.target.value)}>
+          {SIGNED_LETTERS.map(l => <option key={l.client} value={l.client}>{l.client} — signed {l.signedOn}</option>)}
+          <option value="manual">Enter manually — no signed letter yet</option>
+        </select>
+        <small className="field-note">Engagement letters are signed and stored in AssurePro. Selecting one carries its client, type and period into this engagement.</small>
+      </Field>
+      {manualEntry && <Field label="Client name" required><input value={client} onChange={e => setClient(e.target.value)} placeholder="e.g. Riverside Youth Alliance"/></Field>}
+      <div className="form-grid"><Field label="Engagement type"><select value={engagementType} disabled={!manualEntry} onChange={e => setEngagementType(e.target.value)}><option>Financial Audit</option><option>EBP Audit</option><option>Fund Audit</option><option>NFP Audit</option><option>Government Audit</option></select></Field><Field label="Period start" required><input type="date" value={periodStart} disabled={!manualEntry} onChange={e => setPeriodStart(e.target.value)}/></Field><Field label="Period end" required><input type="date" value={periodEnd} disabled={!manualEntry} onChange={e => setPeriodEnd(e.target.value)}/></Field></div>
       <div className="wizard-grid">
         <div className="wizard-panel">
           <h3>Key Engagement Details</h3>
@@ -942,6 +997,8 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
             <select value={coaTemplate} onChange={e => setCoaTemplate(e.target.value)}>{COA_TEMPLATES.map(c => <option key={c}>{c}</option>)}</select>
             <button type="button" className="wizard-learn" onClick={() => learnMore("The Chart of Accounts template maps standard financial statement areas used later in Data Foundation account mapping.")}>Learn more</button>
           </Field>
+          <Field label="Archive date"><input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)}/></Field>
+          <label className="checkbox-row"><input type="checkbox" checked={linkPriorYear} onChange={e => setLinkPriorYear(e.target.checked)}/><span>Link prior year engagement — carry forward structure, mapping and methodology as editable drafts</span></label>
         </div>
         <div className="wizard-panel">
           <h3>Initial Accountability & Timeline</h3>
@@ -956,9 +1013,12 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
       <div className="review-summary-grid">
         <div className="review-summary-block">
           <h3>Key Engagement Details</h3>
+          <div className="review-row"><span>Signed engagement letter</span><strong>{manualEntry ? "None on file yet" : "Linked from AssurePro"}</strong></div>
           <div className="review-row"><span>Client</span><strong>{client}</strong></div>
           <div className="review-row"><span>Engagement type</span><strong>{engagementType}</strong></div>
-          <div className="review-row"><span>Period end</span><strong>{periodEnd}</strong></div>
+          <div className="review-row"><span>Period</span><strong>{periodStart} – {periodEnd}</strong></div>
+          <div className="review-row"><span>Archive date</span><strong>{archiveDate || "Not set"}</strong></div>
+          <div className="review-row"><span>Link prior year</span><strong>{linkPriorYear ? "Yes" : "No"}</strong></div>
           <div className="review-row"><span>Workpapers Content Pack</span><strong>{contentPack}</strong></div>
           <div className="review-row"><span>Entity Risk Level</span><strong>{entityRiskLevel}</strong></div>
           <div className="review-row"><span>Initial Engagement</span><strong>{initialEngagement}</strong></div>
@@ -971,6 +1031,79 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
       </div>
       <div className="modal-actions"><button className="secondary-btn" onClick={() => setStep(1)}>Back</button><button className="primary-btn" onClick={create}>Confirm & Create</button></div>
     </>}
+  </div></div>;
+}
+const ENGAGEMENT_TEAM_ROLES: EngagementTeamRole[] = ["Junior", "Senior", "Manager", "Engagement Leader", "Engagement Quality Reviewer"];
+function initialsOf(name: string) { return name.trim().split(/\s+/).map(p => p[0]).join("").toUpperCase().slice(0, 2); }
+function EngagementTeamModal({ state, update, close }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; close: () => void }) {
+  const [tab, setTab] = useState<"Engagement team" | "Client team">("Engagement team");
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [role, setRole] = useState<EngagementTeamRole>("Senior");
+  const addMember = () => {
+    if (!name.trim() || !email.trim()) return;
+    const member: TeamMember = { id: `tm-${state.teamMembers.length}-${initialsOf(name)}`, name: name.trim(), initials: initialsOf(name), email: email.trim(), role, status: "Pending" };
+    update({ teamMembers: [...state.teamMembers, member] }, `${name} invited to the engagement team as ${role}`);
+    setName(""); setEmail(""); setRole("Senior"); setAdding(false);
+  };
+  const setMemberRole = (id: string, newRole: EngagementTeamRole) => update({ teamMembers: state.teamMembers.map(m => m.id === id ? { ...m, role: newRole } : m) }, `Role updated to ${newRole}`);
+  const removeMember = (m: TeamMember) => update({ teamMembers: state.teamMembers.filter(x => x.id !== m.id) }, `${m.name} removed from this engagement`);
+  return <div className="modal-backdrop"><div className="modal team-modal">
+    <div className="modal-head"><div><h2>Engagement team</h2><p>Manage who has access to this engagement and their role.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="manager-tabs"><button className={tab === "Engagement team" ? "active" : ""} onClick={() => setTab("Engagement team")}>Engagement team · {state.teamMembers.length}</button><button className={tab === "Client team" ? "active" : ""} onClick={() => setTab("Client team")}>Client team · {state.clientContacts.length}</button></div>
+    {tab === "Engagement team" ? <>
+      <div className="table-card"><table><thead><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+        {state.teamMembers.map(m => <tr key={m.id}>
+          <td><div className="member-cell"><div className="person-avatar violet">{m.initials}</div><div><strong>{m.name}</strong><span>{m.email}{m.specialty ? ` · ${m.specialty}` : ""}</span></div></div></td>
+          <td><select aria-label={`Role for ${m.name}`} value={m.role} onChange={e => setMemberRole(m.id, e.target.value as EngagementTeamRole)}>{ENGAGEMENT_TEAM_ROLES.map(r => <option key={r}>{r}</option>)}</select></td>
+          <td><span className={`status-pill ${m.status === "Active" ? "approved" : m.status === "Guest" ? "neutral" : "warning"}`}>{m.status}</span></td>
+          <td className="row-actions">{m.status === "Pending" && <button className="icon-btn" title="Resend invite" onClick={() => update({}, `Invitation resent to ${m.name}`)}><Send size={14}/></button>}<button className="icon-btn" title="Remove from engagement" onClick={() => removeMember(m)}><X size={14}/></button></td>
+        </tr>)}
+      </tbody></table></div>
+      {adding ? <div className="inline-add-row">
+        <input placeholder="Full name" value={name} onChange={e => setName(e.target.value)}/>
+        <input placeholder="Work email" value={email} onChange={e => setEmail(e.target.value)}/>
+        <select value={role} onChange={e => setRole(e.target.value as EngagementTeamRole)}>{ENGAGEMENT_TEAM_ROLES.map(r => <option key={r}>{r}</option>)}</select>
+        <button className="primary-btn" disabled={!name.trim() || !email.trim()} onClick={addMember}>Invite</button>
+        <button className="icon-btn" onClick={() => setAdding(false)}><X size={14}/></button>
+      </div> : <button className="secondary-btn" onClick={() => setAdding(true)}><Plus size={16}/>Add team member</button>}
+    </> : <>
+      <div className="table-card"><table><thead><tr><th>Contact</th><th>Role</th><th>Last login</th><th>2FA</th></tr></thead><tbody>
+        {state.clientContacts.map(c => <tr key={c.email}>
+          <td><div className="member-cell"><div className="person-avatar">{initialsOf(c.name)}</div><div><strong>{c.name}</strong><span>{c.email}</span></div></div></td>
+          <td>{c.role}</td>
+          <td>{c.lastLogin}</td>
+          <td><span className={`status-pill ${c.twoFA ? "approved" : "neutral"}`}>{c.twoFA ? "Enabled" : "Not enabled"}</span></td>
+        </tr>)}
+      </tbody></table></div>
+      <p className="team-note"><Info size={14}/>Client contacts never see internal risk ratings, materiality, or reviewer notes — only what's shared through Planning Requests.</p>
+    </>}
+  </div></div>;
+}
+function EditEngagementModal({ state, update, close }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; close: () => void }) {
+  const periodLocked = state.mapped > 0;
+  const [archiveDate, setArchiveDate] = useState(state.archiveDate);
+  const [entityRisk, setEntityRisk] = useState(state.entityRisk);
+  const [rolledForward, setRolledForward] = useState(state.rolledForward);
+  const save = () => { update({ archiveDate, entityRisk, rolledForward }, "Engagement details updated"); close(); };
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Edit engagement</h2><p>Attributes that can change after the engagement was created from its signed letter.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <Field label="Financial period end">
+      <input type="date" value="2025-12-31" disabled title="Locked — sourced from the signed engagement letter in AssurePro"/>
+      <small className="field-note">{periodLocked ? "Locked — data ingestion has started for this period." : "Sourced from the signed engagement letter in AssurePro."}</small>
+    </Field>
+    <Field label="Archive date"><input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)}/></Field>
+    <Field label="Entity risk level"><select value={entityRisk} onChange={e => setEntityRisk(e.target.value as DemoState["entityRisk"])}><option>Normal</option><option>Elevated</option><option>High</option></select></Field>
+    <label className="checkbox-row"><input type="checkbox" checked={rolledForward} onChange={e => setRolledForward(e.target.checked)}/><span>Link prior year engagement — carries forward structure, mapping and methodology as editable drafts.</span></label>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" onClick={save}>Save changes</button></div>
+  </div></div>;
+}
+function MyAccountModal({ state, update, close }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; close: () => void }) {
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>My account</h2><p>Your profile, notifications and sign-in security.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="member-cell" style={{ marginBottom: 18 }}><div className="person-avatar violet" style={{ width: 40, height: 40, fontSize: 13 }}>OO</div><div><strong>Oscar Owner</strong><span>oscar.owner@cfjosephcpa.com · {state.role}</span></div></div>
+    <label className="checkbox-row"><input type="checkbox" checked={state.notifyDaily} onChange={e => update({ notifyDaily: e.target.checked }, e.target.checked ? "Daily summary email enabled" : "Daily summary email disabled")}/><span>Send me one daily summary email instead of one per request</span></label>
+    <label className="checkbox-row"><input type="checkbox" checked={state.twoFactorEnabled} onChange={e => update({ twoFactorEnabled: e.target.checked }, e.target.checked ? "Two-factor authentication enabled" : "Two-factor authentication disabled")}/><span>Require a verification code at sign-in (two-factor authentication)</span></label>
+    <div className="modal-actions"><button className="primary-btn" onClick={close}>Done</button></div>
   </div></div>;
 }
 // Reusable red/amber/green status-count badge row — always driven by phaseStatusCounts(state),
