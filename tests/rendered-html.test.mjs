@@ -69,3 +69,13 @@ test("keeps engagement-letter facts centralized and the lifecycle actionable", a
   assert.match(page, /Review engagement terms/);
   assert.doesNotMatch(page, /Brooklyn Bridge Animal Welfare Coalition/);
 });
+
+test("isolates live-preview and production-build caches", async () => {
+  const [config, pkg] = await Promise.all([
+    readFile(new URL("../next.config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(config, /distDir:\s*process\.env\.NEXT_OUTPUT_DIR/);
+  assert.match(pkg, /NEXT_OUTPUT_DIR=\.next-dev next dev/);
+  assert.match(pkg, /NEXT_OUTPUT_DIR=\.next-build next build/);
+});

@@ -6,11 +6,11 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "NEXT_OUTPUT_DIR=.next-dev next dev",
+    "build": "NEXT_OUTPUT_DIR=.next-build next build",
     "test": "node --test tests/rendered-html.test.mjs",
-    "start": "next start",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "start": "NEXT_OUTPUT_DIR=.next-build next start",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .next-dev --ignore-pattern .next-build"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
