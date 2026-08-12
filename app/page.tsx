@@ -75,7 +75,6 @@ type DemoState = {
   notifications: AppNotification[];
   contentPack: string;
   coaTemplate: string;
-  hasSeenTour: boolean;
 };
 
 const defaultState: DemoState = {
@@ -109,7 +108,6 @@ const defaultState: DemoState = {
   isInitialEngagement: false,
   contentPack: "US Audit — Private Nonprofit",
   coaTemplate: "AssureAudit Nonprofit (US)",
-  hasSeenTour: false,
   auditLog: [],
   notifications: [
     { id: "n1", actor: "Jasmine Alvarez", initials: "JA", title: "Requested your review", detail: "Independence confirmations — Engagement Foundation", time: "10 min ago", category: "Approval", read: false },
@@ -288,9 +286,7 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem("assureaudit-planning-demo");
-    const parsedSaved = saved ? JSON.parse(saved) : null;
-    if (parsedSaved) setState({ ...defaultState, ...parsedSaved });
-    if (!parsedSaved?.hasSeenTour) setTourOpen(true);
+    if (saved) setState({ ...defaultState, ...JSON.parse(saved) });
     setPath(window.location.pathname === "/" ? "/dashboard" : window.location.pathname);
     const pop = () => setPath(window.location.pathname);
     window.addEventListener("popstate", pop);
@@ -326,7 +322,7 @@ export default function Home() {
         ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
-      {tourOpen && <GuidedTour navigate={navigate} close={() => { setTourOpen(false); update({ hasSeenTour: true }); }}/>}
+      {tourOpen ? <GuidedTour navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" title="Take a tour" onClick={() => setTourOpen(true)}><BookOpen size={20}/></button>}
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
     </div>
   );
@@ -995,37 +991,37 @@ function ContextDrawer({ drawer,setDrawer,open,setOpen,update }: any) {
     {drawer==="Attachments"&&<><DrawerFile update={update} name="2025 Grant Agreement.pdf" meta="1.8 MB · Linked to entity understanding"/><DrawerFile update={update} name="Accounting Policy Handbook.pdf" meta="Client upload · In review"/><button className="secondary-btn full" onClick={()=>update({},"policy-handbook-addendum.pdf attached (simulated)")}><UploadCloud/>Attach evidence</button></>}
   </div></aside> }
 
-type TourStep = { title: string; text: string; cite: boolean; route?: string; cta?: string };
+type TourStep = { title: string; text: string; route?: string; cta?: string };
 const TOUR_STEPS: TourStep[] = [
-  { title: "Welcome to AssureAudit", text: "A quick, 9-step tour of what's live in this prototype — with a call-out on every step that came directly from the Engagement Setup SME reference document.", cite: false },
-  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", cite: false, route: "/dashboard", cta: "Go to Dashboard" },
-  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", cite: true, route: "/engagements", cta: "Go to Engagements" },
-  { title: "New engagement — starts from a signed letter", text: "On the Engagements page, click \"New engagement.\" Notice it starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", cite: true, route: "/engagements", cta: "Go to Engagements" },
-  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", cite: true, route: "/engagements", cta: "Go to Engagements" },
-  { title: "Edit Engagement", text: "Open an engagement, then click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", cite: true, route: "/engagement/bbawc", cta: "Go to the engagement" },
-  { title: "My Account", text: "Click your avatar in the top bar, then \"My account,\" for a daily-digest toggle and two-factor authentication.", cite: true },
-  { title: "Fiscal year switcher", text: "The \"FY 2025\" control in the top bar is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back.", cite: true },
-  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", cite: false, route: "/firm-audit-log", cta: "Go to Firm audit log" },
-  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", cite: false, route: "/engagement/bbawc/planning", cta: "Open the workflow" },
+  { title: "Welcome to AssureAudit", text: "A quick look at what's live in this prototype and where to find it." },
+  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", route: "/dashboard", cta: "Go to Dashboard" },
+  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", route: "/engagements", cta: "Go to Engagements" },
+  { title: "New engagement — starts from a signed letter", text: "On the Engagements page, click \"New engagement.\" It starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", route: "/engagements", cta: "Go to Engagements" },
+  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", route: "/engagements", cta: "Go to Engagements" },
+  { title: "Edit Engagement", text: "Open an engagement, then click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", route: "/engagement/bbawc", cta: "Go to the engagement" },
+  { title: "My Account", text: "Click your avatar in the top bar, then \"My account,\" for a daily-digest toggle and two-factor authentication." },
+  { title: "Fiscal year switcher", text: "The \"FY 2025\" control in the top bar is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back." },
+  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log", cta: "Go to Firm audit log" },
+  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning", cta: "Open the workflow" },
 ];
 function GuidedTour({ navigate, close }: { navigate: (p: string) => void; close: () => void }) {
   const [step, setStep] = useState(0);
   const current = TOUR_STEPS[step];
   const isLast = step === TOUR_STEPS.length - 1;
-  return <div className="modal-backdrop"><div className="modal tour-modal">
-    <div className="modal-head"><div><span className="tour-progress">Step {step + 1} of {TOUR_STEPS.length}</span><h2>{current.title}</h2></div><button className="icon-btn" onClick={close}><X/></button></div>
-    {current.cite && <span className="badge cite-badge">From the SME reference document</span>}
+  return <div className="tour-float">
+    <div className="tour-float-head"><span className="tour-progress">Step {step + 1} of {TOUR_STEPS.length}</span><button className="icon-btn" onClick={close}><X/></button></div>
+    <h3>{current.title}</h3>
     <p className="tour-text">{current.text}</p>
     <div className="tour-dots">{TOUR_STEPS.map((_, i) => <i key={i} className={i === step ? "active" : ""}/>)}</div>
-    <div className="modal-actions tour-actions">
-      <button className="secondary-btn" onClick={close}>Skip tour</button>
-      <div className="tour-nav">
-        {step > 0 && <button className="secondary-btn" onClick={() => setStep(s => s - 1)}><ArrowLeft size={15}/>Back</button>}
-        {current.route && <button className="secondary-btn" onClick={() => navigate(current.route!)}>{current.cta}</button>}
+    {current.route && <button className="secondary-btn tour-go" onClick={() => navigate(current.route!)}>{current.cta} <ArrowRight size={15}/></button>}
+    <div className="tour-nav">
+      <button className="secondary-btn" onClick={close}>Close</button>
+      <div className="tour-nav-right">
+        {step > 0 && <button className="icon-btn" title="Back" onClick={() => setStep(s => s - 1)}><ArrowLeft size={15}/></button>}
         {isLast ? <button className="primary-btn" onClick={close}>Finish <Check size={16}/></button> : <button className="primary-btn" onClick={() => setStep(s => s + 1)}>Next <ArrowRight size={16}/></button>}
       </div>
     </div>
-  </div></div>;
+  </div>;
 }
 function DemoControls({ state,update,close }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;close:()=>void}) { const action=(label:string,patch:Partial<DemoState>)=>update(patch,label); return <div className="demo-panel"><div className="demo-head"><div><span>Prototype only</span><h3>Demo controls</h3><p>Change the engagement state to test validations and transitions.</p></div><button className="icon-btn" onClick={close}><X/></button></div><label className="demo-role"><span>Preview experience as</span><select aria-label="Prototype role" value={state.role} onChange={e=>update({role:e.target.value as Role},`Viewing as ${e.target.value}`)}>{roleNames.map(r=><option key={r}>{r}</option>)}</select></label><div className="demo-actions"><button onClick={()=>action("All outstanding blockers cleared for the current phase",{independenceOutstanding:0,mapped:100,controlTotals:"Pass",transformationConfirmed:true,questionnaireStatus:"Validated",materialityLocked:true,responseGap:false})}><CheckCircle2/>Complete current step</button><button onClick={()=>action("Connector token expired — ingested data preserved",{connector:"Expired"})}><Cloud/>Simulate connector expiry</button><button onClick={()=>action("Control totals forced to failed state",{controlTotals:"Fail",transformationConfirmed:false})}><AlertCircle/>Force failed control totals</button><button onClick={()=>action("Prior-year structure loaded as editable drafts",{rolledForward:true})}><History/>Load rolled-forward engagement</button><button onClick={()=>action("Group-audit fields enabled",{groupAudit:true})}><Building2/>Switch to group audit</button><button onClick={()=>action("Preliminary materiality published",{publishVersion:state.publishVersion+1})}><Zap/>Publish preliminary materiality</button><button onClick={()=>action("Changed Final TB ingested — downstream steps stale",{finalTb:true,reopened:true,locked:false,managerApproved:false,partnerApproved:false,materialityLocked:false})}><FileSpreadsheet/>Ingest changed Final TB</button><button onClick={()=>action("Planning submitted for Manager review",{planningStatus:"Pending Manager Approval"})}><Send/>Submit for review</button><button onClick={()=>action("Manager approval recorded",{managerApproved:true,planningStatus:"Pending Partner Approval"})}><UserRound/>Approve as Manager</button><button disabled={!state.managerApproved} onClick={()=>state.managerApproved?action("Partner approval recorded — Fieldwork unlocked",{partnerApproved:true,locked:true,planningStatus:"Approved & Locked"}):update({},"Manager approval is required before Partner approval")}><ShieldCheck/>Approve as Partner</button><button onClick={()=>action("Planning reopened — 8 workpapers require re-review",{reopened:true,locked:false,managerApproved:false,partnerApproved:false,planningStatus:"Reopened"})}><RotateCcw/>Reopen Planning</button></div><button className="reset-demo" onClick={()=>{localStorage.removeItem("assureaudit-planning-demo");update(defaultState,"Demo engagement reset")}}><RefreshCw/>Reset engagement</button></div> }
 
