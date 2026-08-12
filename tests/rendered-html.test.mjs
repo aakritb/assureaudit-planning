@@ -75,7 +75,9 @@ test("isolates live-preview and production-build caches", async () => {
     readFile(new URL("../next.config.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
-  assert.match(config, /distDir:\s*process\.env\.NEXT_OUTPUT_DIR/);
+  assert.match(config, /distDir:/);
+  assert.match(config, /process\.env\.NEXT_OUTPUT_DIR/);
+  assert.match(config, /process\.env\.VERCEL/);
   assert.match(pkg, /NEXT_OUTPUT_DIR=\.next-dev next dev/);
   assert.match(pkg, /NEXT_OUTPUT_DIR=\.next-build next build/);
 });
