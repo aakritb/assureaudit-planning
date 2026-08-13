@@ -10,7 +10,8 @@ test("keeps the AssureAudit application shell and focused dashboard", async () =
   assert.match(layout, /title:\s*"AssureAudit Planning"/i);
   assert.match(page, /assure/);
   assert.match(page, /Client audit workspace/);
-  assert.match(page, /Collaboration by status/);
+  assert.match(page, /Documents by status/);
+  assert.match(page, /Document activity/);
   assert.match(page, /setCollabAudience\(option\)/);
   assert.match(page, /\["My team","Client"\]/);
   assert.match(page, /\{label:"Report",progress:0,status:"Locked"/);
@@ -35,8 +36,8 @@ test("keeps the AssureAudit application shell and focused dashboard", async () =
   assert.match(page, /<small>Audit period<\/small>/);
   assert.match(page, /<small>Reporting deadline<\/small>/);
   assert.match(page, /const engagementReady=currentEngagement\.id===engagement\.id/);
-  assert.match(page, /This audit workspace is not ready yet/);
-  assert.match(page, /No Riverside data has been carried into this client/);
+  assert.match(page, /Engagement acceptance not yet completed/);
+  assert.match(page, /No Riverside engagement data has been carried into this client record/);
   assert.match(page, /Open in AssurePro/);
   assert.match(page, /Planning prerequisite/);
   assert.match(page, /Data readiness/);
@@ -97,7 +98,8 @@ test("keeps one consistent sidebar and expands Planning as an in-place branch", 
   assert.match(page, /if\(inPlanning\)setPlanningBranchOpen\(open=>!open\)/);
   assert.match(page, /aria-expanded=\{planningBranchOpen\}/);
   assert.match(page, /<span>Review & approval<\/span>/);
-  assert.match(page, /<EngagementPlanningSummary state=\{state\} navigate=\{navigate\}\/>/);
+  assert.doesNotMatch(page, /function EngagementPlanningSummary/);
+  assert.match(page, /<span>Workpapers<\/span>/);
   assert.doesNotMatch(page, /<Home\/>/);
   assert.doesNotMatch(page, /className="planning-stepper"/);
   assert.match(page, /branchLabels=\["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"\]/);
