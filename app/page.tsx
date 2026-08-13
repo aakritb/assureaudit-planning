@@ -12,7 +12,7 @@ import {
   Sparkles, Table2, UploadCloud, UserRound, Users, X, Zap
 } from "lucide-react";
 import {
-  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip,
+  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
   XAxis, YAxis
 } from "recharts";
 
@@ -42,6 +42,7 @@ function useDismissOnOutside(open:boolean,onClose:()=>void) {
 }
 
 type DemoState = {
+  activeClientId: string;
   role: Role;
   connector: "Connected" | "Expired" | "Not connected";
   controlTotals: "Pass" | "Fail";
@@ -91,6 +92,7 @@ type DemoState = {
 };
 
 const defaultState: DemoState = {
+  activeClientId: "bbawc",
   role: "Auditor / Preparer", connector: "Connected", controlTotals: "Pass", mapped: 96,
   groupAudit: false, rolledForward: false, planningStatus: "In Progress", materialityPct: 2.5,
   benchmark: 9600000, performancePct: 75, trivialPct: 5, materialityOverride: false, materialityRationale: "", materialityBenchmarkType: "Total Revenue", materialityLocked: false, transformationConfirmed: false, responseGap: true, independenceOutstanding: 2, finalTb: false,
@@ -133,6 +135,7 @@ const defaultState: DemoState = {
 };
 
 const engagement = {
+  id: "bbawc",
   clientName: "Riverside Youth & Family Services, Inc.",
   shortName: "Riverside Youth & Family Services",
   initials: "RY",
@@ -153,6 +156,16 @@ const engagement = {
   partner: "Oscar Owner",
   manager: "Meera Kapoor",
 };
+
+const engagementCatalog = [
+  engagement,
+  { ...engagement, id:"harbor", clientName:"Harbor Community Foundation", shortName:"Harbor Community Foundation", initials:"HC", periodEnd:"June 30, 2025", periodShort:"Jun 30, 2025", periodStart:"July 1, 2024", industry:"Private foundation", entityType:"Massachusetts charitable foundation", reportingDeadline:"October 31, 2025", locations:"Boston headquarters", accountingSystem:"Sage Intacct", partner:"Oscar Owner", manager:"Meera Kapoor" },
+  { ...engagement, id:"greenfield", clientName:"Greenfield Housing Alliance", shortName:"Greenfield Housing Alliance", initials:"GH", displayType:"NFP Audit", industry:"Affordable housing", entityType:"New Jersey nonprofit corporation", periodEnd:"September 30, 2025", periodShort:"Sep 30, 2025", periodStart:"October 1, 2024", reportingDeadline:"January 31, 2026", locations:"Newark headquarters + 8 properties", accountingSystem:"Yardi Voyager", partner:"Oscar Owner", manager:"Sofia Grant" },
+  { ...engagement, id:"metro", clientName:"Metro Arts Council", shortName:"Metro Arts Council", initials:"MA", displayType:"Fund Audit", industry:"Arts & culture", entityType:"New York nonprofit corporation", periodEnd:"June 30, 2025", periodShort:"Jun 30, 2025", periodStart:"July 1, 2024", reportingDeadline:"November 15, 2025", locations:"New York headquarters + 2 venues", accountingSystem:"QuickBooks Online", partner:"Oscar Owner", manager:"Meera Kapoor" },
+  { ...engagement, id:"horizon", clientName:"Horizon Retirement Plan", shortName:"Horizon Retirement Plan", initials:"HR", engagementType:"Employee Benefit Plan Audit", displayType:"EBP Audit", industry:"Employee benefits", entityType:"ERISA employee benefit plan", reportingDeadline:"October 15, 2026", locations:"New York plan sponsor", accountingSystem:"Fidelity NetBenefits", partner:"Oscar Owner", manager:"Meera Kapoor" },
+  { ...engagement, id:"cedar", clientName:"Cedar Grove Outreach", shortName:"Cedar Grove Outreach", initials:"CG", industry:"Community services", entityType:"Connecticut nonprofit corporation", periodEnd:"March 31, 2025", periodShort:"Mar 31, 2025", periodStart:"April 1, 2024", reportingDeadline:"September 30, 2025", locations:"Hartford headquarters + 2 outreach centers", accountingSystem:"Xero", partner:"Oscar Owner", manager:"Sofia Grant" },
+];
+function selectedEngagement(state:DemoState){return engagementCatalog.find(item=>item.id===state.activeClientId)||engagement}
 
 // Single source of truth for "the risk register", merging the seeded risks with any
 // auditor-added custom risks so the register table, heat map and phase status never disagree.
@@ -340,13 +353,13 @@ export default function Home() {
 
   const planning = path.includes("/planning");
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${planning ? "planning-route" : ""}`}>
       <Sidebar path={path} navigate={navigate} state={state} update={update} mobileNav={mobileNav} setMobileNav={setMobileNav} />
       <main className="main-area">
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {tourOpen ? <GuidedTour path={path} navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" aria-label="Open AssureAudit Guide" title="Open AssureAudit Guide" onClick={() => setTourOpen(true)}><BookOpen size={18}/><span>Guide</span></button>}
@@ -356,23 +369,25 @@ export default function Home() {
 }
 
 function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { path: string; navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; mobileNav: boolean; setMobileNav: (v: boolean) => void }) {
-  const inEngagement=path.startsWith("/engagement/"); const inPlanning=path.includes("/planning"); const active=path.split("/").pop()||"overview"; const branchLabels=["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"]; const phases=getPhases(state);
-  const [stagesOpen,setStagesOpen]=useState(inPlanning&&active!=="planning");
-  useEffect(()=>{if(inPlanning&&active!=="planning")setStagesOpen(true)},[inPlanning,active]);
-  return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`} style={{transform: mobileNav ? "none" : undefined}}>
+  const inEngagement=path.startsWith("/engagement/"); const inPlanning=path.includes("/planning"); const inDocuments=path.endsWith("/documents"); const active=path.split("/").pop()||"overview"; const branchLabels=["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"]; const phases=getPhases(state);
+  const currentEngagement=selectedEngagement(state);
+  const [clientListOpen,setClientListOpen]=useState(false);
+  const clientPickerRef=useDismissOnOutside(clientListOpen,()=>setClientListOpen(false));
+  return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""} ${clientListOpen?"client-picker-open":""}`} style={{transform: mobileNav ? "none" : undefined}}>
     <div className="brand"><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
     <nav>
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
-      <button className={`nav-item ${path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
-      {inEngagement&&<div className="engagement-context"><button className="engagement-back" onClick={()=>navigate("/engagements")}><ArrowLeft/><span>All engagements</span></button><button className="engagement-branch" onClick={()=>navigate("/engagement/bbawc/planning")}><span className="avatar square">RY</span><span><strong>{engagement.shortName}</strong><small>{engagement.displayType} · {engagement.fiscalYear}</small></span><ChevronRight/></button><div className="engagement-progress"><span>Planning progress</span><strong>{planningProgressPct(state)}%</strong><i><em style={{width:`${planningProgressPct(state)}%`}}/></i></div><div className="nav-branch"><button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{if(inPlanning&&active==="planning")setStagesOpen(v=>!v);else{navigate("/engagement/bbawc/planning");setStagesOpen(true)}}}><LayoutDashboard/><span>Overview & planning</span><b>{planningProgressPct(state)}%</b>{stagesOpen?<ChevronDown/>:<ChevronRight/>}</button>{inPlanning&&stagesOpen&&<div className="branch-children"><p>Planning stages</p>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}<div className="branch-secondary"><span>Next phases</span><button onClick={()=>{if(state.locked){navigate("/engagement/bbawc/planning")}else{update({},"Fieldwork unlocks once Planning is Approved & Locked.")}}}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting becomes available after Fieldwork. It is out of scope for this Planning demo.")}><FileCheck2/><span>Reporting</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>{navigate("/engagement/bbawc/planning/data");update({},"Documents live in Data Foundation — showing the Trial Balance, General Ledger and client uploads")}}><FolderOpen/><span>Documents</span></button></div></div></div>}
-      <p className="nav-label practice">Practice</p><button className={`nav-item ${path==="/clients"?"active":""}`} onClick={()=>navigate("/clients")}><Users/><span>Clients</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
+      <p className="nav-label">Current client</p><div className="sidebar-client-picker" ref={clientPickerRef}><button className={`engagement-branch compact ${clientListOpen?"open":""}`} aria-expanded={clientListOpen} onClick={()=>setClientListOpen(v=>!v)}><span className="avatar square">{currentEngagement.initials}</span><span><strong>{currentEngagement.shortName}</strong><small>{currentEngagement.displayType} · {currentEngagement.fiscalYear}</small></span><ChevronDown/></button>{clientListOpen&&<div className="sidebar-client-list"><div className="sidebar-client-list-head"><strong>Switch client</strong><small>{engagementCatalog.length} active engagements</small></div>{engagementCatalog.map(item=><button key={item.id} className={item.id===currentEngagement.id?"selected":""} onClick={()=>{setClientListOpen(false);update({activeClientId:item.id},`Switched audit workspace to ${item.clientName}`);navigate("/dashboard")}}><span className="avatar square">{item.initials}</span><span><strong>{item.clientName}</strong><small>{item.displayType} · {item.periodShort}</small></span>{item.id===currentEngagement.id&&<Check/>}</button>)}</div>}</div>
+      <div className="client-section-nav"><p className="nav-label">Client workspace</p><button className={`nav-item ${path==="/dashboard"||inEngagement&&!inPlanning&&!inDocuments?"active":""}`} onClick={()=>navigate("/dashboard")}><Gauge/><span>Overview</span></button><button className={`nav-item ${inDocuments?"active":""}`} onClick={()=>navigate("/engagement/bbawc/documents")}><FolderOpen/><span>Documents</span></button><div className={`planning-nav-branch ${inPlanning?"open":""}`}><button className={`nav-item planning-parent ${inPlanning?"active":""}`} aria-expanded={inPlanning} onClick={()=>navigate("/engagement/bbawc/planning")}><ClipboardCheck/><span>Planning</span><b>{planningProgressPct(state)}%</b><ChevronDown/></button>{inPlanning&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Overview</span></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)} title={phase.status}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}</div><button className="nav-item" onClick={()=>update({},"Fieldwork unlocks after Planning approval")}><Search/><span>Fieldwork</span><LockKeyhole className="tiny-nav-lock"/></button><button className="nav-item" onClick={()=>update({},"Reporting becomes available after Fieldwork")}><BarChart3/><span>Report</span><LockKeyhole className="tiny-nav-lock"/></button></div>
+      <p className="nav-label practice">Firm</p><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>Baldeep Singh Chhabra · Partner</span></div></div>
   </aside>;
 }
 
 function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; navigate: (p: string) => void; onMenu: () => void; demoOpen: boolean; setDemoOpen: (v: boolean) => void }) {
+  const currentEngagement=selectedEngagement(state);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
@@ -397,7 +412,7 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
   return <><header className="topbar">
     <button className="icon-btn hamburger" onClick={onMenu}><Menu size={20}/></button>
     <div className="top-actions" ref={topActionsRef}>
-      <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "QuickBooks connection tested successfully" : "QuickBooks reconnected safely")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "QuickBooks connected" : "Reconnect QuickBooks"}</button>
+      <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? `${currentEngagement.accountingSystem} connection tested successfully` : `${currentEngagement.accountingSystem} reconnected safely`)}><ShieldCheck size={16}/>{state.connector === "Connected" ? `${currentEngagement.accountingSystem} connected` : `Reconnect ${currentEngagement.accountingSystem}`}</button>
       <div className="topbar-popover">
         <button className="year-select" aria-expanded={yearOpen} onClick={() => { setYearOpen(!yearOpen); setNotifOpen(false); setNotifFilterOpen(false); setProfileOpen(false); }}><CalendarDays size={16}/><span>FY {state.viewYear}</span><ChevronDown size={14}/></button>
         {yearOpen && <div className="dropdown-menu year-menu">
@@ -441,6 +456,7 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
 }
 
 function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoState }) {
+  const engagement=selectedEngagement(state);
   const [filter,setFilter]=useState<"My priorities"|"Due soon"|"In review"|"All">("My priorities");
   const tasks=[
     {title:"Complete independence confirmations",area:"Commence · Independence",status:"Due today",tone:"danger",due:"Today",progress:85,route:"setup",priority:1,review:false},
@@ -460,13 +476,27 @@ function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoStat
 }
 
 function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; setTourOpen: (v:boolean)=>void }) {
-  const pct=planningProgressPct(state); const next=nextOpenPhase(state); const items=attentionItems(state); const declined=state.acceptanceDecision==="decline";
-  const phases=getPhases(state); const current=next||phases[phases.length-1];
-  const lockedPhases=phases.map(p=>({title:p.title,status:"Locked"}));
-  const isAdmin=state.role==="Firm Administrator"||state.role==="Partner"||state.role==="Manager";
+  const [collabAudience,setCollabAudience]=useState<"My team"|"Client">("My team");
+  const currentEngagement=selectedEngagement(state); const pct=planningProgressPct(state); const next=nextOpenPhase(state); const items=attentionItems(state); const declined=state.acceptanceDecision==="decline";
+  const isLiveClient=state.activeClientId==="bbawc";
+  const lifecycle=[{label:"Planning",progress:pct,status:declined?"Paused":state.planningStatus,route:"/engagement/bbawc/planning"},{label:"Fieldwork",progress:state.locked?8:0,status:state.locked?"Available":"Locked",route:""},{label:"Report",progress:0,status:"Locked",route:""},{label:"Completion",progress:0,status:"Locked",route:""}];
+  const statusData=[{name:"Draft",value:3,color:"#ef5c62"},{name:"Prepared",value:5,color:"#f4a23a"},{name:"In review",value:2,color:"#7560df"},{name:"Complete",value:8,color:"#35aa6c"}];
+  const dueData=[{name:"Overdue",value:2,fill:"#ef5c62"},{name:"0–7 days",value:5,fill:"#f0a43a"},{name:"8–14 days",value:3,fill:"#7560df"},{name:"15+ days",value:1,fill:"#b8acef"}];
+  const userData=collabAudience==="My team"?[{name:"JA",value:7},{name:"MK",value:4},{name:"OO",value:2},{name:"LC",value:3}]:[{name:"DC",value:6},{name:"MS",value:4},{name:"AP",value:2}];
   const viewingOtherYear=state.viewYear!==2025;
+  if(!isLiveClient)return <div className="page dashboard-page dashboard-refined">
+    <div className="client-dashboard-head"><div className="avatar square">{currentEngagement.initials}</div><div><p className="eyebrow">Client audit workspace</p><h1>{currentEngagement.clientName}</h1><p>{currentEngagement.industry} · {currentEngagement.reportingFramework}</p></div><div className="client-head-facts"><span><i className="head-fact-icon audit"><FileCheck2/></i><span><small>Audit profile</small><strong>{currentEngagement.displayType} · {currentEngagement.fiscalYear}</strong><em>Period ended {currentEngagement.periodShort}</em></span></span><span><i className="head-fact-icon deadline"><CalendarDays/></i><span><small>Reporting deadline</small><strong>{currentEngagement.reportingDeadline}</strong><em>From engagement letter</em></span></span></div></div>
+    <section className="section-card">
+      <div className="empty-state">
+        <LockKeyhole/>
+        <strong>Full audit data isn't available for {currentEngagement.clientName}</strong>
+        <p>This prototype's live Planning, Fieldwork and Report data is scoped to Riverside Youth &amp; Family Services, Inc. — the one fully interactive engagement in this demo. {currentEngagement.clientName} appears here as a portfolio example only.</p>
+        <button className="primary-btn" style={{marginTop:14}} onClick={()=>update({activeClientId:"bbawc"},"Switched to Riverside Youth & Family Services, Inc.")}>Open Riverside's live engagement <ArrowRight size={16}/></button>
+      </div>
+    </section>
+  </div>;
   if(viewingOtherYear)return <div className="page dashboard-page dashboard-refined">
-    <div className="page-heading"><div><p className="eyebrow">Tuesday, August 12</p><h1>Good afternoon, Oscar</h1><p>Viewing FY {state.viewYear}.</p></div><button className="secondary-btn" onClick={() => navigate("/engagements")}>All engagements <ArrowRight size={16}/></button></div>
+    <div className="page-heading"><div><p className="eyebrow">{currentEngagement.shortName}</p><h1>Client audit dashboard</h1><p>Viewing FY {state.viewYear}.</p></div></div>
     <section className="section-card">
       <div className="empty-state">
         <CalendarDays/>
@@ -477,33 +507,15 @@ function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen }: { nav
     </section>
   </div>;
   return <div className="page dashboard-page dashboard-refined">
-    <div className="page-heading"><div><p className="eyebrow">Tuesday, August 12</p><h1>Good afternoon, Oscar</h1><p>{isAdmin?"Here is exactly where every engagement stands in the audit lifecycle.":"Here is the one engagement that needs your attention today."}</p></div><button className="secondary-btn" onClick={() => navigate("/engagements")}>All engagements <ArrowRight size={16}/></button></div>
-    {isAdmin&&<div className="portfolio-stats"><Metric label="Engagements" value="2" detail={`${declined?"1 declined":"1 in progress"} · 1 approved & locked`}/><Metric label="Need attention" value={String(items.length)} detail={items.length?items[0]:"Nothing blocking review"}/><Metric label="Planning progress" value={`${pct}%`} detail={`${engagement.shortName} · ${current.title}`}/></div>}
-    <div className="dashboard-focus-grid">
-      <section className="focus-engagement">
-        <div className="focus-engagement-head"><div className="avatar square">{engagement.initials}</div><div><span className="eyebrow">{engagement.displayType} · {engagement.fiscalYear}</span><h2>{engagement.clientName}</h2><p>Period ended {engagement.periodEnd}</p></div><span className={`status-pill ${declined?"danger":"progress"}`}>{declined?"Declined":state.planningStatus}</span></div>
-        <div className="focus-progress"><div><span>Planning progress</span><strong>{pct}%</strong></div><i><em style={{width:`${pct}%`}}/></i></div>
-        <div className="focus-next"><div className={declined?"danger":""}>{declined?<AlertCircle/>:<ClipboardCheck/>}<span><small>Next best action</small><strong>{declined?"Review acceptance decision":next?next.title:"Planning review"}</strong><p>{declined?"Planning is paused until the engagement decision changes.":next?.detail||"All planning phases are ready for review."}</p></span></div><button className="primary-btn" onClick={() => navigate(declined?"/engagement/bbawc/planning/setup":"/engagement/bbawc/planning")}>Open planning <ArrowRight/></button></div>
-      </section>
-      <aside className="today-panel"><div className="section-title"><div><p className="eyebrow">Today</p><h2>Review queue</h2></div><span>{items.length}</span></div>{items.length?items.slice(0,3).map((item,i)=><button key={item} onClick={()=>navigate("/engagement/bbawc/planning")}><i className={i===0?"red":"amber"}>{i===0?<AlertCircle/>:<Clock3/>}</i><span><strong>{item}</strong><small>{engagement.shortName} · Planning</small></span><ChevronRight/></button>):<div className="today-empty"><CheckCircle2/><strong>You are caught up</strong><span>No planning items need attention.</span></div>}</aside>
+    <div className="client-dashboard-head"><div className="avatar square">{currentEngagement.initials}</div><div><p className="eyebrow">Client audit workspace</p><h1>{currentEngagement.clientName}</h1><p>{currentEngagement.industry} · {currentEngagement.reportingFramework}</p></div><div className="client-head-facts"><span><i className="head-fact-icon audit"><FileCheck2/></i><span><small>Audit profile</small><strong>{currentEngagement.displayType} · {currentEngagement.fiscalYear}</strong><em>Period ended {currentEngagement.periodShort}</em></span></span><span><i className="head-fact-icon deadline"><CalendarDays/></i><span><small>Reporting deadline</small><strong>{currentEngagement.reportingDeadline}</strong><em>From engagement letter</em></span></span></div></div>
+    <section className="lifecycle-board"><div className="section-title"><div><h2>Audit lifecycle</h2><p>Move directly into the current stage for this client.</p></div><span className={`status-pill ${declined?"danger":"progress"}`}>{declined?"Engagement paused":state.planningStatus}</span></div><div className="lifecycle-cards">{lifecycle.map((stage,index)=><button key={stage.label} className={`${index===0?"current":""} ${stage.status==="Locked"?"locked":""}`} onClick={()=>stage.route?navigate(stage.route):update({},`${stage.label} becomes available when the prior audit stage is approved`)}><span className="lifecycle-number">{stage.status==="Locked"?<LockKeyhole/>:index+1}</span><span><strong>{stage.label}</strong><small>{stage.status}</small></span><b>{stage.progress}%</b><i><em style={{width:`${stage.progress}%`}}/></i>{index<lifecycle.length-1&&<ArrowRight className="lifecycle-arrow"/>}</button>)}</div></section>
+    <div className="dashboard-focus-grid client-focus-grid"><section className="focus-engagement next-action-card"><div className="next-action-head"><span className={declined?"danger":""}>{declined?<AlertCircle/>:<Zap/>}</span><div><p className="eyebrow">Recommended next step</p><h2>{declined?"Review acceptance decision":next?next.title:"Planning review"}</h2></div><span className={`status-pill ${declined?"danger":"progress"}`}>{declined?"Blocked":"Priority 1"}</span></div><p className="next-action-copy">{declined?"Planning is paused until the engagement decision changes.":next?.detail||"All planning phases are ready for review."}</p><div className="next-action-progress"><span><b>{pct}%</b> of Planning complete</span><i><em style={{width:`${pct}%`}}/></i></div><div className="next-action-signals"><span><AlertCircle/><span><small>Resolve before review</small><strong>{state.independenceOutstanding>0?`${state.independenceOutstanding} independence confirmations`:items[0]||"No blocking items"}</strong></span></span><span><Users/><span><small>Owner and due date</small><strong>{state.teamMembers[0]?.name||currentEngagement.manager} · Today</strong></span></span></div><div className="next-action-footer"><span><Clock3/>About 8 minutes</span><button className="primary-btn" onClick={() => navigate(declined?"/engagement/bbawc/planning/setup":next?`/engagement/bbawc/planning/${next.route}`:"/engagement/bbawc/planning")}>Continue <ArrowRight/></button></div></section><aside className="today-panel"><div className="section-title"><div><p className="eyebrow">Today</p><h2>Your queue</h2></div><span>{items.length}</span></div>{items.length?items.slice(0,3).map((item,i)=><button key={item} onClick={()=>navigate(`/engagement/bbawc/planning/${attentionItemRoute(item)}`)}><i className={i===0?"red":"amber"}>{i===0?<AlertCircle/>:<Clock3/>}</i><span><strong>{item}</strong><small>{currentEngagement.shortName} · Planning</small></span><ChevronRight/></button>):<div className="today-empty"><CheckCircle2/><strong>You are caught up</strong><span>No items need attention.</span></div>}</aside></div>
+    <div className="collaboration-grid">
+      <section className="collab-card"><div className="section-title"><div><h2>Collaboration by status</h2><p>Requests and review items for this client.</p></div><InfoTip title="Collaboration status" text="Shows the current state of client requests, prepared work and auditor review items for this engagement." standard="Engagement workspace"/></div><div className="donut-layout"><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusData} dataKey="value" innerRadius={50} outerRadius={72} paddingAngle={3} isAnimationActive={false}>{statusData.map(item=><Cell key={item.name} fill={item.color}/>)}</Pie></PieChart></ResponsiveContainer><strong>{statusData.reduce((sum,item)=>sum+item.value,0)}<small>items</small></strong></div><div className="chart-legend">{statusData.map(item=><span key={item.name}><i style={{background:item.color}}/><b>{item.name}</b><em>{item.value}</em></span>)}</div></div></section>
+      <section className="collab-card"><div className="section-title"><div><h2>Collaboration by due date</h2><p>Open items grouped by urgency.</p></div><InfoTip title="Due-date view" text="Highlights overdue and upcoming collaboration items so the audit team can follow up in priority order." standard="Engagement management"/></div><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={dueData} layout="vertical" margin={{left:6,right:18}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" hide/><YAxis dataKey="name" type="category" width={72} tick={{fontSize:10}} axisLine={false} tickLine={false}/><Bar dataKey="value" radius={[0,6,6,0]} isAnimationActive={false}>{dueData.map(item=><Cell key={item.name} fill={item.fill}/>)}</Bar></BarChart></ResponsiveContainer></div></section>
+      <section className="collab-card"><div className="section-title"><div><h2>Collaboration by user</h2><p>{collabAudience==="My team"?"Open work across the assigned audit team.":"Open requests across client contacts."}</p></div><div className="audience-toggle" aria-label="Collaboration audience">{(["My team","Client"] as const).map(option=><button key={option} className={collabAudience===option?"active":""} aria-pressed={collabAudience===option} onClick={()=>setCollabAudience(option)}>{option}</button>)}</div></div><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={userData} margin={{top:10,right:10,left:-20}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:9}} axisLine={false} tickLine={false}/><Bar dataKey="value" fill={collabAudience==="My team"?"#7560df":"#35aa6c"} radius={[6,6,0,0]} isAnimationActive={false}/></BarChart></ResponsiveContainer></div></section>
     </div>
-    <section className="section-card portfolio-card"><div className="section-title"><div><h2>Engagement portfolio</h2><p>Every engagement and exactly which audit-lifecycle stage it's on.</p></div><button className="secondary-btn" onClick={()=>navigate("/engagements")}>View all <ArrowRight size={16}/></button></div>
-      <div className="portfolio-list">
-        <button className="portfolio-row" onClick={()=>navigate(declined?"/engagement/bbawc/planning/setup":"/engagement/bbawc/planning")}>
-          <div className="portfolio-id"><div className="avatar square">{engagement.initials}</div><div><strong>{engagement.clientName}</strong><span>{engagement.displayType} · {engagement.fiscalYear}</span></div></div>
-          <PhaseStepper phases={phases}/>
-          <div className="portfolio-stage"><strong>{current.title}</strong><span className={`status-pill ${statusClass(current.status)}`}>{current.status}</span></div>
-          <ChevronRight/>
-        </button>
-        <button className="portfolio-row" onClick={()=>navigate("/engagements")}>
-          <div className="portfolio-id"><div className="avatar square muted">HC</div><div><strong>Harbor Community Foundation</strong><span>Financial Audit · FY 2025</span></div></div>
-          <PhaseStepper phases={lockedPhases}/>
-          <div className="portfolio-stage"><strong>Publish &amp; Approval</strong><span className="status-pill approved">Approved &amp; locked</span></div>
-          <ChevronRight/>
-        </button>
-      </div>
-    </section>
-    <section className="dashboard-quick"><button onClick={()=>navigate("/engagement/bbawc")}><LayoutDashboard/><span><strong>Engagement overview</strong><small>Progress, requests and timeline</small></span><ArrowRight/></button><button onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><History/><span><strong>Recent activity</strong><small>Audit trail and review history</small></span><ArrowRight/></button><button onClick={()=>navigate("/engagements")}><BriefcaseBusiness/><span><strong>Engagements</strong><small>Search current and prior periods</small></span><ArrowRight/></button></section>
+    <section className="ingest-progress-card"><div><p className="eyebrow">Data foundation</p><h2>Ingest progress</h2><p>Step 6 of 8 · Map financial statement categories</p></div><div className="ingest-steps">{[1,2,3,4,5,6,7,8].map(step=><i key={step} className={step<6?"done":step===6?"current":""}>{step<6?<Check/>:step}</i>)}</div><button className="secondary-btn" onClick={()=>navigate("/engagement/bbawc/planning/data")}>Continue data mapping <ArrowRight/></button></section>
   </div>;
 }
 
@@ -561,7 +573,35 @@ function Clients({ navigate, state }: { navigate:(p:string)=>void; state:DemoSta
   </div>;
 }
 
+function DocumentsPage({navigate,state,update}:{navigate:(p:string)=>void;state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const engagement=selectedEngagement(state);
+  const [query,setQuery]=useState("");
+  const [category,setCategory]=useState("All documents");
+  const folders=[
+    {name:"Engagement & governance",count:4,detail:"Letters, minutes and legal records",icon:<BriefcaseBusiness/>},
+    {name:"Client-provided records",count:8,detail:"Policies, contracts and schedules",icon:<Users/>},
+    {name:"Planning evidence",count:6,detail:"Evidence linked to workpapers",icon:<ClipboardCheck/>},
+    {name:"Audit outputs",count:3,detail:"Memos and approved deliverables",icon:<FileCheck2/>},
+  ];
+  const documents=[
+    {name:"Signed Engagement Letter.pdf",category:"Engagement & governance",source:"AssurePro",workpaper:"Engagement Foundation",updated:"Aug 4, 2025",status:"Final"},
+    {name:"Board Minutes — Q4 2025.pdf",category:"Engagement & governance",source:"Dana Collins",workpaper:"Understanding the entity",updated:"2 hours ago",status:"Received"},
+    {name:"Accounting Policy Handbook.pdf",category:"Client-provided records",source:"Dana Collins",workpaper:"Internal control & IT",updated:"Yesterday",status:"In review"},
+    {name:"Final Trial Balance.xlsx",category:"Client-provided records",source:engagement.accountingSystem,workpaper:"Data Foundation",updated:"Aug 11, 2025",status:"Validated"},
+    {name:"City Grant Agreement.pdf",category:"Planning evidence",source:"Jasmine Alvarez",workpaper:"Risk assessment",updated:"Aug 10, 2025",status:"Linked"},
+    {name:"Fraud Discussion Minutes.pdf",category:"Planning evidence",source:"Oscar Owner",workpaper:"Engagement Foundation",updated:"Aug 9, 2025",status:"Final"},
+    {name:"Planning Memo — Draft v1.pdf",category:"Audit outputs",source:"AssureAudit",workpaper:"Publish & Approval",updated:"18 min ago",status:"Draft"},
+  ];
+  const visible=documents.filter(doc=>(category==="All documents"||doc.category===category)&&`${doc.name} ${doc.source} ${doc.workpaper}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="page documents-page"><div className="module-page-head"><span className="module-head-icon"><FolderOpen/></span><div><div className="breadcrumbs"><button onClick={()=>navigate("/dashboard")}>Overview</button><ChevronRight/><span>Documents</span></div><h1>Documents</h1><p>{engagement.shortName} · Files, evidence and approved outputs for {engagement.fiscalYear}</p></div><div className="module-head-summary"><small>Current library</small><strong>21 documents</strong><span><CheckCircle2/>7 final & locked</span></div></div>
+    <div className="document-summary"><Metric label="All documents" value="21" detail="Across the current engagement"/><Metric label="Client provided" value="8" detail="2 received this week"/><Metric label="Needs review" value="3" detail="Assigned to the audit team"/><Metric label="Final & locked" value="7" detail="Retained with audit history"/></div>
+    <div className="document-folders">{folders.map(folder=><button key={folder.name} className={category===folder.name?"active":""} onClick={()=>setCategory(category===folder.name?"All documents":folder.name)}><span>{folder.icon}</span><div><strong>{folder.name}</strong><small>{folder.detail}</small></div><b>{folder.count}</b><ChevronRight/></button>)}</div>
+    <section className="document-library"><div className="document-toolbar"><div><h2>{category}</h2><p>{visible.length} file{visible.length===1?"":"s"} shown</p></div><div className="search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search documents, source or workpaper"/></div>{category!=="All documents"&&<button className="secondary-btn" onClick={()=>setCategory("All documents")}><X/>Clear folder</button>}<button className="secondary-btn document-upload" onClick={()=>update({},"Upload window opened — choose a client document and its destination workpaper")}><UploadCloud/>Upload</button></div><div className="document-table-head"><span>Document</span><span>Source</span><span>Linked workpaper</span><span>Updated</span><span>Status</span><span/></div>{visible.map(doc=><button className="document-row" key={doc.name} onClick={()=>update({},`Opening ${doc.name} in the document viewer`)}><span className="document-file-icon"><FileText/></span><span className="document-name"><strong>{doc.name}</strong><small>{doc.category}</small></span><span>{doc.source}</span><span><Link2/>{doc.workpaper}</span><span>{doc.updated}</span><span className={`status-pill ${doc.status==="Draft"?"warning":doc.status==="In review"?"progress":"approved"}`}>{doc.status}</span><MoreHorizontal/></button>)}{visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the folder or search to see the full client library.</p></div>}</section>
+  </div>
+}
+
 function EngagementHome({ navigate, state, update }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void }) {
+  const engagement=selectedEngagement(state);
   const [editOpen, setEditOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const phases = getPhases(state); const declined = state.acceptanceDecision === "decline"; const foundationDone = phases[0].status === "Complete"; const dataDone = phases[1].status === "Complete"; const pct=planningProgressPct(state); const blockers=attentionItems(state).length; const riskList=allRisks(state); const highRiskCount=riskList.filter(r=>r.level==="High").length;
@@ -585,20 +625,29 @@ function EngagementHome({ navigate, state, update }: { navigate: (p: string) => 
 function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawerOpen, setDrawerOpen, demoOpen, setDemoOpen }: any) {
   const view = path.split("/").pop() || "planning";
   const activeView = view === "planning" ? "overview" : view;
+  const isLiveClient = state.activeClientId === "bbawc";
+  const currentEngagement = selectedEngagement(state);
   return <div className="planning-layout">
     <section className={`planning-workspace ${drawerOpen ? "with-drawer" : ""}`}>
       <PlanningHeader state={state} update={update} navigate={navigate} activeView={activeView} demoOpen={demoOpen} setDemoOpen={setDemoOpen}/>
       <div className="workspace-scroll">
-        {activeView === "overview" && <PlanningOverview state={state} update={update} navigate={navigate}/>} 
-        {activeView === "setup" && <SetupView state={state} update={update}/>} 
-        {activeView === "data" && <DataView state={state} update={update}/>} 
-        {activeView === "entity-controls" && <EntityControls state={state} update={update}/>} 
-        {activeView === "materiality" && <Materiality state={state} update={update}/>} 
-        {activeView === "risks" && <RisksView state={state} update={update} navigate={navigate}/>} 
-        {activeView === "responses" && <ResponsesView state={state} update={update}/>} 
-        {activeView === "publish" && <PublishView state={state} update={update} navigate={navigate}/>} 
-        {activeView === "review" && <ReviewView state={state} update={update}/>} 
+        {!isLiveClient ? <div className="content-pad"><div className="empty-state">
+          <LockKeyhole/>
+          <strong>Planning isn't available for {currentEngagement.clientName}</strong>
+          <p>This prototype's Planning data — materiality, risk register, responses, approvals — is scoped to Riverside Youth &amp; Family Services, Inc., the one fully interactive engagement in this demo. Other clients are portfolio examples for the dashboard and directory views only.</p>
+          <button className="primary-btn" style={{marginTop:14}} onClick={()=>update({activeClientId:"bbawc"},"Switched to Riverside Youth & Family Services, Inc.")}>Return to Riverside <ArrowRight size={16}/></button>
+        </div></div> : <>
+        {activeView === "overview" && <PlanningOverview state={state} update={update} navigate={navigate}/>}
+        {activeView === "setup" && <SetupView state={state} update={update}/>}
+        {activeView === "data" && <DataView state={state} update={update}/>}
+        {activeView === "entity-controls" && <EntityControls state={state} update={update}/>}
+        {activeView === "materiality" && <Materiality state={state} update={update}/>}
+        {activeView === "risks" && <RisksView state={state} update={update} navigate={navigate}/>}
+        {activeView === "responses" && <ResponsesView state={state} update={update}/>}
+        {activeView === "publish" && <PublishView state={state} update={update} navigate={navigate}/>}
+        {activeView === "review" && <ReviewView state={state} update={update}/>}
         {activeView === "audit-trail" && <AuditTrail state={state} update={update}/>}
+        </>}
       </div>
     </section>
     <ContextDrawer drawer={drawer} setDrawer={setDrawer} open={drawerOpen} setOpen={setDrawerOpen} update={update} activeView={activeView} navigate={navigate}/>
@@ -606,9 +655,10 @@ function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawe
 }
 
 function PlanningHeader({ state, update, navigate, activeView, demoOpen, setDemoOpen }: any) {
+  const engagement=selectedEngagement(state);
   const titles: Record<string,string> = { overview:"Engagement planning", setup:"Engagement Foundation", data:"Data Foundation", "entity-controls":"Entity & Controls", materiality:"Materiality", risks:"Risk Assessment", responses:"Audit Response", publish:"Publish & Approval", review:"Review & approval", "audit-trail":"Audit trail" };
   const declined = state.acceptanceDecision === "decline";
-  return <div className="planning-header"><div><div className="breadcrumbs"><button onClick={()=>navigate("/engagement/bbawc/planning")}>Planning</button>{activeView!=="overview"&&<><ChevronRight/><span>{titles[activeView]}</span></>}</div><div className="title-line"><h1>{titles[activeView]}</h1><span className={`status-pill ${declined ? "danger" : state.locked ? "approved" : "progress"}`}>{declined ? "Engagement declined" : state.locked ? "Approved & locked" : state.planningStatus}</span>{state.reopened && <span className="status-pill danger">Reopened</span>}</div><p>{engagement.fiscalYear} · Period ended {engagement.periodEnd}</p></div>
+  return <div className="planning-header"><span className="module-head-icon"><ClipboardCheck/></span><div className="planning-head-copy"><div className="breadcrumbs"><button onClick={()=>navigate("/engagement/bbawc/planning")}>Planning</button>{activeView!=="overview"&&<><ChevronRight/><span>{titles[activeView]}</span></>}</div><div className="title-line"><h1>{titles[activeView]}</h1><span className={`status-pill ${declined ? "danger" : state.locked ? "approved" : "progress"}`}>{declined ? "Engagement declined" : state.locked ? "Approved & locked" : state.planningStatus}</span>{state.reopened && <span className="status-pill danger">Reopened</span>}</div><p>{engagement.shortName} · {engagement.fiscalYear} · Period ended {engagement.periodEnd}</p></div>
     <div className="header-actions"><span className="saved"><Check size={14}/>Saved 2:42 PM IST <i>· stored in UTC</i></span></div></div>;
 }
 
@@ -624,6 +674,7 @@ function PlanningOverview({ state, update, navigate }: { state: DemoState; updat
 }
 
 function EngagementPlanningSummary({state,navigate}:{state:DemoState;navigate:(p:string)=>void}){
+  const engagement=selectedEngagement(state);
   const [detailsOpen,setDetailsOpen]=useState(false);
   const team=state.teamMembers.filter(member=>member.status!=="Guest");
   return <section className="engagement-snapshot">
@@ -635,6 +686,7 @@ function EngagementPlanningSummary({state,navigate}:{state:DemoState;navigate:(p
 }
 
 function SetupView({ state, update }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+  const engagement=selectedEngagement(state);
   const [tab,setTab]=useState("Acceptance & continuance");
   const [tabsDone,setTabsDone]=useState<Record<string,boolean>>({});
   const tabs=["Acceptance & continuance","Independence","Engagement details","Strategy & resources"];
@@ -667,6 +719,7 @@ function SetupView({ state, update }: { state:DemoState; update:(p:Partial<DemoS
 
 const RECON_CYCLE: Record<string,string> = { "Accepted":"Investigate", "Investigate":"Resolved", "Resolved":"Accepted" };
 function DataView({ state, update }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+  const engagement=selectedEngagement(state);
   const [tab,setTab]=useState("Import"); const [upload,setUpload]=useState(100); const [unmappedOnly,setUnmappedOnly]=useState(true);
   const reconRows=state.reconciliationRows;
   const cycleRecon=(account:string)=>update({reconciliationRows:reconRows.map(r=>r.account===account?{...r,status:RECON_CYCLE[r.status]||"Accepted"}:r)});
@@ -749,7 +802,7 @@ function Materiality({ state, update }: { state:DemoState; update:(p:Partial<Dem
       <article className="materiality-card calculation-card"><MaterialityCardTitle title="Performance materiality" help="An amount set below overall materiality to reduce the probability that aggregate uncorrected and undetected misstatements exceed overall materiality." standard="ISA 320 · firm methodology"/><div className="big-value">{money(performance)}</div><div className="slider-control"><input aria-label="Performance materiality percentage" type="range" min="40" max="90" value={state.performancePct} onChange={e=>update({performancePct:Number(e.target.value),...(state.materialityLocked?{materialityLocked:false}:{})},state.materialityLocked?"Performance materiality changed — Materiality conclusion reopened for reconfirmation":undefined)}/><strong>{state.performancePct}%</strong></div><span className="method-range">Illustrative firm range: 50%–75%; lower percentages generally reflect higher aggregation or engagement risk.</span></article>
       <article className="materiality-card calculation-card"><MaterialityCardTitle title="Clearly trivial threshold" help="An amount below which misstatements need not be accumulated only when they are clearly inconsequential, individually and in aggregate. ‘Clearly trivial’ is not another expression for ‘not material.’" standard="PCAOB AS 2810.10–.11 · ISA 450"/><div className="big-value">{money(trivial)}</div><div className="slider-control"><input aria-label="Clearly trivial percentage" type="range" min="1" max="5" value={state.trivialPct} onChange={e=>update({trivialPct:Number(e.target.value),...(state.materialityLocked?{materialityLocked:false}:{})},state.materialityLocked?"Clearly trivial threshold changed — Materiality conclusion reopened for reconfirmation":undefined)}/><strong>{state.trivialPct}%</strong></div><span className="method-range">Firm cap: up to 5% of overall materiality. If there is uncertainty, accumulate the misstatement.</span></article>
     </section>
-    <div className="materiality-support"><div className="chart-card"><div className="section-title"><div><h3>Benchmark trend</h3><p>Preliminary, final and prior-period data</p></div><button className="text-link" onClick={()=>setTbSourcesOpen(true)}><Link2/>View TB sources</button></div><ResponsiveContainer width="100%" height={190}><BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name" axisLine={false}/><YAxis tickFormatter={v=>`$${v/1000000}m`} axisLine={false}/><Tooltip formatter={(v)=>money(Number(v))}/><Bar dataKey="value" radius={[8,8,0,0]} fill="#6d55dc"/></BarChart></ResponsiveContainer></div><div className="section-card judgment-card"><h3>Required judgment</h3><p>Who uses the financial statements, and what could influence their decisions?</p><textarea defaultValue="Donors, grantors and the Board assess stewardship, program efficiency, liquidity and compliance with donor restrictions."/><CheckRow title="Qualitative factors considered" detail="Restrictions, related parties, compliance and sensitive disclosures" checked/><CheckRow title="Final TB change will trigger reassessment" detail="Materiality and downstream scopes become stale until reviewed" checked={state.finalTb}/></div></div>
+    <div className="materiality-support"><div className="chart-card"><div className="section-title"><div><h3>Benchmark trend</h3><p>Preliminary, final and prior-period data</p></div><button className="text-link" onClick={()=>setTbSourcesOpen(true)}><Link2/>View TB sources</button></div><ResponsiveContainer width="100%" height={190}><BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name" axisLine={false}/><YAxis tickFormatter={v=>`$${v/1000000}m`} axisLine={false}/><Bar dataKey="value" radius={[8,8,0,0]} fill="#6d55dc" isAnimationActive={false}/></BarChart></ResponsiveContainer></div><div className="section-card judgment-card"><h3>Required judgment</h3><p>Who uses the financial statements, and what could influence their decisions?</p><textarea defaultValue="Donors, grantors and the Board assess stewardship, program efficiency, liquidity and compliance with donor restrictions."/><CheckRow title="Qualitative factors considered" detail="Restrictions, related parties, compliance and sensitive disclosures" checked/><CheckRow title="Final TB change will trigger reassessment" detail="Materiality and downstream scopes become stale until reviewed" checked={state.finalTb}/></div></div>
     {state.groupAudit && <FormSection update={update} title="Component materiality" subtitle="Allocate materiality for this group audit."><div className="table-card"><table><thead><tr><th>Component</th><th>Allocation</th><th>Performance</th><th>Scope</th></tr></thead><tbody><tr><td>Brooklyn Youth Center</td><td>$132,000</td><td>$99,000</td><td>Full scope</td></tr><tr><td>Queens Family Services Program</td><td>$84,000</td><td>$63,000</td><td>Specified procedures</td></tr></tbody></table></div></FormSection>}
     {state.materialityLocked && <Banner tone="success" title="Materiality conclusion locked" text="Overall, Performance and Clearly Trivial materiality are locked for reference by Risk Assessment and Publish. Changing any input above will reopen this conclusion."/>}
     <div className="sticky-action-bar"><span>{state.materialityLocked?<><LockKeyhole size={16}/>Locked</>:<><CheckCircle2/>All materiality validations pass</>}</span><button className="secondary-btn" onClick={()=>update({},"Draft saved")}>Save draft</button><button className="primary-btn" disabled={(override&&!rationale)||state.materialityLocked} onClick={()=>update({materialityLocked:true},"Materiality conclusion completed and locked — downstream steps refreshed")}>{state.materialityLocked?<><Check size={16}/>Completed</>:"Complete materiality"}</button></div>
@@ -836,6 +889,7 @@ function ResponsesView({ state, update }: { state:DemoState; update:(p:Partial<D
 }
 
 function PublishPreviewModal({ title, state, onClose }: { title:string; state:DemoState; onClose:()=>void }) {
+  const engagement=selectedEngagement(state);
   const overall=state.materialityOverride?240000:state.benchmark*(state.materialityPct/100);
   const performance=overall*(state.performancePct/100); const trivial=overall*(state.trivialPct/100);
   const riskList=allRisks(state);
@@ -1124,6 +1178,7 @@ function GuidedTour({ path, navigate, close }: { path: string; navigate: (p: str
 function DemoControls({ state,update,close }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;close:()=>void}) { const action=(label:string,patch:Partial<DemoState>)=>update(patch,label); return <div className="demo-panel"><div className="demo-head"><div><span>Prototype only</span><h3>Demo controls</h3><p>Change the engagement state to test validations and transitions.</p></div><button className="icon-btn" onClick={close}><X/></button></div><label className="demo-role"><span>Preview experience as</span><select aria-label="Prototype role" value={state.role} onChange={e=>update({role:e.target.value as Role},`Viewing as ${e.target.value}`)}>{roleNames.map(r=><option key={r}>{r}</option>)}</select></label><div className="demo-actions"><button onClick={()=>action("All outstanding blockers cleared for the current phase",{independenceOutstanding:0,mapped:100,controlTotals:"Pass",transformationConfirmed:true,questionnaireStatus:"Validated",materialityLocked:true,responseGap:false})}><CheckCircle2/>Complete current step</button><button onClick={()=>action("Connector token expired — ingested data preserved",{connector:"Expired"})}><Cloud/>Simulate connector expiry</button><button onClick={()=>action("Control totals forced to failed state",{controlTotals:"Fail",transformationConfirmed:false})}><AlertCircle/>Force failed control totals</button><button onClick={()=>action("Prior-year structure loaded as editable drafts",{rolledForward:true})}><History/>Load rolled-forward engagement</button><button onClick={()=>action("Group-audit fields enabled",{groupAudit:true})}><Building2/>Switch to group audit</button><button onClick={()=>action("Preliminary materiality published",{publishVersion:state.publishVersion+1})}><Zap/>Publish preliminary materiality</button><button onClick={()=>action("Changed Final TB ingested — downstream steps stale",{finalTb:true,reopened:true,locked:false,managerApproved:false,partnerApproved:false,materialityLocked:false})}><FileSpreadsheet/>Ingest changed Final TB</button><button onClick={()=>action("Planning submitted for Manager review",{planningStatus:"Pending Manager Approval"})}><Send/>Submit for review</button><button onClick={()=>action("Manager approval recorded",{managerApproved:true,planningStatus:"Pending Partner Approval"})}><UserRound/>Approve as Manager</button><button disabled={!state.managerApproved} onClick={()=>state.managerApproved?action("Partner approval recorded — Fieldwork unlocked",{partnerApproved:true,locked:true,planningStatus:"Approved & Locked"}):update({},"Manager approval is required before Partner approval")}><ShieldCheck/>Approve as Partner</button><button onClick={()=>action("Planning reopened — 8 workpapers require re-review",{reopened:true,locked:false,managerApproved:false,partnerApproved:false,planningStatus:"Reopened"})}><RotateCcw/>Reopen Planning</button></div><button className="reset-demo" onClick={()=>{localStorage.removeItem("assureaudit-planning-demo");update(defaultState,"Demo engagement reset")}}><RefreshCw/>Reset engagement</button></div> }
 
 function ClientPortal({ state,update,onExit }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;onExit:()=>void}) {
+  const engagement=selectedEngagement(state);
   const [selectedTitle,setSelectedTitle]=useState<string|null>(null); const [answer,setAnswer]=useState(state.clientAnswer);
   const [notifOpen,setNotifOpen]=useState(false); const [commentDraft,setCommentDraft]=useState("");
   const notifRef=useDismissOnOutside(notifOpen,()=>setNotifOpen(false));

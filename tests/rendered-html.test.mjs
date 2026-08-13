@@ -9,7 +9,21 @@ test("keeps the AssureAudit application shell and focused dashboard", async () =
   ]);
   assert.match(layout, /title:\s*"AssureAudit Planning"/i);
   assert.match(page, /assure/);
-  assert.match(page, /Good afternoon, Oscar/);
+  assert.match(page, /Client audit workspace/);
+  assert.match(page, /Collaboration by status/);
+  assert.match(page, /setCollabAudience\(option\)/);
+  assert.match(page, /\["My team","Client"\]/);
+  assert.match(page, /\{label:"Report",progress:0,status:"Locked"/);
+  assert.match(page, /\{label:"Completion",progress:0,status:"Locked"/);
+  assert.match(page, /const engagementCatalog/);
+  assert.match(page, /className="sidebar-client-list"/);
+  assert.doesNotMatch(page, /client-switch-wrap/);
+  assert.match(page, /<Gauge\/><span>Overview<\/span>/);
+  assert.match(page, /<FolderOpen\/><span>Documents<\/span>/);
+  assert.match(page, /function DocumentsPage\(/);
+  assert.match(page, /className=\{`planning-nav-branch/);
+  assert.match(page, /className="module-page-head"/);
+  assert.doesNotMatch(page, /<Tooltip/);
   assert.match(page, /clientName: "Riverside Youth & Family Services, Inc\."/);
   assert.match(page, /displayType: "Financial Audit"/);
   assert.match(page, /fiscalYear: "FY 2025"/);
@@ -47,10 +61,14 @@ test("keeps materiality guidance contextual and calculates triviality from overa
   assert.match(page, /‘Clearly trivial’ is not another expression for ‘not material.’/);
 });
 
-test("uses one engagement navigation tree without recursively rendering the page", async () => {
+test("keeps one consistent sidebar and expands Planning as an in-place branch", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /<LayoutDashboard\/><span>Overview & planning<\/span>/);
+  assert.match(page, /<Gauge\/><span>Overview<\/span>/);
+  assert.match(page, /<FolderOpen\/><span>Documents<\/span>/);
+  assert.match(page, /className="client-section-nav"/);
+  assert.match(page, /className="branch-children"/);
+  assert.match(page, /<span>Review & approval<\/span>/);
   assert.match(page, /<EngagementPlanningSummary state=\{state\} navigate=\{navigate\}\/>/);
   assert.doesNotMatch(page, /<Home\/>/);
   assert.doesNotMatch(page, /className="planning-stepper"/);
