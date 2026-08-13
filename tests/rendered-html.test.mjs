@@ -23,7 +23,8 @@ test("keeps the AssureAudit application shell and focused dashboard", async () =
   assert.match(page, /function DocumentsPage\(/);
   assert.match(page, /className=\{`planning-nav-branch/);
   assert.match(page, /className="module-page-head"/);
-  assert.doesNotMatch(page, /<Tooltip/);
+  assert.match(page, /function ChartTooltip/);
+  assert.match(page, /<Tooltip content=\{<ChartTooltip/);
   assert.match(page, /clientName: "Riverside Youth & Family Services, Inc\."/);
   assert.match(page, /displayType: "Financial Audit"/);
   assert.match(page, /fiscalYear: "FY 2025"/);
