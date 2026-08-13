@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell,
   BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2,
   ChevronDown, ChevronLeft, ChevronRight, Circle, ClipboardCheck, Clock3,
   Cloud, Database, Download, FileCheck2, FileSpreadsheet, FileText, Filter,
-  FolderOpen, Gauge, History, Home as HomeIcon, Info, LayoutDashboard, Link2, ListChecks,
+  FolderOpen, Gauge, History, Info, LayoutDashboard, Link2, ListChecks,
   LockKeyhole, Menu, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
   Sparkles, Table2, UploadCloud, UserRound, Users, X, Zap
@@ -26,7 +26,20 @@ type EngagementTeamRole = "Junior" | "Senior" | "Manager" | "Engagement Leader" 
 type TeamMember = { id: string; name: string; initials: string; email: string; role: EngagementTeamRole; specialty?: string; status: "Active" | "Pending" | "Guest" };
 type ClientContact = { name: string; email: string; role: string; lastLogin: string; twoFA: boolean };
 type NotificationCategory = "Approval" | "Request" | "Client" | "System";
-type AppNotification = { id: string; actor: string; initials: string; title: string; detail: string; time: string; category: NotificationCategory; read: boolean };
+type AppNotification = { id: string; actor: string; initials: string; title: string; detail: string; time: string; category: NotificationCategory; read: boolean; route: string };
+
+function useDismissOnOutside(open:boolean,onClose:()=>void) {
+  const ref=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!open)return;
+    const dismiss=(event:PointerEvent)=>{if(ref.current&&!ref.current.contains(event.target as Node))onClose()};
+    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape")onClose()};
+    document.addEventListener("pointerdown",dismiss);
+    document.addEventListener("keydown",escape);
+    return()=>{document.removeEventListener("pointerdown",dismiss);document.removeEventListener("keydown",escape)};
+  },[open,onClose]);
+  return ref;
+}
 
 type DemoState = {
   role: Role;
@@ -110,12 +123,12 @@ const defaultState: DemoState = {
   coaTemplate: "AssureAudit Nonprofit (US)",
   auditLog: [],
   notifications: [
-    { id: "n1", actor: "Jasmine Alvarez", initials: "JA", title: "Requested your review", detail: "Independence confirmations — Engagement Foundation", time: "10 min ago", category: "Approval", read: false },
-    { id: "n2", actor: "Dana Collins", initials: "DC", title: "Submitted a client response", detail: "Understanding the Entity questionnaire", time: "1 hour ago", category: "Client", read: false },
-    { id: "n3", actor: "Meera Kapoor", initials: "MK", title: "Approved a workpaper", detail: "Risk assessment — Identify & assess", time: "3 hours ago", category: "Approval", read: false },
-    { id: "n4", actor: "AssureAudit Connector", initials: "QB", title: "Synced General Ledger", detail: "1,204 transactions from QuickBooks Online", time: "Yesterday", category: "System", read: true },
-    { id: "n5", actor: "Leo Chen", initials: "LC", title: "Accepted the engagement invitation", detail: "Joined as Senior (Tax specialist)", time: "Yesterday", category: "Request", read: true },
-    { id: "n6", actor: "Meera Kapoor", initials: "MK", title: "Commented on Materiality", detail: "\"Confirm the benchmark before locking.\"", time: "2 days ago", category: "Approval", read: true },
+    { id: "n1", actor: "Jasmine Alvarez", initials: "JA", title: "Requested your review", detail: "Independence confirmations — Engagement Foundation", time: "10 min ago", category: "Approval", read: false, route: "/engagement/bbawc/planning/setup" },
+    { id: "n2", actor: "Dana Collins", initials: "DC", title: "Submitted a client response", detail: "Understanding the Entity questionnaire", time: "1 hour ago", category: "Client", read: false, route: "/engagement/bbawc/planning/entity-controls" },
+    { id: "n3", actor: "Meera Kapoor", initials: "MK", title: "Approved a workpaper", detail: "Risk assessment — Identify & assess", time: "3 hours ago", category: "Approval", read: false, route: "/engagement/bbawc/planning/risks" },
+    { id: "n4", actor: "AssureAudit Connector", initials: "QB", title: "Synced General Ledger", detail: "1,204 transactions from QuickBooks Online", time: "Yesterday", category: "System", read: true, route: "/engagement/bbawc/planning/data" },
+    { id: "n5", actor: "Leo Chen", initials: "LC", title: "Accepted the engagement invitation", detail: "Joined as Senior (Tax specialist)", time: "Yesterday", category: "Request", read: true, route: "/engagement/bbawc" },
+    { id: "n6", actor: "Meera Kapoor", initials: "MK", title: "Commented on Materiality", detail: "\"Confirm the benchmark before locking.\"", time: "2 days ago", category: "Approval", read: true, route: "/engagement/bbawc/planning/materiality" },
   ],
 };
 
@@ -286,7 +299,21 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem("assureaudit-planning-demo");
-    if (saved) setState({ ...defaultState, ...JSON.parse(saved) });
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Partial<DemoState>;
+        setState({
+          ...defaultState,
+          ...parsed,
+          notifications: (parsed.notifications || defaultState.notifications).map((notification, index) => ({
+            ...defaultState.notifications[index % defaultState.notifications.length],
+            ...notification,
+          })),
+        });
+      } catch {
+        localStorage.removeItem("assureaudit-planning-demo");
+      }
+    }
     setPath(window.location.pathname === "/" ? "/dashboard" : window.location.pathname);
     const pop = () => setPath(window.location.pathname);
     window.addEventListener("popstate", pop);
@@ -296,7 +323,7 @@ export default function Home() {
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3200); return () => clearTimeout(t); }, [toast]);
 
   const navigate = (next: string) => {
-    window.history.pushState({}, "", next); setPath(next); setMobileNav(false); window.scrollTo({ top: 0, behavior: "smooth" });
+    window.history.pushState({}, "", next); setPath(next); setMobileNav(false); setDemoOpen(false); setDrawerOpen(false); window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const update = (patch: Partial<DemoState>, message?: string) => {
     setState(s => ({
@@ -316,13 +343,13 @@ export default function Home() {
     <div className="app-shell">
       <Sidebar path={path} navigate={navigate} state={state} update={update} mobileNav={mobileNav} setMobileNav={setMobileNav} />
       <main className="main-area">
-        <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} setTourOpen={setTourOpen} />
+        <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
-      {tourOpen ? <GuidedTour navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" title="Take a tour" onClick={() => setTourOpen(true)}><BookOpen size={20}/></button>}
+      {tourOpen ? <GuidedTour path={path} navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" aria-label="Open AssureAudit Guide" title="Open AssureAudit Guide" onClick={() => setTourOpen(true)}><BookOpen size={18}/><span>Guide</span></button>}
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
     </div>
   );
@@ -330,20 +357,22 @@ export default function Home() {
 
 function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { path: string; navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; mobileNav: boolean; setMobileNav: (v: boolean) => void }) {
   const inEngagement=path.startsWith("/engagement/"); const inPlanning=path.includes("/planning"); const active=path.split("/").pop()||"overview"; const branchLabels=["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"]; const phases=getPhases(state);
+  const [stagesOpen,setStagesOpen]=useState(inPlanning&&active!=="planning");
+  useEffect(()=>{if(inPlanning&&active!=="planning")setStagesOpen(true)},[inPlanning,active]);
   return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`} style={{transform: mobileNav ? "none" : undefined}}>
-    <div className="brand"><svg className="brand-mark" width="26" height="26" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4L45 40C45 40 41 44 36 44H24V4Z" fill="#6D55DC"/><path d="M24 4L3 40C3 40 7 44 12 44H24V4Z" fill="#9689F2"/><path d="M17.5 44L24 32.5L30.5 44H17.5Z" fill="#fff"/></svg><div><strong>assure</strong><span>audit</span></div><button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
+    <div className="brand"><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
     <nav>
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
-      {inEngagement&&<><p className="nav-label branch-label">Current engagement</p><button className="engagement-branch" onClick={()=>navigate("/engagement/bbawc")}><span className="avatar square">25</span><span><strong>FY 2025 engagement</strong><small>Period end · Dec 31</small></span><ChevronDown/></button><div className="branch-progress" title={`Planning ${planningProgressPct(state)}% complete`}><i style={{width:`${100-planningProgressPct(state)}%`}}/></div><div className="nav-branch"><button className={!inPlanning?"active":""} onClick={()=>navigate("/engagement/bbawc")}><HomeIcon/><span>Overview</span></button><button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>navigate("/engagement/bbawc/planning")}><ClipboardCheck/><span>Planning</span><ChevronDown/></button>{inPlanning&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Overview</span><b>{planningProgressPct(state)}%</b></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}<button onClick={()=>{if(state.locked){navigate("/engagement/bbawc")}else{update({},"Fieldwork unlocks once Planning is Approved & Locked.")}}}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting becomes available after Fieldwork. It is out of scope for this Planning demo.")}><FileCheck2/><span>Reporting</span></button><button onClick={()=>{navigate("/engagement/bbawc/planning/data");update({},"Documents live in Data Foundation — showing the Trial Balance, General Ledger and client uploads")}}><FolderOpen/><span>Documents</span></button></div></>}
-      <p className="nav-label practice">Practice</p><button className={`nav-item ${path==="/engagements"?"active":""}`} onClick={()=>navigate("/engagements")}><Users/><span>Clients</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
+      {inEngagement&&<div className="engagement-context"><button className="engagement-back" onClick={()=>navigate("/engagements")}><ArrowLeft/><span>All engagements</span></button><button className="engagement-branch" onClick={()=>navigate("/engagement/bbawc/planning")}><span className="avatar square">RY</span><span><strong>{engagement.shortName}</strong><small>{engagement.displayType} · {engagement.fiscalYear}</small></span><ChevronRight/></button><div className="engagement-progress"><span>Planning progress</span><strong>{planningProgressPct(state)}%</strong><i><em style={{width:`${planningProgressPct(state)}%`}}/></i></div><div className="nav-branch"><button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{if(inPlanning&&active==="planning")setStagesOpen(v=>!v);else{navigate("/engagement/bbawc/planning");setStagesOpen(true)}}}><LayoutDashboard/><span>Overview & planning</span><b>{planningProgressPct(state)}%</b>{stagesOpen?<ChevronDown/>:<ChevronRight/>}</button>{inPlanning&&stagesOpen&&<div className="branch-children"><p>Planning stages</p>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}<div className="branch-secondary"><span>Next phases</span><button onClick={()=>{if(state.locked){navigate("/engagement/bbawc/planning")}else{update({},"Fieldwork unlocks once Planning is Approved & Locked.")}}}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting becomes available after Fieldwork. It is out of scope for this Planning demo.")}><FileCheck2/><span>Reporting</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>{navigate("/engagement/bbawc/planning/data");update({},"Documents live in Data Foundation — showing the Trial Balance, General Ledger and client uploads")}}><FolderOpen/><span>Documents</span></button></div></div></div>}
+      <p className="nav-label practice">Practice</p><button className={`nav-item ${path==="/clients"?"active":""}`} onClick={()=>navigate("/clients")}><Users/><span>Clients</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>Baldeep Singh Chhabra · Partner</span></div></div>
   </aside>;
 }
 
-function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen, setTourOpen }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; navigate: (p: string) => void; onMenu: () => void; demoOpen: boolean; setDemoOpen: (v: boolean) => void; setTourOpen: (v: boolean) => void }) {
+function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; navigate: (p: string) => void; onMenu: () => void; demoOpen: boolean; setDemoOpen: (v: boolean) => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
@@ -351,6 +380,9 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen, setTou
   const [notifTab, setNotifTab] = useState<"All" | "Unread">("All");
   const [notifFilter, setNotifFilter] = useState<"All types" | NotificationCategory>("All types");
   const [notifFilterOpen, setNotifFilterOpen] = useState(false);
+  const [notifLimit, setNotifLimit] = useState(5);
+  const closeTopbarMenus=()=>{setNotifOpen(false);setNotifFilterOpen(false);setProfileOpen(false);setYearOpen(false)};
+  const topActionsRef=useDismissOnOutside(notifOpen||profileOpen||yearOpen,closeTopbarMenus);
   const currentCalendarYear = new Date().getFullYear();
   const latestFiscalYear = Math.max(currentCalendarYear, 2025);
   const fiscalYears = Array.from({ length: latestFiscalYear - 2023 + 1 }, (_, i) => latestFiscalYear - i);
@@ -358,44 +390,46 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen, setTou
   const visibleNotifications = state.notifications
     .filter(n => notifTab === "All" || !n.read)
     .filter(n => notifFilter === "All types" || n.category === notifFilter);
-  const markAllRead = () => update({ notifications: state.notifications.map(n => ({ ...n, read: true })) }, "All notifications marked as read");
+  const shownNotifications = visibleNotifications.slice(0, notifLimit);
+  const markAllRead = () => { setNotifFilterOpen(false); update({ notifications: state.notifications.map(n => ({ ...n, read: true })) }, "All notifications marked as read"); };
   const markRead = (id: string) => update({ notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n) });
+  const dismissNotification = (id: string) => { setNotifFilterOpen(false); update({ notifications: state.notifications.filter(n => n.id !== id) }); };
   return <><header className="topbar">
     <button className="icon-btn hamburger" onClick={onMenu}><Menu size={20}/></button>
-    <div className="top-actions">
+    <div className="top-actions" ref={topActionsRef}>
       <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "QuickBooks connection tested successfully" : "QuickBooks reconnected safely")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "QuickBooks connected" : "Reconnect QuickBooks"}</button>
       <div className="topbar-popover">
-        <button className="year-select" aria-expanded={yearOpen} onClick={() => { setYearOpen(!yearOpen); setNotifOpen(false); setProfileOpen(false); }}><CalendarDays size={16}/><span>FY {state.viewYear}</span><ChevronDown size={14}/></button>
+        <button className="year-select" aria-expanded={yearOpen} onClick={() => { setYearOpen(!yearOpen); setNotifOpen(false); setNotifFilterOpen(false); setProfileOpen(false); }}><CalendarDays size={16}/><span>FY {state.viewYear}</span><ChevronDown size={14}/></button>
         {yearOpen && <div className="dropdown-menu year-menu">
           <div className="dropdown-head"><strong>Fiscal year</strong></div>
           {fiscalYears.map(y => <button key={y} className="dropdown-item" onClick={() => { setYearOpen(false); update({ viewYear: y }, y === 2025 ? "Back to FY 2025" : `Viewing FY ${y} — no engagements on record for this period`); }}><CalendarDays size={14}/><span>FY {y}{y === currentCalendarYear ? " · Current" : ""}</span>{y === state.viewYear && <Check size={14}/>}</button>)}
         </div>}
       </div>
       <div className="topbar-popover">
-        <button className="icon-btn notification" aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); setYearOpen(false); }}><Bell size={18}/>{unreadCount > 0 && <i className="notif-count">{unreadCount}</i>}</button>
+        <button className="icon-btn notification" aria-label={`Open notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setNotifFilterOpen(false); setProfileOpen(false); setYearOpen(false); }}><Bell size={18}/>{unreadCount > 0 && <i className="notif-count" aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</i>}</button>
         {notifOpen && <div className="dropdown-menu notif-menu">
-          <div className="notif-head"><strong>Notifications</strong>{unreadCount > 0 && <button onClick={markAllRead}>Mark all read</button>}</div>
+          <div className="notif-head"><strong>Notifications</strong>{unreadCount > 0 && <button className="mark-read-btn" onClick={markAllRead}>Mark all read</button>}</div>
           <div className="notif-controls">
-            <div className="manager-tabs notif-tabs"><button className={notifTab === "All" ? "active" : ""} onClick={() => setNotifTab("All")}>All <b>{state.notifications.length}</b></button><button className={notifTab === "Unread" ? "active" : ""} onClick={() => setNotifTab("Unread")}>Unread <b>{unreadCount}</b></button></div>
+            <div className="manager-tabs notif-tabs"><button className={notifTab === "All" ? "active" : ""} onClick={() => {setNotifTab("All");setNotifLimit(5);setNotifFilterOpen(false)}}>All <b>{state.notifications.length}</b></button><button className={notifTab === "Unread" ? "active" : ""} onClick={() => {setNotifTab("Unread");setNotifLimit(5);setNotifFilterOpen(false)}}>Unread <b>{unreadCount}</b></button></div>
             <div className="topbar-popover">
               <button className={`filter-btn compact ${notifFilter !== "All types" ? "active" : ""}`} onClick={() => setNotifFilterOpen(!notifFilterOpen)}><Filter size={13}/>Filter{notifFilter !== "All types" && <i className="filter-badge"/>}</button>
               {notifFilterOpen && <div className="dropdown-menu filter-menu">
                 <div className="dropdown-head"><strong>Category</strong></div>
-                {(["All types", "Approval", "Request", "Client", "System"] as const).map(c => <button key={c} className={`dropdown-item ${notifFilter === c ? "selected" : ""}`} onClick={() => { setNotifFilter(c); setNotifFilterOpen(false); }}>{notifFilter === c && <Check size={14}/>}<span>{c}</span></button>)}
+                {(["All types", "Approval", "Request", "Client", "System"] as const).map(c => <button key={c} className={`dropdown-item ${notifFilter === c ? "selected" : ""}`} onClick={() => { setNotifFilter(c); setNotifFilterOpen(false); setNotifLimit(5); }}>{notifFilter === c && <Check size={14}/>}<span>{c}</span></button>)}
               </div>}
             </div>
           </div>
           <div className="notif-list">
-            {visibleNotifications.length === 0 ? <div className="dropdown-empty">Nothing here.</div> : visibleNotifications.map(n => <button key={n.id} className={`notif-row ${n.read ? "" : "unread"}`} onClick={() => { markRead(n.id); setNotifOpen(false); navigate("/engagement/bbawc/planning"); }}><div className="person-avatar violet">{n.initials}</div><div><strong>{n.actor}</strong><span>{n.title}</span><small>{n.detail}</small></div><em>{n.time}</em></button>)}
+            {visibleNotifications.length === 0 ? <div className="dropdown-empty"><CheckCircle2/>You’re all caught up.</div> : shownNotifications.map(n => <div key={n.id} className={`notif-row ${n.read ? "" : "unread"}`}><button className="notif-main" onClick={() => { markRead(n.id); setNotifOpen(false); setNotifFilterOpen(false); navigate(n.route || "/my-work"); }}><span className={`notif-type ${n.category.toLowerCase()}`}>{n.category==="Approval"?<ClipboardCheck/>:n.category==="Client"?<MessageSquare/>:n.category==="System"?<RefreshCw/>:<Send/>}</span><div><strong>{n.title}{!n.read&&<i className="unread-dot"/>}</strong><small>{n.detail}</small><span className="notif-meta"><b>{n.actor}</b><em>{n.time}</em></span></div></button><button className="notif-dismiss" aria-label={`Dismiss notification from ${n.actor}`} title="Dismiss" onClick={()=>dismissNotification(n.id)}><X/></button></div>)}
           </div>
+          {shownNotifications.length<visibleNotifications.length?<button className="notif-footer" onClick={()=>{setNotifLimit(v=>v+5);setNotifFilterOpen(false)}}>Load more</button>:<button className="notif-footer" onClick={()=>{setNotifOpen(false);setNotifFilterOpen(false);navigate("/my-work")}}>Open My work <ArrowRight/></button>}
         </div>}
       </div>
       <div className="topbar-popover">
-        <button className="avatar" aria-label="Open user profile" aria-expanded={profileOpen} title={state.role} onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); setYearOpen(false); }}>OO</button>
+        <button className="avatar" aria-label="Open user profile" aria-expanded={profileOpen} title={state.role} onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); setNotifFilterOpen(false); setYearOpen(false); }}>OO</button>
         {profileOpen && <div className="dropdown-menu profile-menu">
           <div className="dropdown-head"><strong>Oscar Owner</strong><span>Viewing as {state.role}</span></div>
           <button className="dropdown-item" onClick={() => { setProfileOpen(false); setAccountOpen(true); }}><UserRound size={14}/><span>My account</span></button>
-          <button className="dropdown-item" onClick={() => { setProfileOpen(false); setTourOpen(true); }}><BookOpen size={14}/><span>Take the tour</span></button>
           <button className="dropdown-item" onClick={() => { setProfileOpen(false); setDemoOpen(!demoOpen); }}><SlidersHorizontal size={14}/><span>Switch role</span></button>
           <button className="dropdown-item" onClick={() => { setProfileOpen(false); update({}, "Signed out (simulated) — this is a demo, no session was ended"); }}><LockKeyhole size={14}/><span>Sign out</span></button>
         </div>}
@@ -425,7 +459,7 @@ function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoStat
   </div>;
 }
 
-function Dashboard({ navigate, state, update }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void }) {
+function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; setTourOpen: (v:boolean)=>void }) {
   const pct=planningProgressPct(state); const next=nextOpenPhase(state); const items=attentionItems(state); const declined=state.acceptanceDecision==="decline";
   const phases=getPhases(state); const current=next||phases[phases.length-1];
   const lockedPhases=phases.map(p=>({title:p.title,status:"Locked"}));
@@ -477,30 +511,53 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
   const [newOpen, setNewOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef=useDismissOnOutside(filterOpen,()=>setFilterOpen(false));
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "In Progress" | "Approved" | "Declined">("All");
   const bbawcPlanning = state.acceptanceDecision === "decline" ? "Declined" : state.locked ? "Approved" : "In Progress";
   const bbawcPillClass = state.acceptanceDecision === "decline" ? "danger" : state.locked ? "approved" : "progress";
   const bbawcCounts = phaseStatusCounts(state);
   const rows = [
-    { name: engagement.clientName, planning: bbawcPlanning, live: true },
-    { name: "Harbor Community Foundation", planning: "Approved", live: false },
-  ].filter(r => statusFilter === "All" || r.planning === statusFilter);
+    { name: engagement.clientName, industry:"Nonprofit", engagement:"Financial Audit", period:"Dec 31, 2025", planning:bbawcPlanning, live:true, team:state.teamMembers.slice(0,4).map(m=>m.initials) },
+    { name:"Harbor Community Foundation", industry:"Private foundation", engagement:"Financial Audit", period:"Jun 30, 2025", planning:"Approved", live:false, team:["RP","MK"] },
+    { name:"Greenfield Housing Alliance", industry:"Affordable housing", engagement:"NFP Audit", period:"Sep 30, 2025", planning:"In Progress", live:false, team:["SG","LC","JT"] },
+    { name:"Metro Arts Council", industry:"Arts & culture", engagement:"Fund Audit", period:"Jun 30, 2025", planning:"In Progress", live:false, team:["JA","MK"] },
+    { name:"Horizon Retirement Plan", industry:"Employee benefits", engagement:"EBP Audit", period:"Dec 31, 2025", planning:"Approved", live:false, team:["LC","OO"] },
+    { name:"Cedar Grove Outreach", industry:"Community services", engagement:"Financial Audit", period:"Mar 31, 2025", planning:"Declined", live:false, team:["JA","OO"] },
+  ].filter(r => (statusFilter === "All" || r.planning === statusFilter) && `${r.name} ${r.industry} ${r.engagement}`.toLowerCase().includes(searchTerm.trim().toLowerCase()));
   if(state.viewYear!==2025)return <div className="page"><div className="page-heading"><div><p className="eyebrow">Clients</p><h1>Engagements</h1><p>Viewing FY {state.viewYear}.</p></div></div>
     <section className="section-card"><div className="empty-state"><CalendarDays/><strong>No engagements for FY {state.viewYear}</strong><p>This prototype only has engagement data for FY 2025.</p><button className="primary-btn" style={{marginTop:14}} onClick={()=>update({viewYear:2025},"Back to FY 2025")}>Return to FY 2025 <ArrowRight size={16}/></button></div></section>
   </div>;
-  return <div className="page"><div className="page-heading"><div><p className="eyebrow">Clients</p><h1>Engagements</h1><p>Current and prior-period assurance engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
-    <div className="table-card"><div className="table-toolbar"><div className="search"><Search/><input placeholder="Search engagements"/></div><div className="topbar-popover"><button className={`filter-btn ${statusFilter !== "All" ? "active" : ""}`} onClick={() => setFilterOpen(!filterOpen)}><Filter/>Filters{statusFilter !== "All" && <i className="filter-badge"/>}</button>{filterOpen && <div className="dropdown-menu filter-menu">
+  return <div className="page"><div className="page-heading"><div><p className="eyebrow">Audit portfolio</p><h1>Engagements</h1><p>Current and prior-period assurance engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
+    <div className="summary-grid"><Metric label="FY 2025 engagements" value="6" detail="Across four assurance service types"/><Metric label="In progress" value="3" detail="2 require attention this week"/><Metric label="Approved" value="2" detail="Planning approved and locked"/><Metric label="Declined" value="1" detail="Decision and rationale retained"/></div>
+    <div className="table-card"><div className="table-toolbar"><div className="search"><Search/><input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Search client, industry or audit type"/></div><div className="topbar-popover" ref={filterRef}><button className={`filter-btn ${statusFilter !== "All" ? "active" : ""}`} onClick={() => setFilterOpen(!filterOpen)}><Filter/>Filters{statusFilter !== "All" && <i className="filter-badge"/>}</button>{filterOpen && <div className="dropdown-menu filter-menu">
         <div className="dropdown-head"><strong>Planning status</strong></div>
         {(["All", "In Progress", "Approved", "Declined"] as const).map(s => <button key={s} className={`dropdown-item ${statusFilter === s ? "selected" : ""}`} onClick={() => { setStatusFilter(s); setFilterOpen(false); }}>{statusFilter === s && <Check size={14}/>}<span>{s}</span></button>)}
       </div>}</div></div>
       <table><thead><tr><th>Client</th><th>Engagement</th><th>Period</th><th>Planning</th><th>Assigned team</th><th></th></tr></thead><tbody>
         {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--muted)" }}>No engagements match this filter.</td></tr>}
-        {rows.map(r => r.live ? <tr key={r.name}><td><strong>{r.name}</strong><span>Nonprofit</span></td><td>Financial Audit</td><td>Dec 31, 2025</td><td><span className={`status-pill ${bbawcPillClass}`}>{bbawcPlanning}</span><StatusCountBadges compact complete={bbawcCounts.complete} inProgress={bbawcCounts.inProgress} attention={bbawcCounts.attention}/></td><td><button className="avatar-stack as-button" title="Manage engagement team" onClick={() => setTeamOpen(true)}>{state.teamMembers.slice(0, 4).map(m => <i key={m.id}>{m.initials}</i>)}</button></td><td><button className="icon-btn" onClick={() => navigate("/engagement/bbawc")}><ChevronRight/></button></td></tr>
-          : <tr key={r.name}><td><strong>{r.name}</strong><span>Nonprofit</span></td><td>Financial Audit</td><td>Jun 30, 2025</td><td><span className="status-pill approved">Approved</span></td><td><div className="avatar-stack"><i>RP</i><i>MK</i></div></td><td><button className="icon-btn" onClick={() => update({}, `This demo includes one fully wired engagement — ${engagement.clientName}.`)}><ChevronRight/></button></td></tr>)}
+        {rows.map(r => <tr key={r.name}><td><strong>{r.name}</strong><span>{r.industry}</span></td><td>{r.engagement}</td><td>{r.period}</td><td><span className={`status-pill ${r.live?bbawcPillClass:r.planning==="Approved"?"approved":r.planning==="Declined"?"danger":"progress"}`}>{r.planning}</span>{r.live&&<StatusCountBadges compact complete={bbawcCounts.complete} inProgress={bbawcCounts.inProgress} attention={bbawcCounts.attention}/>}</td><td>{r.live?<button className="avatar-stack as-button" title="Manage engagement team" onClick={() => setTeamOpen(true)}>{r.team.map(initials => <i key={initials}>{initials}</i>)}</button>:<div className="avatar-stack">{r.team.map(initials=><i key={initials}>{initials}</i>)}</div>}</td><td><button className="icon-btn" aria-label={`Open ${r.name}`} onClick={() => r.live?navigate("/engagement/bbawc"):update({},`${r.name} is included as a populated portfolio example; ${engagement.clientName} is the fully interactive engagement.`)}><ChevronRight/></button></td></tr>)}
       </tbody></table>
     </div>
     {newOpen && <NewEngagementWizard onClose={() => setNewOpen(false)} update={update}/>}
     {teamOpen && <EngagementTeamModal state={state} update={update} close={() => setTeamOpen(false)}/>}
+  </div>;
+}
+
+function Clients({ navigate, state }: { navigate:(p:string)=>void; state:DemoState }) {
+  const [search,setSearch]=useState("");
+  const clients=[
+    {name:engagement.clientName,industry:"Youth & family services",location:"Brooklyn, NY",contact:"Dana Collins · Controller",engagements:3,next:"Planning in progress",initials:"RY",live:true},
+    {name:"Harbor Community Foundation",industry:"Private foundation",location:"Boston, MA",contact:"Maya Reed · CFO",engagements:4,next:"FY 2025 approved",initials:"HC"},
+    {name:"Greenfield Housing Alliance",industry:"Affordable housing",location:"Newark, NJ",contact:"Andre Kim · VP Finance",engagements:2,next:"Risk review due Aug 18",initials:"GH"},
+    {name:"Metro Arts Council",industry:"Arts & culture",location:"New York, NY",contact:"Nina Patel · Finance Director",engagements:5,next:"Client responses outstanding",initials:"MA"},
+    {name:"Horizon Retirement Plan",industry:"Employee benefits",location:"Chicago, IL",contact:"Evan Brooks · Plan Administrator",engagements:2,next:"Planning approved",initials:"HR"},
+    {name:"Cedar Grove Outreach",industry:"Community services",location:"Queens, NY",contact:"Lena Ortiz · Executive Director",engagements:1,next:"Acceptance declined",initials:"CG"},
+  ].filter(c=>`${c.name} ${c.industry} ${c.location} ${c.contact}`.toLowerCase().includes(search.trim().toLowerCase()));
+  return <div className="page clients-page"><div className="page-heading"><div><p className="eyebrow">Practice</p><h1>Clients</h1><p>Organization records, key contacts and engagement history.</p></div><button className="primary-btn"><Plus/>New client</button></div>
+    <div className="summary-grid"><Metric label="Active clients" value="6" detail="5 recurring · 1 first year"/><Metric label="Open engagements" value="4" detail="Across audit and EBP services"/><Metric label="Client requests" value="9" detail="4 due within seven days"/><Metric label="Portal adoption" value="83%" detail="5 of 6 clients activated"/></div>
+    <div className="table-toolbar"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search clients, contacts or location"/></div><button className="filter-btn"><Filter/>Filters</button></div>
+    <section className="client-directory">{clients.map(c=><button key={c.name} onClick={()=>c.live?navigate("/engagement/bbawc"):undefined}><span className="avatar square">{c.initials}</span><span className="client-directory-name"><strong>{c.name}</strong><small>{c.industry} · {c.location}</small></span><span><small>Primary contact</small><strong>{c.contact}</strong></span><span><small>Engagement history</small><strong>{c.engagements} engagement{c.engagements===1?"":"s"}</strong></span><span><small>Next action</small><strong>{c.next}</strong></span><ChevronRight/></button>)}</section>
   </div>;
 }
 
@@ -544,12 +601,12 @@ function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawe
         {activeView === "audit-trail" && <AuditTrail state={state} update={update}/>}
       </div>
     </section>
-    <ContextDrawer drawer={drawer} setDrawer={setDrawer} open={drawerOpen} setOpen={setDrawerOpen} update={update}/>
+    <ContextDrawer drawer={drawer} setDrawer={setDrawer} open={drawerOpen} setOpen={setDrawerOpen} update={update} activeView={activeView} navigate={navigate}/>
   </div>;
 }
 
 function PlanningHeader({ state, update, navigate, activeView, demoOpen, setDemoOpen }: any) {
-  const titles: Record<string,string> = { overview:"Planning overview", setup:"Engagement Foundation", data:"Data Foundation", "entity-controls":"Entity & Controls", materiality:"Materiality", risks:"Risk Assessment", responses:"Audit Response", publish:"Publish & Approval", review:"Review & approval", "audit-trail":"Audit trail" };
+  const titles: Record<string,string> = { overview:"Engagement planning", setup:"Engagement Foundation", data:"Data Foundation", "entity-controls":"Entity & Controls", materiality:"Materiality", risks:"Risk Assessment", responses:"Audit Response", publish:"Publish & Approval", review:"Review & approval", "audit-trail":"Audit trail" };
   const declined = state.acceptanceDecision === "decline";
   return <div className="planning-header"><div><div className="breadcrumbs"><button onClick={()=>navigate("/engagement/bbawc/planning")}>Planning</button>{activeView!=="overview"&&<><ChevronRight/><span>{titles[activeView]}</span></>}</div><div className="title-line"><h1>{titles[activeView]}</h1><span className={`status-pill ${declined ? "danger" : state.locked ? "approved" : "progress"}`}>{declined ? "Engagement declined" : state.locked ? "Approved & locked" : state.planningStatus}</span>{state.reopened && <span className="status-pill danger">Reopened</span>}</div><p>{engagement.fiscalYear} · Period ended {engagement.periodEnd}</p></div>
     <div className="header-actions"><span className="saved"><Check size={14}/>Saved 2:42 PM IST <i>· stored in UTC</i></span></div></div>;
@@ -558,11 +615,23 @@ function PlanningHeader({ state, update, navigate, activeView, demoOpen, setDemo
 function PlanningOverview({ state, update, navigate }: { state: DemoState; update:(p:Partial<DemoState>,m?:string)=>void; navigate:(p:string)=>void }) {
   const declined = state.acceptanceDecision === "decline";
   return <div className="content-pad">
+    <EngagementPlanningSummary state={state} navigate={navigate}/>
     {declined && <Banner tone="danger" title="Engagement declined" text="This engagement was declined during Acceptance & continuance. Planning does not proceed to Fieldwork while this decision stands."/>}
     {state.reopened && <Banner tone="danger" title="Planning was reopened after Fieldwork began" text="8 workpapers reference affected variables and require re-review. Prior approval history is preserved."/>}
     {state.rolledForward && <Banner tone="warning" title="Started from prior year" text="Structure and methodology were copied as editable drafts. Current-year evidence, financial data and dollar conclusions were not carried forward."/>}
     <PlanningManager state={state} update={update} navigate={navigate}/>
   </div>;
+}
+
+function EngagementPlanningSummary({state,navigate}:{state:DemoState;navigate:(p:string)=>void}){
+  const [detailsOpen,setDetailsOpen]=useState(false);
+  const team=state.teamMembers.filter(member=>member.status!=="Guest");
+  return <section className="engagement-snapshot">
+    <div className="snapshot-primary"><span className="avatar square">{engagement.initials}</span><div><p className="eyebrow">Current engagement</p><h2>{engagement.clientName}</h2><p>{engagement.displayType} · {engagement.fiscalYear} · Period ended {engagement.periodEnd}</p></div><span className={`status-pill ${state.acceptanceDecision==="decline"?"danger":state.locked?"approved":"progress"}`}>{state.acceptanceDecision==="decline"?"Declined":state.locked?"Approved & locked":state.planningStatus}</span></div>
+    <div className="snapshot-metrics"><button onClick={()=>navigate("/engagement/bbawc/planning/setup")}><CalendarDays/><span><small>Reporting deadline</small><strong>{engagement.reportingDeadline}</strong></span><ChevronRight/></button><button onClick={()=>navigate("/engagement/bbawc/planning/setup")}><Users/><span><small>Engagement team</small><strong>{team.length} assigned</strong></span><ChevronRight/></button><button onClick={()=>navigate("/engagement/bbawc/planning/entity-controls")}><Send/><span><small>Client requests</small><strong>{state.completedRequests} of 6 complete</strong></span><ChevronRight/></button><button onClick={()=>navigate("/engagement/bbawc/planning/risks")}><ShieldCheck/><span><small>Entity risk</small><strong>{state.entityRisk}</strong></span><ChevronRight/></button></div>
+    <button className="snapshot-toggle" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(v=>!v)}>{detailsOpen?"Hide engagement details":"View engagement details"}{detailsOpen?<ChevronDown/>:<ChevronRight/>}</button>
+    {detailsOpen&&<div className="snapshot-details"><InfoBlock label="Service scope" text={engagement.serviceScope}/><InfoBlock label="Reporting framework" text={engagement.reportingFramework}/><InfoBlock label="Entity type" text={engagement.entityType}/><InfoBlock label="Accounting system" text={engagement.accountingSystem}/><InfoBlock label="Locations in scope" text={engagement.locations}/><InfoBlock label="Engagement letter" text={engagement.engagementLetter}/><InfoBlock label="Partner" text={engagement.partner}/><InfoBlock label="Manager" text={engagement.manager}/></div>}
+  </section>
 }
 
 function SetupView({ state, update }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
@@ -691,6 +760,7 @@ function Materiality({ state, update }: { state:DemoState; update:(p:Partial<Dem
 function RisksView({ state, update, navigate }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; navigate:(p:string)=>void }) {
   const [cell,setCell]=useState<string|null>(null); const [selected,setSelected]=useState<any>(null); const [query,setQuery]=useState("");
   const [filterOpen,setFilterOpen]=useState(false); const [sigOnly,setSigOnly]=useState(false); const [fraudOnly,setFraudOnly]=useState(false);
+  const filterRef=useDismissOnOutside(filterOpen,()=>setFilterOpen(false));
   const [addOpen,setAddOpen]=useState(false); const [newTitle,setNewTitle]=useState(""); const [newFsa,setNewFsa]=useState(""); const [newLikelihood,setNewLikelihood]=useState("Moderate"); const [newMagnitude,setNewMagnitude]=useState("Moderate");
   const riskList=allRisks(state);
   const filtered=riskList.filter(r=>(!cell||`${r.likelihood}-${r.magnitude}`===cell)&&(`${r.title} ${r.fsa}`.toLowerCase().includes(query.toLowerCase()))&&(!sigOnly||r.significant)&&(!fraudOnly||r.fraud));
@@ -709,7 +779,7 @@ function RisksView({ state, update, navigate }: { state:DemoState; update:(p:Par
     <FluxAnalytics state={state} update={update} navigate={navigate}/>
     <div className="risk-top-grid"><div className="heatmap-card"><div className="section-title"><div><h3>Inherent risk heat map</h3><p>Click a cell to filter the register.</p></div>{cell&&<button className="text-link" onClick={()=>setCell(null)}>Clear filter</button>}</div><div className="heatmap"><span className="axis y">Magnitude</span><div className="axis-labels y-labels"><span>High</span><span>Moderate</span><span>Low</span></div><div className="heat-grid">{cells.map(c=><button key={c} className={`${heatClass(c)} ${cell===c?"selected":""}`} onClick={()=>setCell(cell===c?null:c)}><strong>{counts[c]}</strong><span>{c.replace("-"," / ")}</span></button>)}</div><div className="axis-labels x-labels"><span>High</span><span>Moderate</span><span>Low</span></div><span className="axis x">Likelihood</span></div></div>
       <div className="risk-insights"><div className="section-title"><div><h3>Analytics-driven indicators</h3><p>Signals from GL analytics and planning evidence.</p></div><Sparkles/></div><Insight tone="danger" title="14 late-posted revenue entries" text="$386,200 posted in the first 5 days after period end."/><Insight tone="warning" title="3 unusual weekend journals" text="Posted by privileged users without approval evidence."/><Insight tone="info" title="Contribution concentration increased" text="Top five donors represent 41% of annual contributions."/></div></div>
-    <div className="section-title"><div><h2>Risk register</h2><p>All non-zero FSAs have a documented risk conclusion.</p></div><div className="table-tools"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search risks"/></div><div className="topbar-popover"><button className={`filter-btn ${activeFilterCount>0?"active":""}`} onClick={()=>setFilterOpen(!filterOpen)}><Filter/>Filters{activeFilterCount>0&&<i className="filter-badge"/>}</button>{filterOpen&&<div className="dropdown-menu filter-menu">
+    <div className="section-title"><div><h2>Risk register</h2><p>All non-zero FSAs have a documented risk conclusion.</p></div><div className="table-tools"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search risks"/></div><div className="topbar-popover" ref={filterRef}><button className={`filter-btn ${activeFilterCount>0?"active":""}`} onClick={()=>setFilterOpen(!filterOpen)}><Filter/>Filters{activeFilterCount>0&&<i className="filter-badge"/>}</button>{filterOpen&&<div className="dropdown-menu filter-menu">
         <div className="dropdown-head"><strong>Filter register</strong></div>
         <label className="dropdown-check"><input type="checkbox" checked={sigOnly} onChange={e=>setSigOnly(e.target.checked)}/><span>Significant only</span></label>
         <label className="dropdown-check"><input type="checkbox" checked={fraudOnly} onChange={e=>setFraudOnly(e.target.checked)}/><span>Fraud only</span></label>
@@ -970,7 +1040,20 @@ function RiskResponseQc({gap}:{gap:boolean}) {
   return <section className="response-qc"><div className="response-qc-head"><div><p className="eyebrow">Auditor-only methodology</p><h2>Risk → response quality check</h2><p>Each significant risk must drive assertion-specific procedures and evidence.</p></div><button className="secondary-btn" onClick={()=>setOpen(!open)}>{open?"Hide QC detail":"Show QC detail"}<ChevronDown/></button></div><div className="risk-response-chain">{["Understand client","Identify risk","Assess risk","Design response","Select procedure","Evaluate evidence","Conclude"].map((s,i)=><div key={s}><span className={gap&&i>3?"pending":"done"}>{i<4||!gap?<Check/>:<Circle/>}</span><strong>{s}</strong>{i<6&&<ArrowRight/>}</div>)}</div>{open&&<div className="qc-detail"><div className="procedure-anatomy">{[["Objective","What are we trying to establish?"],["Risk","Why is the procedure necessary?"],["Assertion","Which assertion is addressed?"],["Population","What data is being tested?"],["Nature / timing / extent","What will be performed, when and how much?"],["Sample","Which items and why?"],["Evidence","What support is required?"],["Exceptions & conclusion","What was found and what does it mean?"]].map(x=><div key={x[0]}><strong>{x[0]}</strong><span>{x[1]}</span></div>)}</div><div className="qc-checks"><CheckRow title="Significant and fraud risks are clearly flagged" detail="3 significant · 2 fraud risks" checked/><CheckRow title="Relevant assertions are documented" detail="Coverage shown by risk and financial statement area" checked/><CheckRow title="Every significant risk has a specifically responsive procedure" detail={gap?"1 gap remains — blocks completion":"All significant risks covered"} checked={!gap}/><CheckRow title="Control reliance is supported by control testing" detail="Controls and substantive responses are separated" checked/></div></div>}</section>
 }
 
-function ContextDrawer({ drawer,setDrawer,open,setOpen,update }: any) {
+const GUIDE_CONTENT: Record<string,{title:string;summary:string;why:string;rule:string;steps:string[];standard:string;route:string;cta:string}> = {
+  overview:{title:"Planning overview",summary:"See active work, blockers and review readiness without opening every workpaper.",why:"A connected planning record keeps data, conclusions, risks and responses traceable.",rule:"Resolve blocking validations before Manager review; client requests can remain open when the auditor documents their impact.",steps:["Open the highest-priority workpaper","Resolve items marked Needs attention","Submit completed work for review"],standard:"ISA 300 / AU-C 300 · Planning an Audit",route:"/engagement/bbawc/planning",cta:"Open planning work"},
+  setup:{title:"Engagement Foundation",summary:"Confirm acceptance, independence, team responsibilities and engagement terms.",why:"The firm must establish that it can accept or continue the engagement and remain independent.",rule:"Acceptance and required independence confirmations must be complete before downstream planning can be approved.",steps:["Confirm acceptance decision","Clear independence exceptions","Verify team and engagement terms"],standard:"ISA 210, ISA 220 / AU-C 210, 220",route:"/engagement/bbawc/planning/setup",cta:"Review foundation"},
+  data:{title:"Data Foundation",summary:"Connect, reconcile and map the Trial Balance and General Ledger before analytics use them.",why:"Risk assessment and materiality are only reliable when the underlying population is complete and accurate.",rule:"Control totals must pass, mapping exceptions must be resolved or documented, and transformations confirmed.",steps:["Validate source and period","Clear reconciliation exceptions","Confirm mapping and transformations"],standard:"ISA 315 / AU-C 315 · Risk assessment evidence",route:"/engagement/bbawc/planning/data",cta:"Review data checks"},
+  "entity-controls":{title:"Entity & Controls",summary:"Collect client facts, validate responses and document the auditor’s conclusion separately.",why:"Understanding the entity and its controls is the basis for identifying where material misstatements could occur.",rule:"Client answers are evidence inputs—not audit conclusions. The auditor must validate, clarify and conclude.",steps:["Send or review questionnaires","Resolve client clarifications","Document the auditor conclusion"],standard:"ISA 315 / AU-C 315",route:"/engagement/bbawc/planning/entity-controls",cta:"Open questionnaires"},
+  materiality:{title:"Materiality",summary:"Select an appropriate benchmark, percentage and lower thresholds using professional judgment.",why:"Materiality focuses the audit on information that could influence financial-statement users.",rule:"Document the benchmark source, rationale and any override before locking materiality for downstream use.",steps:["Confirm benchmark and source","Evaluate suggested range","Document rationale and lock"],standard:"ISA 320 / AU-C 320 · Materiality",route:"/engagement/bbawc/planning/materiality",cta:"Review materiality"},
+  risks:{title:"Risk Assessment",summary:"Connect entity understanding and analytics to assertion-level risks.",why:"The audit response must address assessed risks, including significant and fraud risks.",rule:"Every non-zero financial-statement area needs a conclusion; every significant risk needs a linked response.",steps:["Review flux and scoping","Assess likelihood and magnitude","Flag significant and fraud risks"],standard:"ISA 240, 315 / AU-C 240, 315",route:"/engagement/bbawc/planning/risks",cta:"Review assessed risks"},
+  responses:{title:"Audit Response",summary:"Design auditor-owned procedures that respond directly to assessed risks and assertions.",why:"Generic procedures can leave significant risks without sufficient appropriate audit evidence.",rule:"Each significant risk must have a specific procedure with objective, population, timing, extent and evidence.",steps:["Open uncovered risk gaps","Tailor the audit procedure","Confirm assertion coverage"],standard:"ISA 330 / AU-C 330 · Responses to risk",route:"/engagement/bbawc/planning/responses",cta:"Review responses"},
+  publish:{title:"Publish & Approval",summary:"Run final quality checks, issue planning communications and route the record for approval.",why:"Approval freezes a traceable planning baseline and controls the transition to Fieldwork.",rule:"All blocking checks, required review cards and sequential Manager/Partner approvals must be complete.",steps:["Resolve final QC blockers","Publish planning outputs","Route Manager then Partner approval"],standard:"ISA 300, 260 / AU-C 300, 260",route:"/engagement/bbawc/planning/publish",cta:"Review publish checks"},
+  review:{title:"Review & approval",summary:"Review conclusions by exception, return issues with clear notes and approve in sequence.",why:"A focused review confirms that judgments are supported and important risks have appropriate responses.",rule:"Manager approval precedes Partner approval; reopening retains history and marks affected work for re-review.",steps:["Review outstanding cards","Return or approve each conclusion","Complete final approval"],standard:"ISA 220 / AU-C 220 · Engagement quality",route:"/engagement/bbawc/planning/review",cta:"Open review"},
+  "audit-trail":{title:"Audit trail",summary:"Trace changes, judgments, approvals and overrides across the engagement.",why:"A complete history supports accountability and explains how the final audit plan was reached.",rule:"Material actions must retain actor, time, result and rationale; records should not be silently overwritten.",steps:["Filter significant actions","Inspect rationale and linked work","Export when required"],standard:"ISA 230 / AU-C 230 · Audit documentation",route:"/engagement/bbawc/planning/audit-trail",cta:"Open audit trail"},
+};
+
+function ContextDrawer({ drawer,setDrawer,open,setOpen,update,activeView,navigate }: any) {
   const [comments,setComments]=useState<{author:string;text:string}[]>([]);
   const [commentDraft,setCommentDraft]=useState("");
   const [notes,setNotes]=useState([
@@ -978,13 +1061,14 @@ function ContextDrawer({ drawer,setDrawer,open,setOpen,update }: any) {
     {title:"Link the new grant agreement",author:"Oscar Owner",status:"Cleared"},
   ]);
   const [noteDraft,setNoteDraft]=useState("");
-  if(!open)return <button className="drawer-restore" onClick={()=>setOpen(true)}><MessageSquare/><span>Context</span></button>;
+  const guide=GUIDE_CONTENT[activeView]||GUIDE_CONTENT.overview;
+  if(!open)return <button className="drawer-restore" aria-label="Open workpaper context" title="Comments, review notes and evidence" onClick={()=>{setDrawer("Comments");setOpen(true)}}><MessageSquare/><span>Context</span></button>;
   const tabs=["Guide","Comments","Review notes","Activity","Attachments"];
   const openNotes=notes.filter(n=>n.status==="Open").length;
   const addComment=()=>{ if(!commentDraft.trim())return; setComments(c=>[...c,{author:"Oscar Owner",text:commentDraft.trim()}]); setCommentDraft(""); };
   const addNote=()=>{ if(!noteDraft.trim())return; setNotes(n=>[{title:noteDraft.trim(),author:"Oscar Owner",status:"Open"},...n]); setNoteDraft(""); };
   return <aside className="context-drawer"><div className="context-top"><h3>Planning context</h3><button className="icon-btn" onClick={()=>setOpen(false)}><ChevronRight/></button></div><div className="drawer-tabs">{tabs.map(t=><button key={t} className={drawer===t?"active":""} onClick={()=>setDrawer(t)}>{t==="Guide"?<BookOpen/>:t==="Comments"?<MessageSquare/>:t==="Review notes"?<ClipboardCheck/>:t==="Activity"?<Activity/>:<Paperclip/>}<span>{t}</span>{t==="Review notes"&&openNotes>0&&<i>{openNotes}</i>}</button>)}</div><div className="drawer-content">
-    {drawer==="Guide"&&<><p className="eyebrow">Current section guide</p><h3>Planning overview</h3><p>Complete and validate each conclusion before submitting the engagement for Manager and Partner approval.</p><GuideItem title="Why this matters" text="A connected planning record keeps data, conclusions, risks and the audit program traceable."/><GuideItem title="Completion rule" text="Blocking validations are shown in the relevant step. Client requests warn but do not block approval."/><a href="#">Open firm methodology <ArrowRight/></a></>}
+    {drawer==="Guide"&&<><p className="eyebrow">Guide · Current section</p><h3>{guide.title}</h3><p>{guide.summary}</p><div className="guide-standard"><ShieldCheck/><span><small>Relevant guidance</small><strong>{guide.standard}</strong></span></div><GuideItem title="Why this matters" text={guide.why}/><GuideItem title="Completion rule" text={guide.rule}/><div className="guide-checklist"><strong>Recommended next steps</strong>{guide.steps.map((step:string,index:number)=><span key={step}><b>{index+1}</b>{step}</span>)}</div><button className="primary-btn full" onClick={()=>navigate(guide.route)}>{guide.cta} <ArrowRight/></button><button className="text-link guide-methodology" onClick={()=>update({},`${guide.title} firm methodology opened (simulated)`)}>Open firm methodology <ArrowRight/></button></>}
     {drawer==="Comments"&&<>{comments.length===0?<EmptyIcon icon={<MessageSquare/>} title="No comments yet" text="Start a step-level discussion with the engagement team."/>:<div className="drawer-comment-list">{comments.map((c,i)=><div key={i} className="drawer-comment"><strong>{c.author}</strong><p>{c.text}</p></div>)}</div>}<Field label="Comment"><textarea value={commentDraft} onChange={(e:any)=>setCommentDraft(e.target.value)} placeholder="Add a comment for the engagement team…"/></Field><button className="primary-btn full" disabled={!commentDraft.trim()} onClick={addComment}><Plus/>Add comment</button></>}
     {drawer==="Review notes"&&<>{notes.map((n,i)=><DrawerNote key={i} title={n.title} author={n.author} status={n.status}/>)}<Field label="Review note"><textarea value={noteDraft} onChange={(e:any)=>setNoteDraft(e.target.value)} placeholder="Describe what needs to change before this section can be approved…"/></Field><button className="secondary-btn full" disabled={!noteDraft.trim()} onClick={addNote}><Plus/>Create review note</button></>}
     {drawer==="Activity"&&<><ActivityItem title="Materiality updated" detail="Jasmine · 2 min ago"/><ActivityItem title="GL sync completed" detail="System · 11 min ago"/><ActivityItem title="Review note resolved" detail="Meera · 44 min ago"/></>}
@@ -1004,15 +1088,29 @@ const TOUR_STEPS: TourStep[] = [
   { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log", cta: "Go to Firm audit log" },
   { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning", cta: "Open the workflow" },
 ];
-function GuidedTour({ navigate, close }: { navigate: (p: string) => void; close: () => void }) {
+function GuidedTour({ path, navigate, close }: { path: string; navigate: (p: string) => void; close: () => void }) {
   const [step, setStep] = useState(0);
-  const current = TOUR_STEPS[step];
-  const isLast = step === TOUR_STEPS.length - 1;
+  const view=path.split("/").pop()||"dashboard";
+  const sectionGuide=GUIDE_CONTENT[view==="planning"?"overview":view];
+  const contextual: TourStep = sectionGuide
+    ? {title:sectionGuide.title,text:`${sectionGuide.summary} Start here: ${sectionGuide.steps[0].toLowerCase()}.`,route:sectionGuide.route,cta:sectionGuide.cta}
+    : path==="/dashboard"
+      ? {title:"Your dashboard at a glance",text:"Start with the highlighted next best action, then use the review queue for urgent work. The portfolio below shows each engagement’s current lifecycle stage."}
+      : path==="/my-work"
+        ? {title:"Your personal work queue",text:"AssureAudit ranks assigned work by urgency. Start with the highlighted task, or filter the queue to focus on due-soon and review items."}
+        : {title:"This workspace",text:"Use the page heading for context, act on the primary task first, and open the Guide again whenever you need a quick orientation."};
+  const tourSteps: TourStep[] = [contextual,
+    {title:"Follow the strongest signal",text:"Purple identifies the active path. Red needs attention, amber needs review, and green is complete. Open the most urgent item before browsing secondary detail."},
+    {title:"Notifications take you to the work",text:"Open the bell to filter updates. Selecting an item marks it read and takes you directly to the affected workpaper—not just the Planning home."},
+    {title:"Help stays available",text:"The Guide button remains at the lower right. In Planning, the context panel also explains the relevant audit guidance, completion rule and recommended next steps."}
+  ];
+  const current = tourSteps[step];
+  const isLast = step === tourSteps.length - 1;
   return <div className="tour-float">
-    <div className="tour-float-head"><span className="tour-progress">Step {step + 1} of {TOUR_STEPS.length}</span><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="tour-float-head"><span className="tour-progress">Step {step + 1} of {tourSteps.length}</span><button className="icon-btn" onClick={close}><X/></button></div>
     <h3>{current.title}</h3>
     <p className="tour-text">{current.text}</p>
-    <div className="tour-dots">{TOUR_STEPS.map((_, i) => <i key={i} className={i === step ? "active" : ""}/>)}</div>
+    <div className="tour-dots">{tourSteps.map((_, i) => <i key={i} className={i === step ? "active" : ""}/>)}</div>
     {current.route && <button className="secondary-btn tour-go" onClick={() => navigate(current.route!)}>{current.cta} <ArrowRight size={15}/></button>}
     <div className="tour-nav">
       <button className="secondary-btn" onClick={close}>Close</button>
@@ -1028,6 +1126,7 @@ function DemoControls({ state,update,close }: {state:DemoState;update:(p:Partial
 function ClientPortal({ state,update,onExit }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;onExit:()=>void}) {
   const [selectedTitle,setSelectedTitle]=useState<string|null>(null); const [answer,setAnswer]=useState(state.clientAnswer);
   const [notifOpen,setNotifOpen]=useState(false); const [commentDraft,setCommentDraft]=useState("");
+  const notifRef=useDismissOnOutside(notifOpen,()=>setNotifOpen(false));
   const [statusFilter,setStatusFilter]=useState<"All"|"To do"|"Submitted"|"Done">("All");
   const [requests,setRequests]=useState([
   {title:"Understanding the Entity Questionnaire",type:"Questionnaire",due:"Aug 13",status:state.questionnaireStatus==="Draft"?"To Do":state.questionnaireStatus,file:"",comments:[] as {author:string;text:string}[]},{title:"Internal Control Questionnaire",type:"Questionnaire",due:"Aug 15",status:"To Do",file:"",comments:[] as {author:string;text:string}[]},{title:"Accounting Policy Handbook",type:"File upload",due:"Aug 14",status:"In Review",file:"Accounting Policy Handbook.pdf",comments:[] as {author:string;text:string}[]},{title:"Organizational Chart",type:"File upload",due:"Aug 14",status:"To Do",file:"",comments:[] as {author:string;text:string}[]},{title:"Related-Party Transactions Listing",type:"Questionnaire",due:"Aug 16",status:"Done",file:"Related Parties 2025.xlsx",comments:[] as {author:string;text:string}[]},{title:"Significant Contracts",type:"File upload",due:"Aug 18",status:"Clarification Needed",file:"",comments:[] as {author:string;text:string}[]},{title:"Prior-Year Planning Workpapers",type:"Information only",due:"—",status:"Done",file:"Reference provided by firm",comments:[] as {author:string;text:string}[]},{title:"QuickBooks Online Access Grant",type:"OAuth access consent",due:"Aug 12",status:"Access Not Granted",file:"",comments:[] as {author:string;text:string}[]},
@@ -1039,7 +1138,7 @@ function ClientPortal({ state,update,onExit }: {state:DemoState;update:(p:Partia
   const counts={All:requests.length,"To do":requests.filter(r=>bucketOf(r.status)==="To do").length,Submitted:requests.filter(r=>bucketOf(r.status)==="Submitted").length,Done:requests.filter(r=>bucketOf(r.status)==="Done").length};
   const visibleRequests=requests.filter(r=>statusFilter==="All"||bucketOf(r.status)===statusFilter);
   const dueSoon=requests.filter(r=>bucketOf(r.status)==="To do");
-  return <div className="client-portal"><header className="client-top"><div className="brand white"><svg className="brand-mark" width="26" height="26" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4L45 40C45 40 41 44 36 44H24V4Z" fill="#6D55DC"/><path d="M24 4L3 40C3 40 7 44 12 44H24V4Z" fill="#9689F2"/><path d="M17.5 44L24 32.5L30.5 44H17.5Z" fill="#fff"/></svg><div><strong>assure</strong><span>audit</span></div><em>Client Portal</em></div><div className="client-actions"><button onClick={()=>update({},"Help center opened (simulated) — support articles for the Client Portal")}><BookOpen/>Help</button><div className="topbar-popover"><button onClick={()=>setNotifOpen(!notifOpen)}><Bell/>{dueSoon.length>0&&<i className="portal-notif-dot"/>}</button>{notifOpen&&<div className="dropdown-menu notif-menu">
+  return <div className="client-portal"><header className="client-top"><div className="brand white"><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><em>Client Portal</em></div><div className="client-actions"><button onClick={()=>update({},"Help center opened (simulated) — support articles for the Client Portal")}><BookOpen/>Help</button><div className="topbar-popover" ref={notifRef}><button onClick={()=>setNotifOpen(!notifOpen)}><Bell/>{dueSoon.length>0&&<i className="portal-notif-dot"/>}</button>{notifOpen&&<div className="dropdown-menu notif-menu">
         <div className="dropdown-head"><strong>Notifications</strong><span>{dueSoon.length} request{dueSoon.length===1?"":"s"} need action</span></div>
         {dueSoon.length===0?<div className="dropdown-empty">Nothing needs action right now.</div>:dueSoon.map(r=><button key={r.title} className="dropdown-item" onClick={()=>{setNotifOpen(false);openRequest(r.title)}}><AlertCircle size={14}/><span>{r.title} · Due {r.due}</span></button>)}
       </div>}</div><div className="avatar">DC</div><button className="secondary-btn" onClick={onExit}>Return to firm demo</button></div></header><main><div className="client-welcome"><div><p className="eyebrow">{engagement.displayType} · {engagement.fiscalYear}</p><h1>Planning Requests</h1><p>{engagement.clientName} · Requested by CF Joseph CPA PC</p></div><div className="portal-progress"><div><strong>{requests.filter(r=>r.status==="Done").length} of {requests.length}</strong><span>requests complete</span></div><div className="progress-line"><i style={{width:`${requests.filter(r=>r.status==="Done").length/requests.length*100}%`}}/></div></div></div>
@@ -1260,7 +1359,8 @@ function CheckRow({title,detail,checked=false}:{title:string;detail:string;check
 function Member({name,role,status,update}:{name:string;role:string;status:string;update?:(p:Partial<DemoState>,m?:string)=>void}){return <div className="member-row"><div className="person-avatar violet">{name.split(" ").map(n=>n[0]).join("")}</div><div><strong>{name}</strong><span>{role}</span></div><span className={`status-pill ${status==="Confirmed"?"approved":"warning"}`}>{status}</span>{status==="Pending"&&<button className="secondary-btn" onClick={()=>update?.({},`Independence confirmation reminder sent to ${name}`)}>Send reminder</button>}</div>}
 function UploadCard({title,file,rows,status,progress,onUpload,update}:{title:string;file:string;rows:string;status:string;progress:number;onUpload:()=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
   const [menuOpen,setMenuOpen]=useState(false);
-  return <div className="upload-card"><div className="upload-title"><div className="file-icon"><FileSpreadsheet/></div><div><span className="card-label">Data source</span><h3>{title}</h3></div><span className="status-pill approved">{status}</span></div><div className="file-detail"><FileCheck2/><div><strong>{file}</strong><span>{rows} · Excel/CSV · FY 2025</span></div><div className="topbar-popover"><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen && <div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);onUpload();update({},`${file} replacement started`)}}><UploadCloud size={14}/><span>Replace file</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update({},`${file} removed from this engagement (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div><div className="upload-progress"><i style={{width:`${progress}%`}}/></div><div className="upload-actions"><button className="text-link" onClick={()=>update({},`${title} import template downloaded`)}><Download/>Download template</button><button className="secondary-btn" onClick={onUpload}><UploadCloud/>Replace file</button></div></div>}
+  const menuRef=useDismissOnOutside(menuOpen,()=>setMenuOpen(false));
+  return <div className="upload-card"><div className="upload-title"><div className="file-icon"><FileSpreadsheet/></div><div><span className="card-label">Data source</span><h3>{title}</h3></div><span className="status-pill approved">{status}</span></div><div className="file-detail"><FileCheck2/><div><strong>{file}</strong><span>{rows} · Excel/CSV · FY 2025</span></div><div className="topbar-popover" ref={menuRef}><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen && <div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);onUpload();update({},`${file} replacement started`)}}><UploadCloud size={14}/><span>Replace file</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update({},`${file} removed from this engagement (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div><div className="upload-progress"><i style={{width:`${progress}%`}}/></div><div className="upload-actions"><button className="text-link" onClick={()=>update({},`${title} import template downloaded`)}><Download/>Download template</button><button className="secondary-btn" onClick={onUpload}><UploadCloud/>Replace file</button></div></div>}
 function Question({number,title,tag,children}:{number:string;title:string;tag:string;children:React.ReactNode}){return <article className="question"><div className="question-head"><span>{number}</span><h3>{title}</h3><span className={`status-pill ${statusClass(tag)}`}>{tag}</span></div>{children}</article>}
 function Evidence({file="Accounting Policy Handbook.pdf",pages="4–7",update}:{file?:string;pages?:string;update?:(p:Partial<DemoState>,m?:string)=>void}){return <div className="evidence"><Paperclip/><span><strong>Source evidence</strong>{file} · Pages {pages}</span><button onClick={()=>update?.({},`Opening ${file} (pages ${pages}) — simulated document viewer`)}>Open source <ArrowRight/></button></div>}
 function AiDraft(){return <div className="ai-draft"><Sparkles/><span><strong>AI-assisted draft</strong>Generated from cited evidence · Human validation required</span></div>}
@@ -1277,5 +1377,6 @@ function DrawerNote({title,author,status}:{title:string;author:string;status:str
 function ActivityItem({title,detail}:{title:string;detail:string}){return <div className="activity-item"><i/><div><strong>{title}</strong><span>{detail}</span></div></div>}
 function DrawerFile({name,meta,update}:{name:string;meta:string;update?:(p:Partial<DemoState>,m?:string)=>void}){
   const [menuOpen,setMenuOpen]=useState(false);
-  return <div className="drawer-file"><FileText/><div><strong>{name}</strong><span>{meta}</span></div><div className="topbar-popover"><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen&&<div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} downloaded`)}}><Download size={14}/><span>Download</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} removed from Attachments (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div>}
+  const menuRef=useDismissOnOutside(menuOpen,()=>setMenuOpen(false));
+  return <div className="drawer-file"><FileText/><div><strong>{name}</strong><span>{meta}</span></div><div className="topbar-popover" ref={menuRef}><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen&&<div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} downloaded`)}}><Download size={14}/><span>Download</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} removed from Attachments (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div>}
 function heatClass(cell:string){const [l,m]=cell.split("-");if(l==="High"&&m==="High")return"critical";if(l==="High"||m==="High")return"high-cell";if(l==="Moderate"||m==="Moderate")return"medium-cell";return"low-cell"}

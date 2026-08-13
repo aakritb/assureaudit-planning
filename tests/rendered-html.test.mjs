@@ -50,8 +50,8 @@ test("keeps materiality guidance contextual and calculates triviality from overa
 test("uses one engagement navigation tree without recursively rendering the page", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /Home as HomeIcon/);
-  assert.match(page, /<HomeIcon\/>/);
+  assert.match(page, /<LayoutDashboard\/><span>Overview & planning<\/span>/);
+  assert.match(page, /<EngagementPlanningSummary state=\{state\} navigate=\{navigate\}\/>/);
   assert.doesNotMatch(page, /<Home\/>/);
   assert.doesNotMatch(page, /className="planning-stepper"/);
   assert.match(page, /branchLabels=\["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"\]/);
