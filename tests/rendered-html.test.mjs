@@ -42,7 +42,7 @@ test("keeps the AssureAudit application shell and focused dashboard", async () =
   assert.match(page, /Planning prerequisite/);
   assert.match(page, /Data readiness/);
   assert.match(page, /before Materiality and Risk Assessment can use the trial balance/);
-  assert.match(page, /<Gauge\/><span>Overview<\/span>/);
+  assert.doesNotMatch(page, /<Gauge\/><span>Overview<\/span>/);
   assert.match(page, /<FolderOpen\/><span>Documents<\/span>/);
   assert.match(page, /function DocumentsPage\(/);
   assert.match(page, /className=\{`planning-nav-branch/);
@@ -89,7 +89,7 @@ test("keeps materiality guidance contextual and calculates triviality from overa
 test("keeps one consistent sidebar and expands Planning as an in-place branch", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /<Gauge\/><span>Overview<\/span>/);
+  assert.doesNotMatch(page, /<Gauge\/><span>Overview<\/span>/);
   assert.match(page, /<FolderOpen\/><span>Documents<\/span>/);
   assert.match(page, /className="client-section-nav"/);
   assert.match(page, /className="branch-children"/);
