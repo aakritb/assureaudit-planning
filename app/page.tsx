@@ -9,7 +9,7 @@ import {
   FolderOpen, Gauge, History, Info, LayoutDashboard, Link2, ListChecks,
   LockKeyhole, Menu, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
-  Sparkles, Table2, UploadCloud, UserRound, Users, X, Zap
+  Sparkles, Table2, Trash2, UploadCloud, UserRound, Users, X, Zap
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
@@ -649,32 +649,48 @@ function Engagements({ navigate, update, state, openAssurePro }: { navigate: (p:
   </div>;
 }
 
+const DOC_TONES=["neutral","warning","danger","approved"] as const;
+const TONE_LABEL:Record<string,string>={neutral:"No status",warning:"Due soon",danger:"Overdue",approved:"Complete"};
+const STATUS_OPTIONS=[{tone:"neutral",due:"Not started"},{tone:"warning",due:"Due in 3d"},{tone:"danger",due:"Overdue"},{tone:"approved",due:"Complete"}];
+const WORKPAPER_REFS=[
+  {id:201,title:"Independence confirmations",route:"setup"},
+  {id:202,title:"Understanding the entity",route:"entity-controls"},
+  {id:203,title:"Internal control & IT",route:"entity-controls"},
+  {id:204,title:"Risk assessment",route:"risks"},
+  {id:205,title:"Materiality workpaper",route:"materiality"},
+  {id:206,title:"Planning communications",route:"publish"},
+];
+type DocRecord={id:number;name:string;category:string;source:string;workpaper:string;updated:string;status:string;clientUpload:boolean;tone:string;due:string;assignee:string;attachments:number;description:string;shared:boolean;comments:{author:string;text:string}[]};
+
 function DocumentsPage({navigate,state,update}:{navigate:(p:string)=>void;state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void}){
   const engagement=selectedEngagement(state);
   const [query,setQuery]=useState("");
   const [category,setCategory]=useState("all");
   const [origin,setOrigin]=useState<"All"|"Client"|"Firm">("All");
   const [tab,setTab]=useState<"Files"|"Requests">("Files");
-  const [selectedDoc,setSelectedDoc]=useState<any>(null);
+  const [selectedId,setSelectedId]=useState<number|null>(null);
   const [requestOpen,setRequestOpen]=useState(false);
+  const [categoryOpen,setCategoryOpen]=useState(false);
   const [openRequest,setOpenRequest]=useState<string|null>(null);
-  const folders=[
+  const [toneFilters,setToneFilters]=useState<string[]>([]);
+  const [collapsedGroups,setCollapsedGroups]=useState<Record<string,boolean>>({});
+  const [folders,setFolders]=useState([
     {id:"all",name:"All Documents",icon:<FolderOpen/>},
     {id:"client-uploads",name:"Client Uploads",icon:<UploadCloud/>},
     {id:"Engagement & governance",name:"Engagement & governance",icon:<BriefcaseBusiness/>},
     {id:"Client-provided records",name:"Client-provided records",icon:<Users/>},
     {id:"Planning evidence",name:"Planning evidence",icon:<ClipboardCheck/>},
     {id:"Audit outputs",name:"Audit outputs",icon:<FileCheck2/>},
-  ];
-  const documents=[
-    {name:"Signed Engagement Letter.pdf",category:"Engagement & governance",source:"AssurePro",workpaper:"Engagement Foundation",updated:"Aug 4, 2025",status:"Final",clientUpload:false},
-    {name:"Board Minutes — Q4 2025.pdf",category:"Engagement & governance",source:"Dana Collins",workpaper:"Understanding the entity",updated:"2 hours ago",status:"Received",clientUpload:true},
-    {name:"Accounting Policy Handbook.pdf",category:"Client-provided records",source:"Dana Collins",workpaper:"Internal control & IT",updated:"Yesterday",status:"In review",clientUpload:true},
-    {name:"Final Trial Balance.xlsx",category:"Client-provided records",source:engagement.accountingSystem,workpaper:"Data Foundation",updated:"Aug 11, 2025",status:"Validated",clientUpload:false},
-    {name:"City Grant Agreement.pdf",category:"Planning evidence",source:"Jasmine Alvarez",workpaper:"Risk assessment",updated:"Aug 10, 2025",status:"Linked",clientUpload:false},
-    {name:"Fraud Discussion Minutes.pdf",category:"Planning evidence",source:"Oscar Owner",workpaper:"Engagement Foundation",updated:"Aug 9, 2025",status:"Final",clientUpload:false},
-    {name:"Planning Memo — Draft v1.pdf",category:"Audit outputs",source:"AssureAudit",workpaper:"Publish & Approval",updated:"18 min ago",status:"Draft",clientUpload:false},
-  ];
+  ]);
+  const [documents,setDocuments]=useState<DocRecord[]>([
+    {id:141,name:"Signed Engagement Letter.pdf",category:"Engagement & governance",source:"AssurePro",workpaper:"Engagement Foundation",updated:"Aug 4, 2025",status:"Final",clientUpload:false,tone:"approved",due:"Complete",assignee:"Oscar Owner",attachments:1,shared:true,description:"Fully executed engagement letter synchronized from AssurePro.",comments:[]},
+    {id:142,name:"Board Minutes — Q4 2025.pdf",category:"Engagement & governance",source:"Dana Collins",workpaper:"Understanding the entity",updated:"2 hours ago",status:"Received",clientUpload:true,tone:"approved",due:"Complete",assignee:"Jasmine Alvarez",attachments:1,shared:true,description:"Board minutes covering Q4 2025 governance decisions.",comments:[{author:"Jasmine Alvarez",text:"Linked to the entity-understanding conclusion."}]},
+    {id:143,name:"Accounting Policy Handbook.pdf",category:"Client-provided records",source:"Dana Collins",workpaper:"Internal control & IT",updated:"Yesterday",status:"In review",clientUpload:true,tone:"warning",due:"Due in 2d",assignee:"Meera Kapoor",attachments:1,shared:false,description:"Client's documented accounting policies for FY2025.",comments:[{author:"Meera Kapoor",text:"Reviewing the revenue recognition section."},{author:"Dana Collins",text:"Let me know if anything else is needed."}]},
+    {id:144,name:"Final Trial Balance.xlsx",category:"Client-provided records",source:engagement.accountingSystem,workpaper:"Data Foundation",updated:"Aug 11, 2025",status:"Validated",clientUpload:false,tone:"approved",due:"Complete",assignee:"Jasmine Alvarez",attachments:1,shared:false,description:"Reconciled trial balance used across Planning.",comments:[]},
+    {id:145,name:"City Grant Agreement.pdf",category:"Planning evidence",source:"Jasmine Alvarez",workpaper:"Risk assessment",updated:"Aug 10, 2025",status:"Linked",clientUpload:false,tone:"approved",due:"Complete",assignee:"Jasmine Alvarez",attachments:1,shared:false,description:"Grant agreement supporting the conditional-contribution risk.",comments:[]},
+    {id:146,name:"Fraud Discussion Minutes.pdf",category:"Planning evidence",source:"Oscar Owner",workpaper:"Engagement Foundation",updated:"Aug 9, 2025",status:"Final",clientUpload:false,tone:"danger",due:"Overdue",assignee:"Oscar Owner",attachments:0,shared:false,description:"Team fraud brainstorming session minutes — filing is overdue.",comments:[]},
+    {id:147,name:"Planning Memo — Draft v1.pdf",category:"Audit outputs",source:"AssureAudit",workpaper:"Publish & Approval",updated:"18 min ago",status:"Draft",clientUpload:false,tone:"warning",due:"Due in 5d",assignee:"Oscar Owner",attachments:0,shared:false,description:"Draft planning memo pending partner sign-off.",comments:[{author:"Oscar Owner",text:"Add the updated risk summary before circulating."}]},
+  ]);
   const requests=[
     {id:"req1",title:"Restricted grant confirmations",priority:true,status:"Overdue",assignee:"Dana Collins",items:[
       {name:"City Grant — signed confirmation",code:"GRANT-01",status:"Pending"},
@@ -692,48 +708,105 @@ function DocumentsPage({navigate,state,update}:{navigate:(p:string)=>void;state:
   const folderCount=(id:string)=>id==="all"?documents.length:id==="client-uploads"?documents.filter(d=>d.clientUpload).length:documents.filter(d=>d.category===id).length;
   const currentFolder=folders.find(f=>f.id===category)!;
   const folderDocs=documents.filter(doc=>category==="all"||category==="client-uploads"?(category==="all"||doc.clientUpload):doc.category===category);
-  const visible=folderDocs.filter(doc=>(origin==="All"||(origin==="Client"?doc.clientUpload:!doc.clientUpload))&&`${doc.name} ${doc.source} ${doc.workpaper}`.toLowerCase().includes(query.toLowerCase()));
+  const visible=folderDocs.filter(doc=>(origin==="All"||(origin==="Client"?doc.clientUpload:!doc.clientUpload))&&(toneFilters.length===0||toneFilters.includes(doc.tone))&&`${doc.name} ${doc.source} ${doc.workpaper}`.toLowerCase().includes(query.toLowerCase()));
   const clientCount=folderDocs.filter(d=>d.clientUpload).length;
   const firmCount=folderDocs.length-clientCount;
   const openRequestsCount=requests.filter(r=>r.status!=="Complete").length;
+  const grouped:Record<string,DocRecord[]>={};
+  visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
+  const toggleTone=(tone:string)=>setToneFilters(f=>f.includes(tone)?f.filter(t=>t!==tone):[...f,tone]);
+  const toggleGroup=(cat:string)=>setCollapsedGroups(g=>({...g,[cat]:!g[cat]}));
+  const updateDoc=(id:number,patch:Partial<DocRecord>)=>setDocuments(docs=>docs.map(d=>d.id===id?{...d,...patch}:d));
+  const removeDoc=(id:number)=>{setDocuments(docs=>docs.filter(d=>d.id!==id));setSelectedId(null)};
+  const addCategory=(name:string)=>{setFolders(f=>[...f,{id:name,name,icon:<FolderOpen/>}]);setCategoryOpen(false);update({},`"${name}" category created`)};
+  const selectedDoc=documents.find(d=>d.id===selectedId)||null;
   return <div className="page documents-page"><div className="module-page-head"><span className="module-head-icon"><FolderOpen/></span><div><div className="breadcrumbs"><button onClick={()=>navigate("/dashboard")}>Overview</button><ChevronRight/><span>Documents</span></div><h1>Documents</h1><p>{engagement.shortName} · Files, evidence and approved outputs for {engagement.fiscalYear}</p></div><div className="module-head-summary"><small>Current library</small><strong>21 documents</strong><span><CheckCircle2/>7 final & locked</span></div></div>
     <div className="document-summary"><Metric label="All documents" value="21" detail="Across the current engagement"/><Metric label="Client provided" value="8" detail="2 received this week"/><Metric label="Needs review" value="3" detail="Assigned to the audit team"/><Metric label="Final & locked" value="7" detail="Retained with audit history"/></div>
+    <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/bbawc/planning/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
     <div className="documents-layout">
       <aside className="documents-folders"><p className="documents-folders-label">Folders</p>{folders.map(folder=><button key={folder.id} className={category===folder.id?"active":""} onClick={()=>{setCategory(folder.id);setOrigin("All")}}>{folder.icon}<span>{folder.name}</span><b>{folderCount(folder.id)}</b></button>)}</aside>
       <section className="documents-main">
-        <div className="documents-main-head"><div><h2>{currentFolder.name}</h2><p>{tab==="Files"?`${visible.length} file${visible.length===1?"":"s"} shown`:`${requests.length} request${requests.length===1?"":"s"}`}</p></div><div className="documents-actions"><div className="search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search documents, source or workpaper"/></div><button className="secondary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button><button className="secondary-btn" onClick={()=>update({},"Upload window opened — choose a client document and its destination workpaper")}><UploadCloud size={15}/>Upload</button></div></div>
+        <div className="documents-main-head"><div><h2>{currentFolder.name}</h2><p>{tab==="Files"?`${visible.length} file${visible.length===1?"":"s"} shown`:`${requests.length} request${requests.length===1?"":"s"}`}</p></div><div className="documents-actions"><div className="search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search documents, source or workpaper"/></div><button className="secondary-btn" onClick={()=>update({},"Upload window opened — choose a client document and its destination workpaper")}><UploadCloud size={15}/>Upload</button></div></div>
         <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{folderDocs.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {openRequestsCount>0&&<b className="warn">{openRequestsCount} pending</b>}</button></div>
         {tab==="Files"?<>
-          <div className="subtabs documents-origin-tabs">{(["All","Client","Firm"] as const).map(o=><button key={o} className={origin===o?"active":""} onClick={()=>setOrigin(o)}>{o==="All"?"All documents":o==="Client"?"Client-provided":"Firm-prepared"} <span className="count">{o==="All"?folderDocs.length:o==="Client"?clientCount:firmCount}</span></button>)}</div>
-          <div className="document-table-head"><span>Document</span><span>Source</span><span>Linked workpaper</span><span>Updated</span><span>Status</span><span/></div>
-          {visible.map(doc=><button className="document-row" key={doc.name} onClick={()=>setSelectedDoc(doc)}><span className="document-name-cell"><span className="document-file-icon"><FileText/></span><span className="document-name"><strong>{doc.name}</strong><small>{doc.category}</small></span></span><span>{doc.source}</span><span><Link2/>{doc.workpaper}</span><span>{doc.updated}</span><span className={`status-pill ${doc.status==="Draft"?"warning":doc.status==="In review"?"progress":"approved"}`}>{doc.status}</span><MoreHorizontal/></button>)}
-          {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the folder or search to see the full client library.</p></div>}
+          <div className="documents-toolbar-row">
+            <div className="subtabs documents-origin-tabs no-margin">{(["All","Client","Firm"] as const).map(o=><button key={o} className={origin===o?"active":""} onClick={()=>setOrigin(o)}>{o==="All"?"All documents":o==="Client"?"Client-provided":"Firm-prepared"} <span className="count">{o==="All"?folderDocs.length:o==="Client"?clientCount:firmCount}</span></button>)}</div>
+            <div className="tone-filter-row">{DOC_TONES.map(t=><button key={t} title={TONE_LABEL[t]} aria-label={`Filter: ${TONE_LABEL[t]}`} className={`tone-dot ${t} ${toneFilters.includes(t)?"active":""}`} onClick={()=>toggleTone(t)}/>)}</div>
+            <button className="icon-btn" title="Recent activity" onClick={()=>update({},"Recent activity opened (simulated)")}><History size={16}/></button>
+            <button className="secondary-btn" onClick={()=>update({},"Documents exported as documents.csv (simulated)")}><Download size={15}/>Export</button>
+            <button className="secondary-btn" onClick={()=>setCategoryOpen(true)}><Plus size={15}/>Create Category</button>
+            <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button>
+          </div>
+          <div className="documents-grouped-list">
+            {Object.entries(grouped).map(([cat,docs])=><section className="doc-group" key={cat}>
+              <button className="doc-group-head" onClick={()=>toggleGroup(cat)}><ChevronDown className={collapsedGroups[cat]?"collapsed":""}/><strong>{cat}</strong><b className="count">{docs.length}</b></button>
+              {!collapsedGroups[cat]&&docs.map(doc=><button className="doc-row-v2" key={doc.id} onClick={()=>setSelectedId(doc.id)}>
+                <i className={`tone-dot ${doc.tone}`}/>
+                <span className="doc-id">{doc.id}</span>
+                <span className="doc-row-title"><strong>{doc.name}</strong><small><Link2 size={11}/>{doc.workpaper}</small></span>
+                <span className={`status-pill ${doc.tone}`}>{doc.due}</span>
+                <span className="doc-row-meta"><MessageSquare size={13}/>{doc.comments.length}</span>
+                <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
+              </button>)}
+            </section>)}
+            {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the folder, filters or search to see the full client library.</p></div>}
+          </div>
         </>:<div className="requests-list">{requests.map(r=>{const done=r.items.filter(i=>i.status==="Received").length;return <div className="request-card" key={r.id}><button className="request-card-head" onClick={()=>setOpenRequest(openRequest===r.id?null:r.id)}><ChevronDown className={openRequest===r.id?"":"collapsed"}/><span className="request-card-progress">{done}/{r.items.length}</span><strong>{r.title}</strong>{r.priority&&<span className="status-pill danger">High priority</span>}<span className={`status-pill ${r.status==="Overdue"?"danger":r.status==="Complete"?"approved":"warning"}`}>{r.status}</span><span className="text-link">Open<ArrowRight size={13}/></span></button>{openRequest===r.id&&<>{r.items.map(item=><div className="request-item-row" key={item.code}><FileText size={14}/><span>{item.name}</span><code>{item.code}</code><span className={`status-pill ${item.status==="Received"?"approved":"neutral"}`}>{item.status}</span></div>)}<div className="request-card-footer"><span>{r.items.length} document{r.items.length===1?"":"s"}</span><span>{r.assignee} · Assigned</span></div></>}</div>})}</div>}
       </section>
     </div>
-    {selectedDoc&&<DocumentDetailDrawer doc={selectedDoc} close={()=>setSelectedDoc(null)} update={update}/>}
+    {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)}/>}
     {requestOpen&&<CreateRequestModal close={()=>setRequestOpen(false)} update={update} clientName={engagement.clientName}/>}
+    {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
   </div>
 }
 
-function DocumentDetailDrawer({doc,close,update}:{doc:any;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
-  const [reviewStatus,setReviewStatus]=useState(doc.status);
-  const [shared,setShared]=useState(true);
-  return <div className="detail-drawer">
-    <div className="drawer-head"><div><span className={`status-pill ${reviewStatus==="Draft"?"warning":reviewStatus==="In review"?"progress":reviewStatus==="Needs revision"?"danger":"approved"}`}>{reviewStatus}</span><h2>{doc.name}</h2><p>{doc.category} · {doc.source}</p></div><button className="icon-btn" onClick={close}><X/></button></div>
-    <div className="drawer-body">
-      <div className="doc-preview-placeholder"><FileText size={36}/><span>{doc.name.split(".").pop()?.toUpperCase()} preview</span></div>
-      <p className="drawer-label">Review status</p>
-      <div className="review-actions-row">
-        <button className={`review-choice approve ${reviewStatus==="Final"?"active":""}`} onClick={()=>{setReviewStatus("Final");update({},`${doc.name} approved`)}}><Check size={14}/>Approve</button>
-        <button className={`review-choice revise ${reviewStatus==="Needs revision"?"active":""}`} onClick={()=>{setReviewStatus("Needs revision");update({},`${doc.name} sent back for revision`)}}><RotateCcw size={14}/>Needs revision</button>
+function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[]}){
+  const [tab,setTab]=useState<"Request Info"|"Client Docs"|"Comments"|"Activity">("Request Info");
+  const [statusMenuOpen,setStatusMenuOpen]=useState(false);
+  const [assignOpen,setAssignOpen]=useState(false);
+  const [commentDraft,setCommentDraft]=useState("");
+  const statusRef=useDismissOnOutside(statusMenuOpen,()=>setStatusMenuOpen(false));
+  const assignRef=useDismissOnOutside(assignOpen,()=>setAssignOpen(false));
+  const setStatus=(tone:string,due:string)=>{onUpdate({tone,due});setStatusMenuOpen(false);update({},`${doc.name} marked ${due}`)};
+  const toggleShared=()=>{onUpdate({shared:!doc.shared});update({},doc.shared?`${doc.name} made internal — hidden from the client portal`:`${doc.name} shared with client`)};
+  const addComment=()=>{if(!commentDraft.trim())return;onUpdate({comments:[...doc.comments,{author:"Oscar Owner",text:commentDraft.trim()}]});setCommentDraft("")};
+  const assignTo=(name:string)=>{onUpdate({assignee:name});setAssignOpen(false);update({},`${doc.name} assigned to ${name}`)};
+  const uploadDoc=()=>{onUpdate({attachments:doc.attachments+1});update({},`File uploaded to ${doc.name}`)};
+  const tabs=["Request Info","Client Docs","Comments","Activity"] as const;
+  return <div className="detail-drawer document-detail-panel">
+    <div className="drawer-head"><div><span className={`status-pill ${doc.tone}`}>{doc.due}</span><h2>{doc.name}</h2><p>{doc.category} · #{doc.id}</p></div>
+      <div className="drawer-head-actions">
+        <button className="icon-btn" title={doc.shared?"Shared with client — click to make internal":"Internal only — click to share"} onClick={toggleShared}><LockKeyhole size={16} className={doc.shared?"":"locked"}/></button>
+        <button className="icon-btn" title="Rename" onClick={()=>update({},"Rename not available in this prototype")}><Pencil size={16}/></button>
+        <button className="icon-btn danger" title="Delete" onClick={onDelete}><Trash2 size={16}/></button>
+        <button className="icon-btn" onClick={close}><X/></button>
       </div>
-      <label className="switch-label doc-visibility"><input type="checkbox" checked={shared} onChange={e=>{setShared(e.target.checked);update({},e.target.checked?`${doc.name} shared with client`:`${doc.name} made internal — hidden from the client portal`)}}/><i/>{shared?"Shared with client":"Internal only"}</label>
-      <InfoBlock label="Linked workpaper" text={doc.workpaper}/>
-      <InfoBlock label="Source" text={doc.source}/>
-      <InfoBlock label="Last updated" text={doc.updated}/>
+    </div>
+    <div className="panel-status-row"><div className="topbar-popover" ref={statusRef}><button className="secondary-btn" onClick={()=>setStatusMenuOpen(v=>!v)}>Change Status <ChevronDown size={14}/></button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{STATUS_OPTIONS.map(o=><button key={o.due} className="dropdown-item" onClick={()=>setStatus(o.tone,o.due)}><i className={`tone-dot ${o.tone}`}/><span>{o.due}</span></button>)}</div>}</div></div>
+    <div className="drawer-tabs">{tabs.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
+    <div className="drawer-body">
+      {tab==="Request Info"&&<>
+        <p className="drawer-label">Description</p>
+        <p className="panel-description">{doc.description}</p>
+        <div className="panel-meta-row"><div><small>Created by</small><strong>{doc.source}</strong></div><div><small>Due Date</small><strong>{doc.due}</strong></div></div>
+        <div className="panel-assign-row"><div><small>Assignments</small><strong>{doc.assignee||"Unassigned"}</strong></div><div className="topbar-popover" ref={assignRef}><button className="text-link" onClick={()=>setAssignOpen(v=>!v)}>Assign</button>{assignOpen&&<div className="dropdown-menu">{["Jasmine Alvarez","Meera Kapoor","Oscar Owner","Leo Chen"].map(name=><button key={name} className="dropdown-item" onClick={()=>assignTo(name)}>{name}</button>)}</div>}</div></div>
+        <p className="drawer-label">My Documents</p>
+        {doc.attachments>0?<div className="drawer-file"><FileText/><div><strong>{doc.name}</strong><span>{doc.attachments} file{doc.attachments===1?"":"s"} attached · {doc.updated}</span></div></div>:<div className="panel-upload-empty"><p>No documents uploaded yet.</p><button className="secondary-btn" onClick={uploadDoc}><UploadCloud size={15}/>Upload Document</button></div>}
+      </>}
+      {tab==="Client Docs"&&(clientDocs.length?<div className="drawer-comment-list">{clientDocs.map(d=><div className="drawer-file" key={d.id}><FileText/><div><strong>{d.name}</strong><span>{d.updated}</span></div></div>)}</div>:<EmptyIcon icon={<FolderOpen/>} title="No client documents" text="No client-provided files in this category yet."/>)}
+      {tab==="Comments"&&<>{doc.comments.length===0?<p className="panel-empty-text">No comments yet.</p>:<div className="drawer-comment-list">{doc.comments.map((c,i)=><div className="drawer-comment" key={i}><strong>{c.author}</strong><p>{c.text}</p></div>)}</div>}<div className="comment-input"><input value={commentDraft} onChange={e=>setCommentDraft(e.target.value)} placeholder="Add a comment…" onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addComment()}}}/><button className="icon-btn" disabled={!commentDraft.trim()} onClick={addComment}><Send size={15}/></button></div></>}
+      {tab==="Activity"&&<><ActivityItem title={`Uploaded by ${doc.source}`} detail={doc.updated}/><ActivityItem title={`Status set to ${doc.due}`} detail="Updated just now"/><ActivityItem title={`Linked to ${doc.workpaper}`} detail="Planning workpaper"/></>}
     </div>
   </div>;
+}
+
+function CreateCategoryModal({close,onCreate}:{close:()=>void;onCreate:(name:string)=>void}){
+  const [name,setName]=useState("");
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Create category</h2><p>Add a new folder to organize documents.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <Field label="Category name" required><input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Tax workpapers"/></Field>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!name.trim()} onClick={()=>onCreate(name.trim())}>Create</button></div>
+  </div></div>;
 }
 
 function CreateRequestModal({close,update,clientName}:{close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;clientName:string}){
