@@ -1285,7 +1285,7 @@ function RiskResponseQc({gap}:{gap:boolean}) {
 }
 
 const GUIDE_CONTENT: Record<string,{title:string;summary:string;why:string;rule:string;steps:string[];standard:string;route:string;cta:string}> = {
-  overview:{title:"Planning overview",summary:"See active work, blockers and review readiness without opening every workpaper.",why:"A connected planning record keeps data, conclusions, risks and responses traceable.",rule:"Resolve blocking validations before Manager review; client requests can remain open when the auditor documents their impact.",steps:["Open the highest-priority workpaper","Resolve items marked Needs attention","Submit completed work for review"],standard:"ISA 300 / AU-C 300 · Planning an Audit",route:"/engagement/bbawc/planning",cta:"Open planning work"},
+  overview:{title:"Planning overview",summary:"See active work, blockers and review readiness without opening every workpaper.",why:"A connected planning record keeps data, conclusions, risks and responses traceable.",rule:"Resolve blocking validations before Manager review; client requests can remain open when the auditor documents their impact.",steps:["Open the highest-priority workpaper","Resolve items marked Needs attention","Add any missing standard workpaper from the firm library","Submit completed work for review"],standard:"ISA 300 / AU-C 300 · Planning an Audit",route:"/engagement/bbawc/planning",cta:"Open planning work"},
   setup:{title:"Engagement Foundation",summary:"Confirm acceptance, independence, team responsibilities and engagement terms.",why:"The firm must establish that it can accept or continue the engagement and remain independent.",rule:"Acceptance and required independence confirmations must be complete before downstream planning can be approved.",steps:["Confirm acceptance decision","Clear independence exceptions","Verify team and engagement terms"],standard:"ISA 210, ISA 220 / AU-C 210, 220",route:"/engagement/bbawc/planning/setup",cta:"Review foundation"},
   data:{title:"Data Foundation",summary:"Connect, reconcile and map the Trial Balance and General Ledger before analytics use them.",why:"Risk assessment and materiality are only reliable when the underlying population is complete and accurate.",rule:"Control totals must pass, mapping exceptions must be resolved or documented, and transformations confirmed.",steps:["Validate source and period","Clear reconciliation exceptions","Confirm mapping and transformations"],standard:"ISA 315 / AU-C 315 · Risk assessment evidence",route:"/engagement/bbawc/planning/data",cta:"Review data checks"},
   "entity-controls":{title:"Entity & Controls",summary:"Collect client facts, validate responses and document the auditor’s conclusion separately.",why:"Understanding the entity and its controls is the basis for identifying where material misstatements could occur.",rule:"Client answers are evidence inputs—not audit conclusions. The auditor must validate, clarify and conclude.",steps:["Send or review questionnaires","Resolve client clarifications","Document the auditor conclusion"],standard:"ISA 315 / AU-C 315",route:"/engagement/bbawc/planning/entity-controls",cta:"Open questionnaires"},
@@ -1320,18 +1320,6 @@ function ContextDrawer({ drawer,setDrawer,open,setOpen,update,activeView,navigat
   </div></aside> }
 
 type TourStep = { title: string; text: string; route?: string; cta?: string };
-const TOUR_STEPS: TourStep[] = [
-  { title: "Welcome to AssureAudit", text: "A quick look at what's live in this prototype and where to find it." },
-  { title: "Dashboard", text: "Your first screen. See exactly where every engagement stands, ranked by what needs attention today.", route: "/dashboard", cta: "Go to Dashboard" },
-  { title: "Engagements — organization list", text: "Search, filter by planning status, and see live attention/in-progress/complete counts for every engagement.", route: "/engagements", cta: "Go to Engagements" },
-  { title: "New engagement — starts from a signed letter", text: "On the Engagements page, click \"New engagement.\" It starts from a signed AssurePro engagement letter, not a blank form — picking one locks the client, type and period as synced facts.", route: "/engagements", cta: "Go to Engagements" },
-  { title: "Engagement team management", text: "Click the avatar stack on any engagement row (or \"Manage team\" on the Engagement Overview) to add/invite members, assign a role, resend an invite, or remove access.", route: "/engagements", cta: "Go to Engagements" },
-  { title: "Edit Engagement", text: "Open an engagement, then click the pencil icon next to the client name. Archive date, prior-year linkage, and entity risk can all change after creation — the financial period correctly locks once data ingestion has started.", route: "/engagement/bbawc", cta: "Go to the engagement" },
-  { title: "My Account", text: "Click your avatar in the top bar, then \"My account,\" for a daily-digest toggle and two-factor authentication." },
-  { title: "Fiscal year switcher", text: "The \"FY 2025\" control in the top bar is a real dropdown — it always includes the current year, and picking one with no data shows an honest empty state with a one-click way back." },
-  { title: "Firm Audit Log", text: "Every real action across the app — approvals, overrides, uploads — is logged with a timestamp here in real time, aggregated across engagements.", route: "/firm-audit-log", cta: "Go to Firm audit log" },
-  { title: "The audit workflow", text: "This prototype's core: a seven-phase stage — Engagement Foundation through Publish & Approval — that sits ahead of Fieldwork and Reporting in the full audit lifecycle.", route: "/engagement/bbawc/planning", cta: "Open the workflow" },
-];
 function GuidedTour({ path, navigate, close }: { path: string; navigate: (p: string) => void; close: () => void }) {
   const [step, setStep] = useState(0);
   const view=path.split("/").pop()||"dashboard";
@@ -1342,7 +1330,11 @@ function GuidedTour({ path, navigate, close }: { path: string; navigate: (p: str
       ? {title:"Your dashboard at a glance",text:"Start with the highlighted next best action, then use the review queue for urgent work. The portfolio below shows each engagement’s current lifecycle stage."}
       : path==="/my-work"
         ? {title:"Your personal work queue",text:"AssureAudit ranks assigned work by urgency. Start with the highlighted task, or filter the queue to focus on due-soon and review items."}
-        : {title:"This workspace",text:"Use the page heading for context, act on the primary task first, and open the Guide again whenever you need a quick orientation."};
+        : path==="/engagements"
+          ? {title:"Engagements",text:"Client and engagement records are managed in AssurePro — this list carries that context in, and opening an engagement switches your workspace to it. There's no separate Clients page."}
+          : view==="documents"
+            ? {title:"Documents",text:"Files are organized into folders with an explicit Client-provided vs. Firm-prepared split. Use the Requests tab for outstanding client asks, and open any file for a review drawer to approve, send back or set its client visibility."}
+            : {title:"This workspace",text:"Use the page heading for context, act on the primary task first, and open the Guide again whenever you need a quick orientation."};
   const tourSteps: TourStep[] = [contextual,
     {title:"Follow the strongest signal",text:"Purple identifies the active path. Red needs attention, amber needs review, and green is complete. Open the most urgent item before browsing secondary detail."},
     {title:"Notifications take you to the work",text:"Open the bell to filter updates. Selecting an item marks it read and takes you directly to the affected workpaper—not just the Planning home."},
