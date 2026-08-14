@@ -41,9 +41,8 @@ test("keeps the AssureAudit application shell and focused dashboard", async () =
   assert.match(page, /Engagement acceptance not yet completed/);
   assert.match(page, /No Riverside engagement data has been carried into this client record/);
   assert.match(page, /Open in AssurePro/);
-  assert.match(page, /Planning prerequisite/);
-  assert.match(page, /Data readiness/);
-  assert.match(page, /before Materiality and Risk Assessment can use the trial balance/);
+  assert.doesNotMatch(page, /Planning prerequisite/);
+  assert.doesNotMatch(page, /data-readiness-card/);
   assert.doesNotMatch(page, /<Gauge\/><span>Overview<\/span>/);
   assert.match(page, /<FolderOpen\/><span>Documents<\/span>/);
   assert.match(page, /function DocumentsPage\(/);
