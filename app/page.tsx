@@ -309,6 +309,9 @@ export default function Home() {
   const [tourOpen, setTourOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
+  const [assurePro, setAssurePro] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: "", message: "" });
+  const openAssurePro = (title: string, message: string) => setAssurePro({ open: true, title, message });
+  const closeAssurePro = () => setAssurePro(a => ({ ...a, open: false }));
 
   useEffect(() => {
     if (!mobileNav) return;
@@ -361,22 +364,40 @@ export default function Home() {
   const planning = path.includes("/planning");
   return (
     <div className={`app-shell ${planning ? "planning-route" : ""}`}>
-      <Sidebar path={path} navigate={navigate} state={state} update={update} mobileNav={mobileNav} setMobileNav={setMobileNav} />
+      <Sidebar path={path} navigate={navigate} state={state} update={update} mobileNav={mobileNav} setMobileNav={setMobileNav} openAssurePro={openAssurePro} />
       {mobileNav && <div className="mobile-nav-backdrop" onClick={() => setMobileNav(false)}/>}
       <main className="main-area">
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
-          <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} />}
+          <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} openAssurePro={openAssurePro} />
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} openAssurePro={openAssurePro} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} openAssurePro={openAssurePro} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} openAssurePro={openAssurePro} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {tourOpen ? <GuidedTour path={path} navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" aria-label="Open AssureAudit Guide" title="Open AssureAudit Guide" onClick={() => setTourOpen(true)}><BookOpen size={18}/><span>Guide</span></button>}
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
+      <AssureProPanel open={assurePro.open} title={assurePro.title} message={assurePro.message} close={closeAssurePro} update={update}/>
     </div>
   );
 }
 
-function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { path: string; navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; mobileNav: boolean; setMobileNav: (v: boolean) => void }) {
+function AssureProPanel({ open, title, message, close, update }: { open: boolean; title: string; message: string; close: () => void; update: (p: Partial<DemoState>, m?: string) => void }) {
+  const panelRef = useDismissOnOutside(open, close);
+  if (!open) return null;
+  return <div className="assurepro-panel-backdrop">
+    <aside className="assurepro-panel" ref={panelRef}>
+      <div className="assurepro-panel-head"><span className="assurepro-panel-icon"><BriefcaseBusiness/></span><div><p className="eyebrow">Manage in AssurePro</p><h2>{title}</h2></div><button className="icon-btn" aria-label="Close" onClick={close}><X/></button></div>
+      <p className="assurepro-panel-message">{message}</p>
+      <div className="assurepro-panel-switcher">
+        <p className="assurepro-panel-label">Continue in</p>
+        <button className="product-option selected"><span className="product-icon audit"><ShieldCheck/></span><span><strong>AssureAudit</strong><small>Audit engagements</small></span><Check/></button>
+        <button className="product-option" onClick={()=>{update({},"Opening AssurePro — simulated handoff");close()}}><span className="product-icon pro"><BriefcaseBusiness/></span><span><strong>AssurePro</strong><small>Practice management</small></span><ArrowRight/></button>
+        <button className="product-option" onClick={()=>{update({},"Opening AssureDocs — simulated handoff");close()}}><span className="product-icon docs"><FolderOpen/></span><span><strong>AssureDocs</strong><small>Client documents</small></span><ArrowRight/></button>
+      </div>
+    </aside>
+  </div>;
+}
+
+function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav, openAssurePro }: { path: string; navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; mobileNav: boolean; setMobileNav: (v: boolean) => void; openAssurePro:(title:string,message:string)=>void }) {
   const inEngagement=path.startsWith("/engagement/"); const inPlanning=path.includes("/planning"); const inDocuments=path.endsWith("/documents"); const active=path.split("/").pop()||"overview"; const branchLabels=["Commence","Data ingest","Understand","Materiality","Identify & assess","Respond","Approve"]; const phases=getPhases(state);
   const [productOpen,setProductOpen]=useState(false);
   const [planningBranchOpen,setPlanningBranchOpen]=useState(inPlanning);
@@ -386,7 +407,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
   return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`} style={{transform: mobileNav ? "none" : undefined}}>
     <div className="brand product-switcher-wrap" ref={productRef}>
       <button className="product-switcher-trigger" aria-label="Switch Assure product" aria-haspopup="menu" aria-expanded={productOpen} onClick={()=>setProductOpen(v=>!v)}><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><ChevronDown/></button>
-      {productOpen&&<div className="product-switcher-menu" role="menu" aria-label="Assure products"><div className="product-switcher-head"><strong>Assure products</strong><small>Move between connected workspaces</small></div><button className="selected" role="menuitem" onClick={()=>setProductOpen(false)}><span className="product-icon audit"><ShieldCheck/></span><span><strong>AssureAudit</strong><small>Audit engagements</small></span><Check/></button><button role="menuitem" onClick={()=>{setProductOpen(false);update({},"AssurePro selected — product handoff simulated")}}><span className="product-icon pro"><BriefcaseBusiness/></span><span><strong>AssurePro</strong><small>Practice management</small></span><ArrowRight/></button><button role="menuitem" onClick={()=>{setProductOpen(false);update({},"AssureDocs selected — product handoff simulated")}}><span className="product-icon docs"><FolderOpen/></span><span><strong>AssureDocs</strong><small>Client documents</small></span><ArrowRight/></button></div>}
+      {productOpen&&<div className="product-switcher-menu" role="menu" aria-label="Assure products"><div className="product-switcher-head"><strong>Assure products</strong><small>Move between connected workspaces</small></div><button className="selected" role="menuitem" onClick={()=>setProductOpen(false)}><span className="product-icon audit"><ShieldCheck/></span><span><strong>AssureAudit</strong><small>Audit engagements</small></span><Check/></button><button role="menuitem" onClick={()=>{setProductOpen(false);openAssurePro("Switch to AssurePro","Practice management — client records, engagement letters, billing and task management — lives in AssurePro.")}}><span className="product-icon pro"><BriefcaseBusiness/></span><span><strong>AssurePro</strong><small>Practice management</small></span><ArrowRight/></button><button role="menuitem" onClick={()=>{setProductOpen(false);update({},"Opening AssureDocs — simulated handoff")}}><span className="product-icon docs"><FolderOpen/></span><span><strong>AssureDocs</strong><small>Client documents</small></span><ArrowRight/></button></div>}
       <button className="icon-btn close-mobile" aria-label="Close navigation" onClick={() => setMobileNav(false)}><X size={18}/></button>
     </div>
     <nav>
@@ -401,8 +422,6 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
 
 function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; navigate: (p: string) => void; onMenu: () => void; demoOpen: boolean; setDemoOpen: (v: boolean) => void }) {
   const currentEngagement=selectedEngagement(state);
-  const [clientSearchOpen,setClientSearchOpen]=useState(false);
-  const [clientQuery,setClientQuery]=useState("");
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
@@ -413,18 +432,6 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
   const [notifLimit, setNotifLimit] = useState(5);
   const closeTopbarMenus=()=>{setNotifOpen(false);setNotifFilterOpen(false);setProfileOpen(false);setYearOpen(false)};
   const topActionsRef=useDismissOnOutside(notifOpen||profileOpen||yearOpen,closeTopbarMenus);
-  const clientSearchRef=useDismissOnOutside(clientSearchOpen,()=>{setClientSearchOpen(false);setClientQuery("")});
-  useEffect(()=>{
-    const openClientSearch=(event:KeyboardEvent)=>{
-      if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="k"){
-        event.preventDefault();
-        closeTopbarMenus();
-        setClientSearchOpen(true);
-      }
-    };
-    document.addEventListener("keydown",openClientSearch);
-    return()=>document.removeEventListener("keydown",openClientSearch);
-  },[]);
   const currentCalendarYear = new Date().getFullYear();
   const latestFiscalYear = Math.max(currentCalendarYear, 2025);
   const fiscalYears = Array.from({ length: latestFiscalYear - 2023 + 1 }, (_, i) => latestFiscalYear - i);
@@ -433,27 +440,11 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
     .filter(n => notifTab === "All" || !n.read)
     .filter(n => notifFilter === "All types" || n.category === notifFilter);
   const shownNotifications = visibleNotifications.slice(0, notifLimit);
-  const normalizedClientQuery=clientQuery.trim().toLowerCase();
-  const clientResults=engagementCatalog.filter(item=>!normalizedClientQuery||[item.clientName,item.shortName,item.displayType,item.engagementType,item.fiscalYear,item.periodEnd,item.industry].join(" ").toLowerCase().includes(normalizedClientQuery));
-  const switchClient=(item:typeof engagement)=>{
-    setClientSearchOpen(false);setClientQuery("");closeTopbarMenus();
-    update({activeClientId:item.id},`Switched audit workspace to ${item.clientName}`);
-    navigate("/dashboard");
-  };
   const markAllRead = () => { setNotifFilterOpen(false); update({ notifications: state.notifications.map(n => ({ ...n, read: true })) }, "All notifications marked as read"); };
   const markRead = (id: string) => update({ notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n) });
   const dismissNotification = (id: string) => { setNotifFilterOpen(false); update({ notifications: state.notifications.filter(n => n.id !== id) }); };
   return <><header className="topbar">
     <button className="icon-btn hamburger" onClick={onMenu}><Menu size={20}/></button>
-    <div className="client-command-wrap" ref={clientSearchRef}>
-      <button className={`client-command-trigger simple ${clientSearchOpen?"open":""}`} aria-label="Switch client" aria-haspopup="dialog" aria-expanded={clientSearchOpen} onClick={()=>{setClientSearchOpen(v=>!v);closeTopbarMenus()}}><i className="client-command-icon"><Search/></i><span><strong>Switch client</strong></span><ChevronDown className="client-command-chevron"/></button>
-      {clientSearchOpen&&<div className="client-command-menu" role="dialog" aria-label="Search AssureAudit clients">
-        <div className="client-command-head"><div><strong>Switch client</strong><span>{engagementCatalog.length} active audit engagements</span></div><button className="icon-btn" aria-label="Close client search" onClick={()=>{setClientSearchOpen(false);setClientQuery("")}}><X/></button></div>
-        <label className="client-command-search"><Search/><input autoFocus value={clientQuery} onChange={event=>setClientQuery(event.target.value)} placeholder="Search client, audit type or period" aria-label="Search client, audit type or period"/><kbd>ESC</kbd></label>
-        <div className="client-command-label">{clientQuery?`${clientResults.length} result${clientResults.length===1?"":"s"}`:"Recent clients"}</div>
-        <div className="client-command-results">{clientResults.length?clientResults.map(item=><button key={item.id} className={item.id===currentEngagement.id?"selected":""} onClick={()=>switchClient(item)}><span className="avatar square">{item.initials}</span><span><strong>{item.clientName}</strong><small>{item.displayType} · {item.fiscalYear} · Period ended {item.periodShort}</small></span><span className="client-result-meta">{item.id===currentEngagement.id?<><Check/>Current</>:<><ArrowRight/>Open</>}</span></button>):<div className="client-command-empty"><Search/><strong>No clients found</strong><span>Try the client name, audit type, fiscal year or period end.</span></div>}</div>
-      </div>}
-    </div>
     <div className="top-actions" ref={topActionsRef}>
       <button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? `${currentEngagement.accountingSystem} connection tested successfully` : `${currentEngagement.accountingSystem} reconnected safely`)}><ShieldCheck size={16}/>{state.connector === "Connected" ? `${currentEngagement.accountingSystem} connected` : `Reconnect ${currentEngagement.accountingSystem}`}</button>
       <div className="topbar-popover">
@@ -498,7 +489,7 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
   </>;
 }
 
-function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+function MyWork({ navigate, state, update, openAssurePro }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; openAssurePro:(title:string,message:string)=>void }) {
   const engagement=selectedEngagement(state);
   const [tab,setTab]=useState<"All"|"My tasks">("All");
   const [query,setQuery]=useState("");
@@ -517,13 +508,14 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
   const q=query.trim().toLowerCase();
   const visibleTasks=tasks.filter(t=>(tab==="All"||t.owner==="OO")&&(!q||`${t.title} ${t.area}`.toLowerCase().includes(q)));
   const groups=owners.map(o=>({...o,items:visibleTasks.filter(t=>t.owner===o.id)})).filter(g=>g.items.length>0);
-  const handoff=(message:string)=>update({},message);
   return <div className="page my-work-page">
     <div className="page-heading"><div><p className="eyebrow">Personal workspace</p><h1>My work</h1><p>Tasks assigned across this engagement's team, synced from AssurePro.</p></div></div>
     <div className="work-toolbar">
       <div className="work-tabs">{(["All","My tasks"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
       <div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tasks..."/></div>
-      <button className="primary-btn" onClick={()=>handoff("Opening AssurePro to create a new task — simulated handoff")}><Plus size={15}/>New task</button>
+      <button className="secondary-btn" onClick={()=>openAssurePro("Display settings","Grouping, filtering and display options for this task list are configured in AssurePro.")}><SlidersHorizontal size={14}/>Display</button>
+      <button className="secondary-btn" onClick={()=>openAssurePro("Task insights","Break down task counts by status, priority and assignee in AssurePro's task insights view.")}><BarChart3 size={14}/>Insights</button>
+      <button className="primary-btn" onClick={()=>openAssurePro("Create a new task","Tasks are created and assigned in AssurePro. Open AssurePro to add a new task for this engagement's team.")}><Plus size={15}/>New task</button>
     </div>
     <div className="task-groups">
       {groups.map(group=><section className="task-group" key={group.id}>
@@ -535,13 +527,13 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
         </button>
         {!collapsed[group.id]&&<div className="task-group-body">
           {group.items.map(task=><div className="task-row" key={task.id}>
-            <button className="task-checkbox" aria-label="Mark task complete" title="Mark complete" onClick={()=>handoff("Task completion is managed in AssurePro — open the task there to update its status")}><Circle/></button>
+            <button className="task-checkbox" aria-label="Mark task complete" title="Mark complete" onClick={()=>openAssurePro("Update task status","Task completion is managed in AssurePro. Open the task there to mark it complete.")}><Circle/></button>
             <button className="task-main" onClick={()=>navigate(`/engagement/bbawc/planning/${task.route}`)}><strong>{task.title}</strong><small>{engagement.shortName} · {task.area}</small></button>
             <span className={`task-due ${task.overdue?"overdue":""}`}><CalendarDays size={12}/>{task.due}</span>
-            <span className={`status-pill ${priorityTone(task.priority)}`}>{task.priority}</span>
-            <span className="status-pill neutral">{task.stage}</span>
+            <span className={`task-priority ${priorityTone(task.priority)}`}><SlidersHorizontal size={12}/>{task.priority}</span>
+            <span className="task-stage"><i className="stage-dot"/>{task.stage}</span>
           </div>)}
-          <button className="task-add" onClick={()=>handoff("Opening AssurePro to add a task — simulated handoff")}><Plus size={13}/>Add task</button>
+          <button className="task-add" onClick={()=>openAssurePro("Add a task",`Add a task for ${group.name} in AssurePro. Tasks created there sync back into this list.`)}><Plus size={13}/>Add task</button>
         </div>}
       </section>)}
       {groups.length===0&&<div className="work-empty"><CheckCircle2/><h3>No tasks found</h3><p>Try a different search or switch tabs.</p></div>}
@@ -555,7 +547,7 @@ function ChartTooltip({ active, payload, label, formatter }: any) {
   return <div className="chart-tooltip"><strong>{label ?? payload[0].name}</strong><span>{formatter ? formatter(value) : value}</span></div>;
 }
 
-function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; setTourOpen: (v:boolean)=>void }) {
+function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen, openAssurePro }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; setTourOpen: (v:boolean)=>void; openAssurePro:(title:string,message:string)=>void }) {
   const [collabAudience,setCollabAudience]=useState<"My team"|"Client">("My team");
   const [activeSlice,setActiveSlice]=useState<number|null>(null);
   const currentEngagement=selectedEngagement(state); const pct=planningProgressPct(state); const next=nextOpenPhase(state); const items=attentionItems(state); const declined=state.acceptanceDecision==="decline";
@@ -578,7 +570,7 @@ function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen }: { nav
   </div>;
   if(!engagementReady)return <div className="page dashboard-page dashboard-refined incomplete-engagement-page">
     <div className="client-dashboard-head incomplete"><div className="avatar square">{currentEngagement.initials}</div><div className="client-head-identity"><p className="eyebrow">Selected client</p><h1>{currentEngagement.clientName}</h1><p>{currentEngagement.industry}</p></div><span className="status-pill warning">Pending engagement acceptance</span></div>
-    <section className="assurepro-setup-gate"><div className="setup-gate-icon"><AlertTriangle/></div><div className="setup-gate-copy"><p className="eyebrow">Complete in AssurePro</p><h2>Engagement acceptance not yet completed</h2><p>AssureAudit surfaces engagement data only after client acceptance and continuance, the signed engagement letter and initial trial balance ingestion have been completed and synchronized from AssurePro. No Riverside engagement data has been carried into this client record.</p></div><button className="primary-btn" onClick={()=>update({},`Opening ${currentEngagement.shortName} in AssurePro — simulated handoff`)}>Open in AssurePro <ArrowRight/></button><div className="setup-required-list"><span><i><FileCheck2/></i><span><strong>Engagement Foundation</strong><small>Client acceptance, engagement letter and independence confirmations</small></span><b>Required</b></span><span><i><Database/></i><span><strong>Data Foundation</strong><small>Accounting system connected and trial balance imported</small></span><b>Required</b></span><span><i><Users/></i><span><strong>Engagement team</strong><small>Partner, manager and preparer assignments</small></span><b>Required</b></span><span><i><CalendarDays/></i><span><strong>Audit period</strong><small>Fiscal year-end and reporting deadline</small></span><b>Required</b></span></div><div className="setup-gate-note"><Info/><span><strong>What happens next?</strong>Once AssurePro sync is complete, the audit lifecycle, collaboration analytics, My Work queue and data-readiness status will become available for this client.</span></div></section>
+    <section className="assurepro-setup-gate"><div className="setup-gate-icon"><AlertTriangle/></div><div className="setup-gate-copy"><p className="eyebrow">Complete in AssurePro</p><h2>Engagement acceptance not yet completed</h2><p>AssureAudit surfaces engagement data only after client acceptance and continuance, the signed engagement letter and initial trial balance ingestion have been completed and synchronized from AssurePro. No Riverside engagement data has been carried into this client record.</p></div><button className="primary-btn" onClick={()=>openAssurePro(`Set up ${currentEngagement.shortName}`,`Client acceptance, the engagement letter, team assignments and the accounting system connection for ${currentEngagement.shortName} are completed in AssurePro. Once synced, this engagement becomes fully available here.`)}>Open in AssurePro <ArrowRight/></button><div className="setup-required-list"><span><i><FileCheck2/></i><span><strong>Engagement Foundation</strong><small>Client acceptance, engagement letter and independence confirmations</small></span><b>Required</b></span><span><i><Database/></i><span><strong>Data Foundation</strong><small>Accounting system connected and trial balance imported</small></span><b>Required</b></span><span><i><Users/></i><span><strong>Engagement team</strong><small>Partner, manager and preparer assignments</small></span><b>Required</b></span><span><i><CalendarDays/></i><span><strong>Audit period</strong><small>Fiscal year-end and reporting deadline</small></span><b>Required</b></span></div><div className="setup-gate-note"><Info/><span><strong>What happens next?</strong>Once AssurePro sync is complete, the audit lifecycle, collaboration analytics, My Work queue and data-readiness status will become available for this client.</span></div></section>
   </div>;
   return <div className="page dashboard-page dashboard-refined">
     <div className="client-dashboard-head"><div className="avatar square">{currentEngagement.initials}</div><div className="client-head-identity"><p className="eyebrow">Client audit workspace</p><h1>{currentEngagement.clientName}</h1><p>{currentEngagement.industry} · {currentEngagement.reportingFramework}</p></div><div className="client-head-facts"><span><i className="head-fact-icon audit"><FileCheck2/></i><span><small>Audit type</small><strong>{currentEngagement.displayType}</strong><em>Financial statement assurance</em></span></span><span><i className="head-fact-icon period"><CalendarDays/></i><span><small>Audit period</small><strong>{currentEngagement.fiscalYear}</strong><em>Ended {currentEngagement.periodShort}</em></span></span><span><i className="head-fact-icon deadline"><Clock3/></i><span><small>Reporting deadline</small><strong>{currentEngagement.reportingDeadline}</strong><em>From engagement letter</em></span></span></div></div>
@@ -595,7 +587,7 @@ function Dashboard({ navigate, state, update, setTourOpen: _setTourOpen }: { nav
   </div>;
 }
 
-function Engagements({ navigate, update, state }: { navigate: (p: string) => void; update: (p: Partial<DemoState>, m?: string) => void; state: DemoState }) {
+function Engagements({ navigate, update, state, openAssurePro }: { navigate: (p: string) => void; update: (p: Partial<DemoState>, m?: string) => void; state: DemoState; openAssurePro:(title:string,message:string)=>void }) {
   const [newOpen, setNewOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -606,17 +598,19 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
   const bbawcPillClass = state.acceptanceDecision === "decline" ? "danger" : state.locked ? "approved" : "progress";
   const bbawcCounts = phaseStatusCounts(state);
   const rows = [
-    { name: engagement.clientName, industry:"Nonprofit", engagement:"Financial Audit", period:"Dec 31, 2025", planning:bbawcPlanning, live:true, team:state.teamMembers.slice(0,4).map(m=>m.initials) },
-    { name:"Harbor Community Foundation", industry:"Private foundation", engagement:"Financial Audit", period:"Jun 30, 2025", planning:"Approved", live:false, team:["RP","MK"] },
-    { name:"Greenfield Housing Alliance", industry:"Affordable housing", engagement:"NFP Audit", period:"Sep 30, 2025", planning:"In Progress", live:false, team:["SG","LC","JT"] },
-    { name:"Metro Arts Council", industry:"Arts & culture", engagement:"Fund Audit", period:"Jun 30, 2025", planning:"In Progress", live:false, team:["JA","MK"] },
-    { name:"Horizon Retirement Plan", industry:"Employee benefits", engagement:"EBP Audit", period:"Dec 31, 2025", planning:"Approved", live:false, team:["LC","OO"] },
-    { name:"Cedar Grove Outreach", industry:"Community services", engagement:"Financial Audit", period:"Mar 31, 2025", planning:"Declined", live:false, team:["JA","OO"] },
+    { id:"bbawc", name: engagement.clientName, industry:"Nonprofit", engagement:"Financial Audit", period:"Dec 31, 2025", planning:bbawcPlanning, live:true, team:state.teamMembers.slice(0,4).map(m=>m.initials) },
+    { id:"harbor", name:"Harbor Community Foundation", industry:"Private foundation", engagement:"Financial Audit", period:"Jun 30, 2025", planning:"Approved", live:false, team:["RP","MK"] },
+    { id:"greenfield", name:"Greenfield Housing Alliance", industry:"Affordable housing", engagement:"NFP Audit", period:"Sep 30, 2025", planning:"In Progress", live:false, team:["SG","LC","JT"] },
+    { id:"metro", name:"Metro Arts Council", industry:"Arts & culture", engagement:"Fund Audit", period:"Jun 30, 2025", planning:"In Progress", live:false, team:["JA","MK"] },
+    { id:"horizon", name:"Horizon Retirement Plan", industry:"Employee benefits", engagement:"EBP Audit", period:"Dec 31, 2025", planning:"Approved", live:false, team:["LC","OO"] },
+    { id:"cedar", name:"Cedar Grove Outreach", industry:"Community services", engagement:"Financial Audit", period:"Mar 31, 2025", planning:"Declined", live:false, team:["JA","OO"] },
   ].filter(r => (statusFilter === "All" || r.planning === statusFilter) && `${r.name} ${r.industry} ${r.engagement}`.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+  const openEngagement=(r:{id:string;name:string})=>{update({activeClientId:r.id},`Switched audit workspace to ${r.name}`);navigate("/dashboard")};
   if(state.viewYear!==2025)return <div className="page"><div className="page-heading"><div><p className="eyebrow">Clients</p><h1>Engagements</h1><p>Viewing FY {state.viewYear}.</p></div></div>
     <section className="section-card"><div className="empty-state"><CalendarDays/><strong>No engagements for FY {state.viewYear}</strong><p>This prototype only has engagement data for FY 2025.</p><button className="primary-btn" style={{marginTop:14}} onClick={()=>update({viewYear:2025},"Back to FY 2025")}>Return to FY 2025 <ArrowRight size={16}/></button></div></section>
   </div>;
   return <div className="page"><div className="page-heading"><div><p className="eyebrow">Audit portfolio</p><h1>Engagements</h1><p>Current and prior-period assurance engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
+    <div className="banner info assurepro-banner"><BriefcaseBusiness/><div><strong>Engagement records are managed in AssurePro</strong><span>Client acceptance, engagement letters, team assignments and status changes for these engagements happen in AssurePro. Select a row to open that client's audit workspace here.</span></div><button className="secondary-btn" onClick={()=>openAssurePro("Manage engagements","Create, edit or reassign engagements in AssurePro — changes sync back into AssureAudit automatically.")}>Open AssurePro<ArrowRight size={15}/></button></div>
     <div className="summary-grid"><Metric label="FY 2025 engagements" value="6" detail="Across four assurance service types"/><Metric label="In progress" value="3" detail="2 require attention this week"/><Metric label="Approved" value="2" detail="Planning approved and locked"/><Metric label="Declined" value="1" detail="Decision and rationale retained"/></div>
     <div className="table-card"><div className="table-toolbar"><div className="search"><Search/><input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Search client, industry or audit type"/></div><div className="topbar-popover" ref={filterRef}><button className={`filter-btn ${statusFilter !== "All" ? "active" : ""}`} onClick={() => setFilterOpen(!filterOpen)}><Filter/>Filters{statusFilter !== "All" && <i className="filter-badge"/>}</button>{filterOpen && <div className="dropdown-menu filter-menu">
         <div className="dropdown-head"><strong>Planning status</strong></div>
@@ -624,7 +618,7 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
       </div>}</div></div>
       <table><thead><tr><th>Client</th><th>Engagement</th><th>Period</th><th>Planning</th><th>Assigned team</th><th></th></tr></thead><tbody>
         {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--muted)" }}>No engagements match this filter.</td></tr>}
-        {rows.map(r => <tr key={r.name}><td><strong>{r.name}</strong><span>{r.industry}</span></td><td>{r.engagement}</td><td>{r.period}</td><td><span className={`status-pill ${r.live?bbawcPillClass:r.planning==="Approved"?"approved":r.planning==="Declined"?"danger":"progress"}`}>{r.planning}</span>{r.live&&<StatusCountBadges compact complete={bbawcCounts.complete} inProgress={bbawcCounts.inProgress} attention={bbawcCounts.attention}/>}</td><td>{r.live?<button className="avatar-stack as-button" title="Manage engagement team" onClick={() => setTeamOpen(true)}>{r.team.map(initials => <i key={initials}>{initials}</i>)}</button>:<div className="avatar-stack">{r.team.map(initials=><i key={initials}>{initials}</i>)}</div>}</td><td><button className="icon-btn" aria-label={`Open ${r.name}`} onClick={() => r.live?navigate("/engagement/bbawc"):update({},`${r.name} is included as a populated portfolio example; ${engagement.clientName} is the fully interactive engagement.`)}><ChevronRight/></button></td></tr>)}
+        {rows.map(r => <tr key={r.name}><td><strong>{r.name}</strong><span>{r.industry}</span></td><td>{r.engagement}</td><td>{r.period}</td><td><span className={`status-pill ${r.live?bbawcPillClass:r.planning==="Approved"?"approved":r.planning==="Declined"?"danger":"progress"}`}>{r.planning}</span>{r.live&&<StatusCountBadges compact complete={bbawcCounts.complete} inProgress={bbawcCounts.inProgress} attention={bbawcCounts.attention}/>}</td><td>{r.live?<button className="avatar-stack as-button" title="Manage engagement team" onClick={() => setTeamOpen(true)}>{r.team.map(initials => <i key={initials}>{initials}</i>)}</button>:<div className="avatar-stack">{r.team.map(initials=><i key={initials}>{initials}</i>)}</div>}</td><td><button className="icon-btn" aria-label={`Open ${r.name}`} onClick={() => openEngagement(r)}><ChevronRight/></button></td></tr>)}
       </tbody></table>
     </div>
     {newOpen && <NewEngagementWizard onClose={() => setNewOpen(false)} update={update}/>}
@@ -700,7 +694,7 @@ function EngagementHome({ navigate, state, update }: { navigate: (p: string) => 
 
 const planningViews = ["overview", "setup", "data", "entity-controls", "materiality", "risks", "responses", "publish", "review", "audit-trail"];
 
-function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawerOpen, setDrawerOpen, demoOpen, setDemoOpen }: any) {
+function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawerOpen, setDrawerOpen, demoOpen, setDemoOpen, openAssurePro }: any) {
   const view = path.split("/").pop() || "planning";
   const activeView = view === "planning" ? "overview" : view;
   const currentEngagement = selectedEngagement(state);
@@ -713,7 +707,7 @@ function PlanningShell({ path, navigate, state, update, drawer, setDrawer, drawe
           <AlertTriangle/>
           <strong>Planning isn't available for {currentEngagement.clientName}</strong>
           <p>Client acceptance and continuance for this engagement hasn't been completed and synchronized from AssurePro, so there's no Engagement Foundation or Data Foundation for Planning to build on — materiality, risk assessment, audit response and approvals all depend on that foundation. No Riverside engagement data has been carried into this client record.</p>
-          <button className="primary-btn" style={{marginTop:14}} onClick={()=>update({},`Opening ${currentEngagement.shortName} in AssurePro — simulated handoff`)}>Open in AssurePro <ArrowRight size={16}/></button>
+          <button className="primary-btn" style={{marginTop:14}} onClick={()=>openAssurePro(`Set up ${currentEngagement.shortName}`,`Client acceptance, the engagement letter, team assignments and the accounting system connection for ${currentEngagement.shortName} are completed in AssurePro. Once synced, Planning becomes available here.`)}>Open in AssurePro <ArrowRight size={16}/></button>
         </div></div> : <>
         {activeView === "overview" && <PlanningOverview state={state} update={update} navigate={navigate}/>}
         {activeView === "setup" && <SetupView state={state} update={update}/>}
