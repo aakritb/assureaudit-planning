@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell,
+  Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BarChart3, Bell,
   BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2,
   ChevronDown, ChevronLeft, ChevronRight, Circle, ClipboardCheck, Clock3,
   Cloud, Database, Download, FileCheck2, FileSpreadsheet, FileText, Filter,
@@ -370,7 +370,7 @@ export default function Home() {
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} openAssurePro={openAssurePro} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} openAssurePro={openAssurePro} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} openAssurePro={openAssurePro} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} openAssurePro={openAssurePro} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} openAssurePro={openAssurePro} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} openAssurePro={openAssurePro} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} openAssurePro={openAssurePro} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {tourOpen ? <GuidedTour path={path} navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" aria-label="Open AssureAudit Guide" title="Open AssureAudit Guide" onClick={() => setTourOpen(true)}><BookOpen size={18}/><span>Guide</span></button>}
@@ -388,10 +388,10 @@ function AssureProPanel({ open, title, message, close, update }: { open: boolean
       <div className="assurepro-panel-head"><span className="assurepro-panel-icon"><BriefcaseBusiness/></span><div><p className="eyebrow">Manage in AssurePro</p><h2>{title}</h2></div><button className="icon-btn" aria-label="Close" onClick={close}><X/></button></div>
       <p className="assurepro-panel-message">{message}</p>
       <div className="assurepro-panel-switcher">
-        <p className="assurepro-panel-label">Continue in</p>
-        <button className="product-option selected"><span className="product-icon audit"><ShieldCheck/></span><span><strong>AssureAudit</strong><small>Audit engagements</small></span><Check/></button>
-        <button className="product-option" onClick={()=>{update({},"Opening AssurePro — simulated handoff");close()}}><span className="product-icon pro"><BriefcaseBusiness/></span><span><strong>AssurePro</strong><small>Practice management</small></span><ArrowRight/></button>
-        <button className="product-option" onClick={()=>{update({},"Opening AssureDocs — simulated handoff");close()}}><span className="product-icon docs"><FolderOpen/></span><span><strong>AssureDocs</strong><small>Client documents</small></span><ArrowRight/></button>
+        <p className="assurepro-panel-label">Assure suite</p>
+        <button className="product-option" onClick={()=>{update({},"Opening AssurePro — simulated handoff");close()}}><i className="suite-dot connected"/><span><strong>AssurePro</strong><small>Practice management</small></span><ArrowUpRight/></button>
+        <button className="product-option" onClick={()=>{update({},"Opening Assure Audit — simulated handoff");close()}}><i className="suite-dot connected"/><span><strong>Assure Audit</strong><small>Audit fieldwork</small></span><ArrowUpRight/></button>
+        <button className="product-option" onClick={()=>{update({},"Opening AssureDocs — simulated handoff");close()}}><i className="suite-dot"/><span><strong>AssureDocs</strong><small>Client documents</small></span><ArrowUpRight/></button>
       </div>
     </aside>
   </div>;
@@ -414,7 +414,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav, openA
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
       <div className="client-section-nav"><p className="nav-label">Client workspace</p><button className={`nav-item ${inDocuments?"active":""}`} onClick={()=>navigate("/engagement/bbawc/documents")}><FolderOpen/><span>Documents</span></button><div className={`planning-nav-branch ${planningBranchOpen?"open":""}`}><button className={`nav-item planning-parent ${inPlanning?"active":""}`} aria-expanded={planningBranchOpen} onClick={()=>{setPlanningBranchTouched(true);if(inPlanning)setPlanningBranchOpen(open=>!open);else{setPlanningBranchOpen(true);navigate("/engagement/bbawc/planning")}}}><ClipboardCheck/><span>Planning</span><b>{planningProgressPct(state)}%</b><ChevronDown/></button>{planningBranchOpen&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Workpapers</span></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)} title={phase.status}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}</div><button className="nav-item" onClick={()=>update({},state.locked?"Fieldwork workspace isn't built in this prototype yet":"Fieldwork unlocks after Planning approval")}><Search/><span>Fieldwork</span>{!state.locked&&<LockKeyhole className="tiny-nav-lock"/>}</button><button className="nav-item" onClick={()=>update({},"Reporting becomes available after Fieldwork")}><BarChart3/><span>Report</span><LockKeyhole className="tiny-nav-lock"/></button></div>
-      <p className="nav-label practice">Firm</p><button className={`nav-item ${path==="/engagements"?"active":""}`} onClick={()=>navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button><button className={`nav-item ${path==="/clients"?"active":""}`} onClick={()=>navigate("/clients")}><Building2/><span>Clients</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
+      <p className="nav-label practice">Firm</p><button className={`nav-item ${path==="/engagements"?"active":""}`} onClick={()=>navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>Baldeep Singh Chhabra · Partner</span></div></div>
   </aside>;
@@ -494,6 +494,7 @@ function MyWork({ navigate, state, update, openAssurePro }: { navigate:(p:string
   const [tab,setTab]=useState<"All"|"My tasks">("All");
   const [query,setQuery]=useState("");
   const [collapsed,setCollapsed]=useState<Record<string,boolean>>({});
+  const [insightsOpen,setInsightsOpen]=useState(false);
   const owners=[{id:"JA",name:"Jasmine Alvarez"},{id:"MK",name:"Meera Kapoor"},{id:"OO",name:"Oscar Owner"},{id:"LC",name:"Leo Chen"}];
   const tasks=[
     {id:"t1",title:"Complete independence confirmations",area:"Commence · Independence",owner:"JA",due:"Today",overdue:true,priority:"Urgent",stage:"Commence",route:"setup"},
@@ -514,7 +515,7 @@ function MyWork({ navigate, state, update, openAssurePro }: { navigate:(p:string
       <div className="work-tabs">{(["All","My tasks"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
       <div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tasks..."/></div>
       <button className="secondary-btn" onClick={()=>openAssurePro("Display settings","Grouping, filtering and display options for this task list are configured in AssurePro.")}><SlidersHorizontal size={14}/>Display</button>
-      <button className="secondary-btn" onClick={()=>openAssurePro("Task insights","Break down task counts by status, priority and assignee in AssurePro's task insights view.")}><BarChart3 size={14}/>Insights</button>
+      <button className="secondary-btn" onClick={()=>setInsightsOpen(true)}><BarChart3 size={14}/>Insights</button>
       <button className="primary-btn" onClick={()=>openAssurePro("Create a new task","Tasks are created and assigned in AssurePro. Open AssurePro to add a new task for this engagement's team.")}><Plus size={15}/>New task</button>
     </div>
     <div className="task-groups">
@@ -538,6 +539,28 @@ function MyWork({ navigate, state, update, openAssurePro }: { navigate:(p:string
       </section>)}
       {groups.length===0&&<div className="work-empty"><CheckCircle2/><h3>No tasks found</h3><p>Try a different search or switch tabs.</p></div>}
     </div>
+    {insightsOpen&&<TaskInsightsPanel tasks={tasks} owners={owners} scope={tab} close={()=>setInsightsOpen(false)}/>}
+  </div>;
+}
+
+function TaskInsightsPanel({tasks,owners,scope,close}:{tasks:any[];owners:{id:string;name:string}[];scope:string;close:()=>void}){
+  const priorities=["Urgent","High","Medium","Low"];
+  const priorityColor:Record<string,string>={Urgent:"#c94747",High:"#cc8421",Medium:"#6d55dc",Low:"#b8b2c4"};
+  const scoped=scope==="My tasks"?tasks.filter(t=>t.owner==="OO"):tasks;
+  const chartData=owners.map(o=>{
+    const row:any={name:o.id};
+    priorities.forEach(p=>{row[p]=scoped.filter(t=>t.owner===o.id&&t.priority===p).length});
+    return row;
+  }).filter(r=>priorities.some(p=>r[p]>0));
+  const overdueCount=scoped.filter(t=>t.overdue).length;
+  return <div className="assurepro-panel-backdrop">
+    <aside className="assurepro-panel task-insights-panel">
+      <div className="assurepro-panel-head"><span className="assurepro-panel-icon"><BarChart3/></span><div><p className="eyebrow">Task insights</p><h2>{scoped.length} tasks</h2></div><button className="icon-btn" aria-label="Close" onClick={close}><X/></button></div>
+      <p className="assurepro-panel-message">{scope==="My tasks"?"My tasks":"All tasks"} · {overdueCount} overdue · broken down by priority across the team.</p>
+      <div className="insights-chart"><ResponsiveContainer width="100%" height={Math.max(120,chartData.length*38)}><BarChart data={chartData} layout="vertical" margin={{left:4,right:8}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false} tick={{fontSize:10}}/><YAxis dataKey="name" type="category" width={34} tick={{fontSize:11,fontWeight:650}} axisLine={false} tickLine={false}/><Tooltip content={<ChartTooltip formatter={(v:number)=>`${v} task${v===1?"":"s"}`}/>} cursor={{fill:"rgba(109,85,220,.06)"}}/>{priorities.map((p,i)=><Bar key={p} dataKey={p} stackId="a" fill={priorityColor[p]} radius={i===priorities.length-1?[0,4,4,0]:undefined}/>)}</BarChart></ResponsiveContainer></div>
+      <div className="insights-legend">{priorities.map(p=><span key={p}><i style={{background:priorityColor[p]}}/>{p}</span>)}</div>
+      <table className="insights-table"><thead><tr><th>Owner</th>{priorities.map(p=><th key={p}>{p}</th>)}<th>Total</th></tr></thead><tbody>{owners.map(o=>{const counts=priorities.map(p=>scoped.filter(t=>t.owner===o.id&&t.priority===p).length);const total=counts.reduce((a,b)=>a+b,0);return total?<tr key={o.id}><td>{o.name}</td>{counts.map((c,i)=><td key={i}>{c||"—"}</td>)}<td><strong>{total}</strong></td></tr>:null;})}</tbody></table>
+    </aside>
   </div>;
 }
 
@@ -610,7 +633,7 @@ function Engagements({ navigate, update, state, openAssurePro }: { navigate: (p:
     <section className="section-card"><div className="empty-state"><CalendarDays/><strong>No engagements for FY {state.viewYear}</strong><p>This prototype only has engagement data for FY 2025.</p><button className="primary-btn" style={{marginTop:14}} onClick={()=>update({viewYear:2025},"Back to FY 2025")}>Return to FY 2025 <ArrowRight size={16}/></button></div></section>
   </div>;
   return <div className="page"><div className="page-heading"><div><p className="eyebrow">Audit portfolio</p><h1>Engagements</h1><p>Current and prior-period assurance engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
-    <div className="banner info assurepro-banner"><BriefcaseBusiness/><div><strong>Engagement records are managed in AssurePro</strong><span>Client acceptance, engagement letters, team assignments and status changes for these engagements happen in AssurePro. Select a row to open that client's audit workspace here.</span></div><button className="secondary-btn" onClick={()=>openAssurePro("Manage engagements","Create, edit or reassign engagements in AssurePro — changes sync back into AssureAudit automatically.")}>Open AssurePro<ArrowRight size={15}/></button></div>
+    <div className="banner info assurepro-banner"><BriefcaseBusiness/><div><strong>Client and engagement records are managed in AssurePro</strong><span>This list is how AssureAudit reflects your practice's clients — client details, contacts, acceptance decisions, engagement letters and team assignments are all created and maintained in AssurePro. Select a row to open that client's audit workspace here.</span></div><button className="secondary-btn" onClick={()=>openAssurePro("Manage clients & engagements","Create clients, set up new engagements, or edit acceptance and team details in AssurePro — changes sync back into AssureAudit automatically.")}>Open AssurePro<ArrowRight size={15}/></button></div>
     <div className="summary-grid"><Metric label="FY 2025 engagements" value="6" detail="Across four assurance service types"/><Metric label="In progress" value="3" detail="2 require attention this week"/><Metric label="Approved" value="2" detail="Planning approved and locked"/><Metric label="Declined" value="1" detail="Decision and rationale retained"/></div>
     <div className="table-card"><div className="table-toolbar"><div className="search"><Search/><input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Search client, industry or audit type"/></div><div className="topbar-popover" ref={filterRef}><button className={`filter-btn ${statusFilter !== "All" ? "active" : ""}`} onClick={() => setFilterOpen(!filterOpen)}><Filter/>Filters{statusFilter !== "All" && <i className="filter-badge"/>}</button>{filterOpen && <div className="dropdown-menu filter-menu">
         <div className="dropdown-head"><strong>Planning status</strong></div>
@@ -626,48 +649,103 @@ function Engagements({ navigate, update, state, openAssurePro }: { navigate: (p:
   </div>;
 }
 
-function Clients({ navigate, state }: { navigate:(p:string)=>void; state:DemoState }) {
-  const [search,setSearch]=useState("");
-  const clients=[
-    {name:engagement.clientName,industry:"Youth & family services",location:"Brooklyn, NY",contact:"Dana Collins · Controller",engagements:3,next:"Planning in progress",initials:"RY",live:true},
-    {name:"Harbor Community Foundation",industry:"Private foundation",location:"Boston, MA",contact:"Maya Reed · CFO",engagements:4,next:"FY 2025 approved",initials:"HC"},
-    {name:"Greenfield Housing Alliance",industry:"Affordable housing",location:"Newark, NJ",contact:"Andre Kim · VP Finance",engagements:2,next:"Risk review due Aug 18",initials:"GH"},
-    {name:"Metro Arts Council",industry:"Arts & culture",location:"New York, NY",contact:"Nina Patel · Finance Director",engagements:5,next:"Client responses outstanding",initials:"MA"},
-    {name:"Horizon Retirement Plan",industry:"Employee benefits",location:"Chicago, IL",contact:"Evan Brooks · Plan Administrator",engagements:2,next:"Planning approved",initials:"HR"},
-    {name:"Cedar Grove Outreach",industry:"Community services",location:"Queens, NY",contact:"Lena Ortiz · Executive Director",engagements:1,next:"Acceptance declined",initials:"CG"},
-  ].filter(c=>`${c.name} ${c.industry} ${c.location} ${c.contact}`.toLowerCase().includes(search.trim().toLowerCase()));
-  return <div className="page clients-page"><div className="page-heading"><div><p className="eyebrow">Practice</p><h1>Clients</h1><p>Organization records, key contacts and engagement history.</p></div><button className="primary-btn"><Plus/>New client</button></div>
-    <div className="summary-grid"><Metric label="Active clients" value="6" detail="5 recurring · 1 first year"/><Metric label="Open engagements" value="4" detail="Across audit and EBP services"/><Metric label="Client requests" value="9" detail="4 due within seven days"/><Metric label="Portal adoption" value="83%" detail="5 of 6 clients activated"/></div>
-    <div className="table-toolbar"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search clients, contacts or location"/></div><button className="filter-btn"><Filter/>Filters</button></div>
-    <section className="client-directory">{clients.map(c=><button key={c.name} onClick={()=>c.live?navigate("/engagement/bbawc"):undefined}><span className="avatar square">{c.initials}</span><span className="client-directory-name"><strong>{c.name}</strong><small>{c.industry} · {c.location}</small></span><span><small>Primary contact</small><strong>{c.contact}</strong></span><span><small>Engagement history</small><strong>{c.engagements} engagement{c.engagements===1?"":"s"}</strong></span><span><small>Next action</small><strong>{c.next}</strong></span><ChevronRight/></button>)}</section>
-  </div>;
-}
-
 function DocumentsPage({navigate,state,update}:{navigate:(p:string)=>void;state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void}){
   const engagement=selectedEngagement(state);
   const [query,setQuery]=useState("");
-  const [category,setCategory]=useState("All documents");
+  const [category,setCategory]=useState("all");
+  const [tab,setTab]=useState<"Files"|"Requests">("Files");
+  const [selectedDoc,setSelectedDoc]=useState<any>(null);
+  const [requestOpen,setRequestOpen]=useState(false);
+  const [openRequest,setOpenRequest]=useState<string|null>(null);
   const folders=[
-    {name:"Engagement & governance",count:4,detail:"Letters, minutes and legal records",icon:<BriefcaseBusiness/>},
-    {name:"Client-provided records",count:8,detail:"Policies, contracts and schedules",icon:<Users/>},
-    {name:"Planning evidence",count:6,detail:"Evidence linked to workpapers",icon:<ClipboardCheck/>},
-    {name:"Audit outputs",count:3,detail:"Memos and approved deliverables",icon:<FileCheck2/>},
+    {id:"all",name:"All Documents",icon:<FolderOpen/>},
+    {id:"client-uploads",name:"Client Uploads",icon:<UploadCloud/>},
+    {id:"Engagement & governance",name:"Engagement & governance",icon:<BriefcaseBusiness/>},
+    {id:"Client-provided records",name:"Client-provided records",icon:<Users/>},
+    {id:"Planning evidence",name:"Planning evidence",icon:<ClipboardCheck/>},
+    {id:"Audit outputs",name:"Audit outputs",icon:<FileCheck2/>},
   ];
   const documents=[
-    {name:"Signed Engagement Letter.pdf",category:"Engagement & governance",source:"AssurePro",workpaper:"Engagement Foundation",updated:"Aug 4, 2025",status:"Final"},
-    {name:"Board Minutes — Q4 2025.pdf",category:"Engagement & governance",source:"Dana Collins",workpaper:"Understanding the entity",updated:"2 hours ago",status:"Received"},
-    {name:"Accounting Policy Handbook.pdf",category:"Client-provided records",source:"Dana Collins",workpaper:"Internal control & IT",updated:"Yesterday",status:"In review"},
-    {name:"Final Trial Balance.xlsx",category:"Client-provided records",source:engagement.accountingSystem,workpaper:"Data Foundation",updated:"Aug 11, 2025",status:"Validated"},
-    {name:"City Grant Agreement.pdf",category:"Planning evidence",source:"Jasmine Alvarez",workpaper:"Risk assessment",updated:"Aug 10, 2025",status:"Linked"},
-    {name:"Fraud Discussion Minutes.pdf",category:"Planning evidence",source:"Oscar Owner",workpaper:"Engagement Foundation",updated:"Aug 9, 2025",status:"Final"},
-    {name:"Planning Memo — Draft v1.pdf",category:"Audit outputs",source:"AssureAudit",workpaper:"Publish & Approval",updated:"18 min ago",status:"Draft"},
+    {name:"Signed Engagement Letter.pdf",category:"Engagement & governance",source:"AssurePro",workpaper:"Engagement Foundation",updated:"Aug 4, 2025",status:"Final",clientUpload:false},
+    {name:"Board Minutes — Q4 2025.pdf",category:"Engagement & governance",source:"Dana Collins",workpaper:"Understanding the entity",updated:"2 hours ago",status:"Received",clientUpload:true},
+    {name:"Accounting Policy Handbook.pdf",category:"Client-provided records",source:"Dana Collins",workpaper:"Internal control & IT",updated:"Yesterday",status:"In review",clientUpload:true},
+    {name:"Final Trial Balance.xlsx",category:"Client-provided records",source:engagement.accountingSystem,workpaper:"Data Foundation",updated:"Aug 11, 2025",status:"Validated",clientUpload:false},
+    {name:"City Grant Agreement.pdf",category:"Planning evidence",source:"Jasmine Alvarez",workpaper:"Risk assessment",updated:"Aug 10, 2025",status:"Linked",clientUpload:false},
+    {name:"Fraud Discussion Minutes.pdf",category:"Planning evidence",source:"Oscar Owner",workpaper:"Engagement Foundation",updated:"Aug 9, 2025",status:"Final",clientUpload:false},
+    {name:"Planning Memo — Draft v1.pdf",category:"Audit outputs",source:"AssureAudit",workpaper:"Publish & Approval",updated:"18 min ago",status:"Draft",clientUpload:false},
   ];
-  const visible=documents.filter(doc=>(category==="All documents"||doc.category===category)&&`${doc.name} ${doc.source} ${doc.workpaper}`.toLowerCase().includes(query.toLowerCase()));
+  const requests=[
+    {id:"req1",title:"Restricted grant confirmations",priority:true,status:"Overdue",assignee:"Dana Collins",items:[
+      {name:"City Grant — signed confirmation",code:"GRANT-01",status:"Pending"},
+      {name:"State Grant — signed confirmation",code:"GRANT-02",status:"Pending"},
+      {name:"Foundation Grant — signed confirmation",code:"GRANT-03",status:"Received"},
+    ]},
+    {id:"req2",title:"Bank confirmation letters",priority:false,status:"Pending",assignee:"Dana Collins",items:[
+      {name:"Operating account — First National",code:"BANK-01",status:"Pending"},
+      {name:"Reserve account — First National",code:"BANK-02",status:"Pending"},
+    ]},
+    {id:"req3",title:"Board-approved FY2025 budget",priority:false,status:"Complete",assignee:"Dana Collins",items:[
+      {name:"Board minutes approving budget",code:"BUD-01",status:"Received"},
+    ]},
+  ];
+  const folderCount=(id:string)=>id==="all"?documents.length:id==="client-uploads"?documents.filter(d=>d.clientUpload).length:documents.filter(d=>d.category===id).length;
+  const currentFolder=folders.find(f=>f.id===category)!;
+  const visible=documents.filter(doc=>(category==="all"||category==="client-uploads"?(category==="all"||doc.clientUpload):doc.category===category)&&`${doc.name} ${doc.source} ${doc.workpaper}`.toLowerCase().includes(query.toLowerCase()));
+  const openRequestsCount=requests.filter(r=>r.status!=="Complete").length;
   return <div className="page documents-page"><div className="module-page-head"><span className="module-head-icon"><FolderOpen/></span><div><div className="breadcrumbs"><button onClick={()=>navigate("/dashboard")}>Overview</button><ChevronRight/><span>Documents</span></div><h1>Documents</h1><p>{engagement.shortName} · Files, evidence and approved outputs for {engagement.fiscalYear}</p></div><div className="module-head-summary"><small>Current library</small><strong>21 documents</strong><span><CheckCircle2/>7 final & locked</span></div></div>
     <div className="document-summary"><Metric label="All documents" value="21" detail="Across the current engagement"/><Metric label="Client provided" value="8" detail="2 received this week"/><Metric label="Needs review" value="3" detail="Assigned to the audit team"/><Metric label="Final & locked" value="7" detail="Retained with audit history"/></div>
-    <div className="document-folders">{folders.map(folder=><button key={folder.name} className={category===folder.name?"active":""} onClick={()=>setCategory(category===folder.name?"All documents":folder.name)}><span>{folder.icon}</span><div><strong>{folder.name}</strong><small>{folder.detail}</small></div><b>{folder.count}</b><ChevronRight/></button>)}</div>
-    <section className="document-library"><div className="document-toolbar"><div><h2>{category}</h2><p>{visible.length} file{visible.length===1?"":"s"} shown</p></div><div className="search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search documents, source or workpaper"/></div>{category!=="All documents"&&<button className="secondary-btn" onClick={()=>setCategory("All documents")}><X/>Clear folder</button>}<button className="secondary-btn document-upload" onClick={()=>update({},"Upload window opened — choose a client document and its destination workpaper")}><UploadCloud/>Upload</button></div><div className="document-table-head"><span>Document</span><span>Source</span><span>Linked workpaper</span><span>Updated</span><span>Status</span><span/></div>{visible.map(doc=><button className="document-row" key={doc.name} onClick={()=>update({},`Opening ${doc.name} in the document viewer`)}><span className="document-file-icon"><FileText/></span><span className="document-name"><strong>{doc.name}</strong><small>{doc.category}</small></span><span>{doc.source}</span><span><Link2/>{doc.workpaper}</span><span>{doc.updated}</span><span className={`status-pill ${doc.status==="Draft"?"warning":doc.status==="In review"?"progress":"approved"}`}>{doc.status}</span><MoreHorizontal/></button>)}{visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the folder or search to see the full client library.</p></div>}</section>
+    <div className="documents-layout">
+      <aside className="documents-folders"><p className="documents-folders-label">Folders</p>{folders.map(folder=><button key={folder.id} className={category===folder.id?"active":""} onClick={()=>setCategory(folder.id)}>{folder.icon}<span>{folder.name}</span><b>{folderCount(folder.id)}</b></button>)}</aside>
+      <section className="documents-main">
+        <div className="documents-main-head"><div><h2>{currentFolder.name}</h2><p>{tab==="Files"?`${visible.length} file${visible.length===1?"":"s"} shown`:`${requests.length} request${requests.length===1?"":"s"}`}</p></div><div className="documents-actions"><div className="search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search documents, source or workpaper"/></div><button className="secondary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button><button className="secondary-btn" onClick={()=>update({},"Upload window opened — choose a client document and its destination workpaper")}><UploadCloud size={15}/>Upload</button></div></div>
+        <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{documents.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {openRequestsCount>0&&<b className="warn">{openRequestsCount} pending</b>}</button></div>
+        {tab==="Files"?<>
+          <div className="document-table-head"><span>Document</span><span>Source</span><span>Linked workpaper</span><span>Updated</span><span>Status</span><span/></div>
+          {visible.map(doc=><button className="document-row" key={doc.name} onClick={()=>setSelectedDoc(doc)}><span className="document-name-cell"><span className="document-file-icon"><FileText/></span><span className="document-name"><strong>{doc.name}</strong><small>{doc.category}</small></span></span><span>{doc.source}</span><span><Link2/>{doc.workpaper}</span><span>{doc.updated}</span><span className={`status-pill ${doc.status==="Draft"?"warning":doc.status==="In review"?"progress":"approved"}`}>{doc.status}</span><MoreHorizontal/></button>)}
+          {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the folder or search to see the full client library.</p></div>}
+        </>:<div className="requests-list">{requests.map(r=>{const done=r.items.filter(i=>i.status==="Received").length;return <div className="request-card" key={r.id}><button className="request-card-head" onClick={()=>setOpenRequest(openRequest===r.id?null:r.id)}><ChevronDown className={openRequest===r.id?"":"collapsed"}/><span className="request-card-progress">{done}/{r.items.length}</span><strong>{r.title}</strong>{r.priority&&<span className="status-pill danger">High priority</span>}<span className={`status-pill ${r.status==="Overdue"?"danger":r.status==="Complete"?"approved":"warning"}`}>{r.status}</span><span className="text-link">Open<ArrowRight size={13}/></span></button>{openRequest===r.id&&<>{r.items.map(item=><div className="request-item-row" key={item.code}><FileText size={14}/><span>{item.name}</span><code>{item.code}</code><span className={`status-pill ${item.status==="Received"?"approved":"neutral"}`}>{item.status}</span></div>)}<div className="request-card-footer"><span>{r.items.length} document{r.items.length===1?"":"s"}</span><span>{r.assignee} · Assigned</span></div></>}</div>})}</div>}
+      </section>
+    </div>
+    {selectedDoc&&<DocumentDetailDrawer doc={selectedDoc} close={()=>setSelectedDoc(null)} update={update}/>}
+    {requestOpen&&<CreateRequestModal close={()=>setRequestOpen(false)} update={update} clientName={engagement.clientName}/>}
   </div>
+}
+
+function DocumentDetailDrawer({doc,close,update}:{doc:any;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const [reviewStatus,setReviewStatus]=useState(doc.status);
+  const [shared,setShared]=useState(true);
+  return <div className="detail-drawer">
+    <div className="drawer-head"><div><span className={`status-pill ${reviewStatus==="Draft"?"warning":reviewStatus==="In review"?"progress":reviewStatus==="Needs revision"?"danger":"approved"}`}>{reviewStatus}</span><h2>{doc.name}</h2><p>{doc.category} · {doc.source}</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="drawer-body">
+      <div className="doc-preview-placeholder"><FileText size={36}/><span>{doc.name.split(".").pop()?.toUpperCase()} preview</span></div>
+      <p className="drawer-label">Review status</p>
+      <div className="review-actions-row">
+        <button className={`review-choice approve ${reviewStatus==="Final"?"active":""}`} onClick={()=>{setReviewStatus("Final");update({},`${doc.name} approved`)}}><Check size={14}/>Approve</button>
+        <button className={`review-choice revise ${reviewStatus==="Needs revision"?"active":""}`} onClick={()=>{setReviewStatus("Needs revision");update({},`${doc.name} sent back for revision`)}}><RotateCcw size={14}/>Needs revision</button>
+      </div>
+      <label className="switch-label doc-visibility"><input type="checkbox" checked={shared} onChange={e=>{setShared(e.target.checked);update({},e.target.checked?`${doc.name} shared with client`:`${doc.name} made internal — hidden from the client portal`)}}/><i/>{shared?"Shared with client":"Internal only"}</label>
+      <InfoBlock label="Linked workpaper" text={doc.workpaper}/>
+      <InfoBlock label="Source" text={doc.source}/>
+      <InfoBlock label="Last updated" text={doc.updated}/>
+    </div>
+  </div>;
+}
+
+function CreateRequestModal({close,update,clientName}:{close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;clientName:string}){
+  const [title,setTitle]=useState("");
+  const [description,setDescription]=useState("");
+  const [category,setCategory]=useState("Financial Statements");
+  const [dueDate,setDueDate]=useState("");
+  const [priority,setPriority]=useState(false);
+  const canCreate=title.trim().length>0&&dueDate.trim().length>0;
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Create request</h2><p>Add a new document request for {clientName}.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <label className="checkbox-row"><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)}/><span>Mark as high priority</span></label>
+    <Field label="Request title" required><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Bank confirmations"/></Field>
+    <Field label="Description"><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Optional description"/></Field>
+    <div className="form-grid"><Field label="Category"><select value={category} onChange={e=>setCategory(e.target.value)}>{["Financial Statements","General Ledger","Bank & Confirmations","Supporting Schedules","Compliance & Legal","Other"].map(c=><option key={c}>{c}</option>)}</select></Field><Field label="Due date" required><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></Field></div>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!canCreate} onClick={()=>{update({},`Request "${title}" sent to ${clientName}${priority?" — marked high priority":""}`);close()}}>Create</button></div>
+  </div></div>;
 }
 
 function EngagementHome({ navigate, state, update }: { navigate: (p: string) => void; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void }) {
@@ -1327,7 +1405,7 @@ function NewEngagementWizard({ onClose, update }: { onClose: () => void; update:
         <small className="field-note">Engagement letters are signed and stored in AssurePro. Selecting one carries its client, type and period into this engagement.</small>
       </Field>
       {manualEntry && <Field label="Client name" required><input value={client} onChange={e => setClient(e.target.value)} placeholder="e.g. Riverside Youth Alliance"/></Field>}
-      <div className="form-grid"><Field label="Engagement type"><select value={engagementType} disabled={!manualEntry} onChange={e => setEngagementType(e.target.value)}><option>Financial Audit</option><option>EBP Audit</option><option>Fund Audit</option><option>NFP Audit</option><option>Government Audit</option></select></Field><Field label="Period start" required><input type="date" value={periodStart} disabled={!manualEntry} onChange={e => setPeriodStart(e.target.value)}/></Field><Field label="Period end" required><input type="date" value={periodEnd} disabled={!manualEntry} onChange={e => setPeriodEnd(e.target.value)}/></Field></div>
+      <div className="form-grid"><Field label="Engagement type" locked={!manualEntry}><select value={engagementType} disabled={!manualEntry} onChange={e => setEngagementType(e.target.value)}><option>Financial Audit</option><option>EBP Audit</option><option>Fund Audit</option><option>NFP Audit</option><option>Government Audit</option></select></Field><Field label="Period start" required locked={!manualEntry}><input type="date" value={periodStart} disabled={!manualEntry} onChange={e => setPeriodStart(e.target.value)}/></Field><Field label="Period end" required locked={!manualEntry}><input type="date" value={periodEnd} disabled={!manualEntry} onChange={e => setPeriodEnd(e.target.value)}/></Field></div>
       <div className="wizard-grid">
         <div className="wizard-panel">
           <h3>Key Engagement Details</h3>
@@ -1469,7 +1547,11 @@ function statusClass(s:string){ if(["Complete","Approved","Done","Validated","Re
 function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>}
 function PhaseStepper({phases}:{phases:{title:string;status:string}[]}){return <div className="phase-stepper">{phases.map((p,i)=>{const tone=(p.status==="Complete"||p.status==="Locked"||p.status==="Approved")?"done":(p.status==="Needs Attention"||p.status==="Declined"||p.status==="Stale")?"attention":p.status==="Not Started"?"upcoming":"active";return <span key={p.title} className={`phase-dot ${tone}`} title={`${p.title} — ${p.status}`}>{tone==="done"?<Check size={11}/>:i+1}</span>})}</div>}
 function Banner({tone,title,text,action,onAction}:{tone:string;title:string;text:string;action?:string;onAction?:()=>void}){return <div className={`banner ${tone}`}>{tone==="danger"?<AlertCircle/>:tone==="warning"?<AlertTriangle/>:tone==="success"?<CheckCircle2/>:<Info/>}<div><strong>{title}</strong><span>{text}</span></div>{action&&<button onClick={onAction}>{action}<ArrowRight/></button>}</div>}
-function Field({label,required,info,children}:{label:string;required?:boolean;info?:string;children:React.ReactNode}){return <label className="field"><span>{label}{required&&<em>*</em>}{info&&<HelpTip text={info}/>}</span>{children}</label>}
+function Field({label,required,info,locked,children}:{label:string;required?:boolean;info?:string;locked?:boolean;children:React.ReactNode}){return <label className="field">
+  <span>{label}{required&&<em>*</em>}{info&&<HelpTip text={info}/>}{locked&&<LockKeyhole size={11} className="field-lock"/>}</span>
+  {children}
+  {locked&&<small className="field-note">Locked — sourced from the signed engagement letter</small>}
+</label>}
 function FormSection({title,subtitle,children,update}:{title:string;subtitle:string;children:React.ReactNode;update?:(p:Partial<DemoState>,m?:string)=>void}){return <section className="form-section"><div className="section-title"><div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-btn" onClick={()=>update?.({},`More options for "${title}" (history, print, and export)`)}><MoreHorizontal/></button></div>{children}</section>}
 function MaterialityCardTitle({title,help,standard}:{title:string;help:string;standard:string}){return <div className="materiality-card-title"><h2>{title}</h2><InfoTip title={title} text={help} standard={standard}/></div>}
 function InfoTip({title,text,standard}:{title:string;text:string;standard:string}){return <span className="info-tip" tabIndex={0} aria-label={`${title}. ${text} Reference: ${standard}`}><Info aria-hidden="true"/><span className="info-popover" role="tooltip"><strong>Audit perspective</strong><p>{text}</p><small>{standard}</small></span></span>}
