@@ -1168,13 +1168,29 @@ function FirmAuditLog({ state, update }: { state: DemoState; update:(p:Partial<D
   </div>;
 }
 
+const WORKPAPER_LIBRARY=[
+  {stage:"Commence",title:"Engagement letter execution",route:"setup"},
+  {stage:"Commence",title:"Predecessor auditor communication",route:"setup"},
+  {stage:"Data ingest",title:"Chart of accounts mapping",route:"data"},
+  {stage:"Data ingest",title:"Reconciliation of TB to GL",route:"data"},
+  {stage:"Understand",title:"Fraud risk discussion",route:"entity-controls"},
+  {stage:"Understand",title:"Related party identification",route:"entity-controls"},
+  {stage:"Identify & assess",title:"Significant risk register",route:"risks"},
+  {stage:"Identify & assess",title:"Fraud risk assessment summary",route:"risks"},
+  {stage:"Respond",title:"Substantive testing plan",route:"responses"},
+  {stage:"Respond",title:"Sampling methodology",route:"responses"},
+  {stage:"Approve",title:"Manager review checklist",route:"publish"},
+  {stage:"Approve",title:"Partner sign-off memo",route:"publish"},
+];
+
 function PlanningManager({state,update,navigate}:{state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;navigate:(p:string)=>void}) {
   const [selected,setSelected]=useState<string|null>(null);
   const [showCompleted,setShowCompleted]=useState(false);
   const [expanded,setExpanded]=useState<Record<string,boolean>>({"Commence":true,"Understand":true,"Identify & assess":true,"Respond":true});
   const [reviewSent,setReviewSent]=useState<Record<string,boolean>>({});
+  const [addOpen,setAddOpen]=useState(false);
   const statusFor=(w:{title:string;status:string})=>reviewSent[w.title]&&w.status!=="Complete"?"In Review":w.status;
-  const workpapers=[
+  const [workpapers,setWorkpapers]=useState([
     {stage:"Commence",title:"Acceptance & continuance",status:"Complete",owner:"JA",points:0,due:"Aug 12",progress:100,route:"setup"},
     {stage:"Commence",title:"Independence",status:"In Review",owner:"MK",points:2,due:"Aug 12",progress:85,route:"setup"},
     {stage:"Data ingest",title:"Trial balance & general ledger",status:"Complete",owner:"JA",points:0,due:"Aug 13",progress:100,route:"data"},
@@ -1184,19 +1200,45 @@ function PlanningManager({state,update,navigate}:{state:DemoState;update:(p:Part
     {stage:"Identify & assess",title:"Risk assessment",status:"In Review",owner:"MK",points:1,due:"Aug 16",progress:78,route:"risks"},
     {stage:"Respond",title:"Audit plan",status:"Needs Attention",owner:"JA",points:1,due:"Aug 18",progress:58,route:"responses"},
     {stage:"Approve",title:"Planning communications",status:"Not Started",owner:"OO",points:0,due:"Aug 20",progress:0,route:"publish"},
-  ];
+  ]);
   const stages=["Commence","Data ingest","Understand","Identify & assess","Respond","Approve"];
+  const addWorkpapers=(items:{stage:string;title:string;route:string}[])=>{
+    setWorkpapers(w=>[...w,...items.map(i=>({...i,status:"Not Started",owner:"OO",points:0,due:"Set due date",progress:0}))]);
+    setExpanded(v=>{const next={...v};items.forEach(i=>{next[i.stage]=true});return next});
+    update({},`${items.length} workpaper${items.length===1?"":"s"} added to Planning`);
+    setAddOpen(false);
+  };
   const completedCount=workpapers.filter(w=>w.status==="Complete").length;
   const current=workpapers.find(w=>w.title===selected);
   if(current)return <section className="workpaper-detail"><div className="workpaper-detail-head"><button className="back-link" onClick={()=>setSelected(null)}><ArrowLeft/>Planning workpapers</button><div className="workpaper-detail-head-row"><div><span className="eyebrow">{current.stage}</span><h2>{current.title}</h2><p>Prepared by {current.owner} · Due {current.due}</p></div><div><span className={`status-pill ${statusClass(statusFor(current))}`}>{statusFor(current)}</span><button className="secondary-btn" onClick={()=>navigate(`/engagement/bbawc/planning/${current.route}`)}>Open full workpaper <ArrowRight/></button></div></div></div><div className="workpaper-detail-progress"><span><strong>{current.progress}%</strong> complete</span><i><em style={{width:`${current.progress}%`}}/></i></div><div className="workpaper-detail-grid"><div className="procedure-panel"><div className="section-title"><div><p className="eyebrow">Procedure 01</p><h3>Document and evaluate the planning conclusion</h3></div><span className="status-pill progress">In progress</span></div><p>Perform the required procedure, cross-reference supporting evidence and document a clear conclusion. Client responses are inputs only; the auditor owns the conclusion.</p><div className="procedure-checks"><CheckRow title="Objective and relevant assertion documented" detail="Linked to the engagement-level planning objective" checked/><CheckRow title="Evidence cross-referenced" detail="Two supporting files linked" checked={current.progress===100}/><CheckRow title="Reviewer point resolved" detail={current.points?`${current.points} open review point${current.points===1?"":"s"}`:"No open review points"} checked={current.points===0}/></div><Field label="Auditor response and conclusion"><textarea defaultValue="Procedure performed. Evidence inspected and the conclusion is consistent with the planning record. Any exceptions are documented in the review notes."/></Field><div className="workpaper-actions"><button className="secondary-btn" onClick={()=>update({},`${current.title} response saved as draft`)}>Save draft</button><button className="primary-btn" disabled={reviewSent[current.title]} onClick={()=>{setReviewSent(v=>({...v,[current.title]:true}));update({},`${current.title} sent for review`)}}>{reviewSent[current.title]?"Sent for review":<>Send for review <Send/></>}</button></div></div><aside className="workpaper-evidence"><h3>Evidence & review</h3><button><FileText/><span><strong>Planning support.pdf</strong><small>Evidence · 1.8 MB</small></span><ChevronRight/></button><button><MessageSquare/><span><strong>{current.points} review points</strong><small>{current.points?"Requires auditor response":"Nothing outstanding"}</small></span><ChevronRight/></button><button><History/><span><strong>Activity history</strong><small>Last updated 18 min ago</small></span><ChevronRight/></button></aside></div></section>;
   if(state.acceptanceDecision==="decline")return <div className="empty-state"><LockKeyhole/><strong>Planning workpapers are blocked</strong><p>This engagement was declined during Acceptance & continuance. Change the decision on the Acceptance & continuance tab to resume.</p></div>;
   return <section className="planning-board">
-    <div className="planning-board-head"><div><p className="eyebrow">Planning workpapers</p><h2>Complete the work, then send it for review</h2><p>Active work is shown first. Completed work stays available without competing for attention.</p></div><div className="board-head-actions"><button className={`secondary-btn completed-toggle ${showCompleted?"active":""}`} onClick={()=>setShowCompleted(!showCompleted)}>{showCompleted?<><Circle/>Hide completed</>:<><CheckCircle2/>Show completed ({completedCount})</>}</button><button className="primary-btn" onClick={()=>update({},"New workpaper draft created (simulated)")}><Plus/>Add workpaper</button></div></div>
+    <div className="planning-board-head"><div><p className="eyebrow">Planning workpapers</p><h2>Complete the work, then send it for review</h2><p>Active work is shown first. Completed work stays available without competing for attention.</p></div><div className="board-head-actions"><button className={`secondary-btn completed-toggle ${showCompleted?"active":""}`} onClick={()=>setShowCompleted(!showCompleted)}>{showCompleted?<><Circle/>Hide completed</>:<><CheckCircle2/>Show completed ({completedCount})</>}</button><button className="primary-btn" onClick={()=>setAddOpen(true)}><Plus/>Add workpaper</button></div></div>
     <div className="planning-phase-strip"><div><span>Planning</span><strong>{planningProgressPct(state)}%</strong><i><em style={{width:`${planningProgressPct(state)}%`}}/></i></div><div><span>Response</span><strong>{responseCoveragePct(state)}%</strong><i><em style={{width:`${responseCoveragePct(state)}%`}}/></i></div><div><span>Completion</span><strong>{Math.round(workpapers.reduce((s,w)=>s+w.progress,0)/workpapers.length)}%</strong><i><em style={{width:`${Math.round(workpapers.reduce((s,w)=>s+w.progress,0)/workpapers.length)}%`}}/></i></div></div>
     <div className="planning-board-grid"><div className="workpaper-groups">{stages.map(stage=>{const allRows=workpapers.filter(w=>w.stage===stage);const rows=showCompleted?allRows:allRows.filter(w=>w.status!=="Complete");if(rows.length===0)return null;const pct=Math.round(allRows.reduce((sum,w)=>sum+w.progress,0)/allRows.length);const activeCount=allRows.filter(r=>r.status!=="Complete").length;const isOpen=!!expanded[stage];return <section className="workpaper-stage" key={stage}><button className="stage-toggle" onClick={()=>setExpanded(v=>({...v,[stage]:!isOpen}))}><span><strong>{stage}</strong><small>{activeCount} active · {allRows.length-activeCount} complete</small></span><span className="stage-progress"><b>{pct}%</b><i><em style={{width:`${pct}%`}}/></i>{isOpen?<ChevronDown/>:<ChevronRight/>}</span></button>{isOpen&&<div className="stage-rows">{rows.map(row=><button className="workpaper-row-refined" key={row.title} onClick={()=>setSelected(row.title)}><span className={`workpaper-state ${statusClass(statusFor(row))}`}>{statusFor(row)==="Complete"?<Check/>:statusFor(row)==="Needs Attention"?<AlertCircle/>:<Circle/>}</span><span className="workpaper-title"><strong>{row.title}</strong><small>{statusFor(row)} · {row.progress}% complete</small></span><span className="row-meter"><i><em style={{width:`${row.progress}%`}}/></i></span>{row.points>0&&<span className="review-count"><MessageSquare/>{row.points}</span>}<i className="person-avatar violet">{row.owner}</i><span className="row-due"><small>Due</small>{row.due}</span><ChevronRight/></button>)}</div>}</section>})}</div>
       <aside className="planning-insight-rail"><section><div className="rail-title"><h3>Key information</h3><button className="icon-btn" title="Figures flow from connected engagement data"><Info/></button></div><dl><div><dt>Revenue</dt><dd>$9.6M</dd></div><div><dt>Net assets</dt><dd>$2.21M</dd></div><div><dt>Overall materiality</dt><dd>{money(state.materialityOverride?240000:state.benchmark*(state.materialityPct/100))}</dd></div><div><dt>Performance materiality</dt><dd>{money((state.materialityOverride?240000:state.benchmark*(state.materialityPct/100))*state.performancePct/100)}</dd></div></dl><label>Entity risk<select value={state.entityRisk} onChange={e=>update({entityRisk:e.target.value as DemoState["entityRisk"]},`Entity risk updated to ${e.target.value}`)}><option>Normal</option><option>Elevated</option><option>High</option></select></label></section><section><div className="rail-title"><h3>Needs attention</h3><span className="rail-count">{attentionItems(state).length}</span></div>{attentionItems(state).length===0?<p className="rail-empty">Nothing needs attention right now.</p>:attentionItems(state).map((item,i)=><button key={i} onClick={()=>navigate(`/engagement/bbawc/planning/${attentionItemRoute(item)}`)}><AlertCircle/><span><strong>{item}</strong></span><ChevronRight/></button>)}</section></aside>
     </div>
+    {addOpen&&<AddWorkpaperModal existing={workpapers.map(w=>w.title)} onAdd={addWorkpapers} onClose={()=>setAddOpen(false)}/>}
   </section>
+}
+
+function AddWorkpaperModal({existing,onAdd,onClose}:{existing:string[];onAdd:(items:{stage:string;title:string;route:string}[])=>void;onClose:()=>void}){
+  const [query,setQuery]=useState("");
+  const [phase,setPhase]=useState("All phases");
+  const [picked,setPicked]=useState<string[]>([]);
+  const phases=["All phases","Commence","Data ingest","Understand","Identify & assess","Respond","Approve"];
+  const available=WORKPAPER_LIBRARY.filter(w=>!existing.includes(w.title));
+  const visible=available.filter(w=>(phase==="All phases"||w.stage===phase)&&w.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const toggle=(title:string)=>setPicked(p=>p.includes(title)?p.filter(t=>t!==title):[...p,title]);
+  return <div className="modal-backdrop"><div className="modal wizard-modal">
+    <div className="modal-head"><div><h2>Add workpaper</h2><p>Add standard workprograms from the firm's content library to this engagement's Planning board.</p></div><button className="icon-btn" onClick={onClose}><X/></button></div>
+    <div className="table-toolbar" style={{marginBottom:12}}><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search workpapers"/></div><select style={{width:170}} value={phase} onChange={e=>setPhase(e.target.value)}>{phases.map(p=><option key={p}>{p}</option>)}</select></div>
+    <div className="table-card"><table><thead><tr><th>Workpaper name</th><th>Phase</th><th></th></tr></thead><tbody>
+      {visible.length===0&&<tr><td colSpan={3} style={{textAlign:"center",color:"var(--muted)"}}>No workpapers match this search.</td></tr>}
+      {visible.map(w=><tr key={w.title}><td><strong>{w.title}</strong></td><td>{w.stage}</td><td style={{textAlign:"right"}}><button className={picked.includes(w.title)?"primary-btn":"secondary-btn"} onClick={()=>toggle(w.title)}>{picked.includes(w.title)?<><Check size={14}/>Selected</>:"Select"}</button></td></tr>)}
+    </tbody></table></div>
+    <div className="modal-actions"><button className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={picked.length===0} onClick={()=>onAdd(WORKPAPER_LIBRARY.filter(w=>picked.includes(w.title)))}>Add {picked.length||""} workpaper{picked.length===1?"":"s"}</button></div>
+  </div></div>;
 }
 
 function QuestionnaireWorkspace({state,update}:{state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void}) {
