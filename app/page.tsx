@@ -367,7 +367,7 @@ export default function Home() {
         <Topbar state={state} update={update} navigate={navigate} onMenu={() => setMobileNav(!mobileNav)} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         {planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} /> : path === "/engagements" ? <Engagements navigate={navigate} update={update} state={state} /> : path === "/clients" ? <Clients navigate={navigate} state={state} /> : path === "/firm-audit-log" ? <FirmAuditLog state={state} update={update} /> : path.endsWith("/documents") ? <DocumentsPage navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <EngagementHome navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} update={update} setTourOpen={setTourOpen} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>}
       {tourOpen ? <GuidedTour path={path} navigate={navigate} close={() => setTourOpen(false)}/> : <button className="tour-fab" aria-label="Open AssureAudit Guide" title="Open AssureAudit Guide" onClick={() => setTourOpen(true)}><BookOpen size={18}/><span>Guide</span></button>}
@@ -393,7 +393,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
       <div className="client-section-nav"><p className="nav-label">Client workspace</p><button className={`nav-item ${inDocuments?"active":""}`} onClick={()=>navigate("/engagement/bbawc/documents")}><FolderOpen/><span>Documents</span></button><div className={`planning-nav-branch ${planningBranchOpen?"open":""}`}><button className={`nav-item planning-parent ${inPlanning?"active":""}`} aria-expanded={planningBranchOpen} onClick={()=>{setPlanningBranchTouched(true);if(inPlanning)setPlanningBranchOpen(open=>!open);else{setPlanningBranchOpen(true);navigate("/engagement/bbawc/planning")}}}><ClipboardCheck/><span>Planning</span><b>{planningProgressPct(state)}%</b><ChevronDown/></button>{planningBranchOpen&&<div className="branch-children"><button className={active==="planning"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning")}><i/><span>Workpapers</span></button>{phases.map((phase,i)=><button key={phase.route} className={active===phase.route?"active":""} onClick={()=>navigate(`/engagement/bbawc/planning/${phase.route}`)} title={phase.status}><i className={statusClass(phase.status)}/><span>{branchLabels[i]}</span></button>)}<button className={active==="review"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/review")}><i/><span>Review & approval</span></button><button className={active==="audit-trail"?"active":""} onClick={()=>navigate("/engagement/bbawc/planning/audit-trail")}><i/><span>Audit trail</span></button></div>}</div><button className="nav-item" onClick={()=>update({},state.locked?"Fieldwork workspace isn't built in this prototype yet":"Fieldwork unlocks after Planning approval")}><Search/><span>Fieldwork</span>{!state.locked&&<LockKeyhole className="tiny-nav-lock"/>}</button><button className="nav-item" onClick={()=>update({},"Reporting becomes available after Fieldwork")}><BarChart3/><span>Report</span><LockKeyhole className="tiny-nav-lock"/></button></div>
-      <p className="nav-label practice">Firm</p><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
+      <p className="nav-label practice">Firm</p><button className={`nav-item ${path==="/engagements"?"active":""}`} onClick={()=>navigate("/engagements")}><BriefcaseBusiness/><span>Engagements</span></button><button className={`nav-item ${path==="/clients"?"active":""}`} onClick={()=>navigate("/clients")}><Building2/><span>Clients</span></button><button className={`nav-item ${path==="/firm-audit-log"?"active":""}`} onClick={()=>navigate("/firm-audit-log")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>Baldeep Singh Chhabra · Partner</span></div></div>
   </aside>;
@@ -498,23 +498,54 @@ function Topbar({ state, update, navigate, onMenu, demoOpen, setDemoOpen }: { st
   </>;
 }
 
-function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoState }) {
+function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
   const engagement=selectedEngagement(state);
-  const [filter,setFilter]=useState<"My priorities"|"Due soon"|"In review"|"All">("My priorities");
+  const [tab,setTab]=useState<"All"|"My tasks">("All");
+  const [query,setQuery]=useState("");
+  const [collapsed,setCollapsed]=useState<Record<string,boolean>>({});
+  const owners=[{id:"JA",name:"Jasmine Alvarez"},{id:"MK",name:"Meera Kapoor"},{id:"OO",name:"Oscar Owner"},{id:"LC",name:"Leo Chen"}];
   const tasks=[
-    {title:"Complete independence confirmations",area:"Commence · Independence",status:"Due today",tone:"danger",due:"Today",progress:85,route:"setup",priority:1,review:false},
-    {title:"Resolve audit-plan response gap",area:"Respond · Audit plan",status:"Needs attention",tone:"danger",due:"Aug 18",progress:58,route:"responses",priority:1,review:false},
-    {title:"Review risk assessment",area:"Identify & assess · Risk assessment",status:"In review",tone:"warning",due:"Aug 16",progress:78,route:"risks",priority:2,review:true},
-    {title:"Validate entity understanding",area:"Understand · Client response",status:"In progress",tone:"progress",due:"Aug 14",progress:70,route:"entity-controls",priority:2,review:false},
-    {title:"Review account mapping exceptions",area:"Data ingest · Trial balance",status:"4 exceptions",tone:"warning",due:"Aug 13",progress:96,route:"data",priority:2,review:false},
-    {title:"Approve planning communications",area:"Approve · Communications",status:"Not started",tone:"neutral",due:"Aug 20",progress:0,route:"publish",priority:3,review:true},
+    {id:"t1",title:"Complete independence confirmations",area:"Commence · Independence",owner:"JA",due:"Today",overdue:true,priority:"Urgent",stage:"Commence",route:"setup"},
+    {id:"t2",title:"Review account mapping exceptions",area:"Data ingest · Trial balance",owner:"JA",due:"Aug 13",overdue:true,priority:"Medium",stage:"Data ingest",route:"data"},
+    {id:"t3",title:"Review risk assessment",area:"Identify & assess · Risk assessment",owner:"MK",due:"Aug 16",overdue:false,priority:"High",stage:"Identify & assess",route:"risks"},
+    {id:"t4",title:"Approve planning communications",area:"Approve · Communications",owner:"MK",due:"Aug 20",overdue:false,priority:"Low",stage:"Approve",route:"publish"},
+    {id:"t5",title:"Resolve audit-plan response gap",area:"Respond · Audit plan",owner:"OO",due:"Aug 18",overdue:false,priority:"Urgent",stage:"Respond",route:"responses"},
+    {id:"t6",title:"Validate entity understanding",area:"Understand · Client response",owner:"OO",due:"Aug 14",overdue:true,priority:"Medium",stage:"Understand",route:"entity-controls"},
+    {id:"t7",title:"Confirm engagement letter distribution",area:"Commence · Engagement letter",owner:"LC",due:"Aug 12",overdue:true,priority:"Low",stage:"Commence",route:"setup"},
   ];
-  const visible=tasks.filter(t=>filter==="All"||filter==="My priorities"&&t.priority<=2||filter==="Due soon"&&["Today","Aug 13","Aug 14"].includes(t.due)||filter==="In review"&&t.review);
-  const next=visible[0];
-  return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Personal workspace</p><h1>My work</h1><p>Only the work that needs your action, ordered by urgency.</p></div><div className="my-work-summary"><span><strong>{tasks.filter(t=>t.priority===1).length}</strong> urgent</span><span><strong>{tasks.filter(t=>t.review).length}</strong> to review</span></div></div>
-    {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{engagement.shortName} · {next.area} · Due {next.due.toLowerCase()}</p></div><div className="next-work-progress"><strong>{next.progress}%</strong><i><em style={{width:`${next.progress}%`}}/></i></div><button className="primary-btn" onClick={()=>navigate(`/engagement/bbawc/planning/${next.route}`)}>Open task <ArrowRight/></button></section>}
-    <div className="my-work-toolbar"><div className="my-work-filters">{(["My priorities","Due soon","In review","All"] as const).map(f=><button key={f} className={filter===f?"active":""} onClick={()=>setFilter(f)}>{f}{f==="My priorities"&&<span>{tasks.filter(t=>t.priority<=2).length}</span>}</button>)}</div><span>{visible.length} task{visible.length===1?"":"s"}</span></div>
-    <section className="work-queue">{visible.map(task=><button key={task.title} className="work-queue-row" onClick={()=>navigate(`/engagement/bbawc/planning/${task.route}`)}><span className={`queue-signal ${task.tone}`}>{task.tone==="danger"?<AlertCircle/>:task.review?<ClipboardCheck/>:<Clock3/>}</span><span className="queue-title"><strong>{task.title}</strong><small>{engagement.shortName} · {task.area}</small></span><span className="queue-progress"><small>Progress</small><i><em style={{width:`${task.progress}%`}}/></i><b>{task.progress}%</b></span><span className={`status-pill ${task.tone}`}>{task.status}</span><span className="queue-due"><small>Due</small><strong>{task.due}</strong></span><ChevronRight/></button>)}{visible.length===0&&<div className="work-empty"><CheckCircle2/><h3>No work in this view</h3><p>Choose another filter to see assigned tasks.</p></div>}</section>
+  const priorityTone=(p:string)=>p==="Urgent"?"danger":p==="High"?"warning":p==="Medium"?"progress":"neutral";
+  const q=query.trim().toLowerCase();
+  const visibleTasks=tasks.filter(t=>(tab==="All"||t.owner==="OO")&&(!q||`${t.title} ${t.area}`.toLowerCase().includes(q)));
+  const groups=owners.map(o=>({...o,items:visibleTasks.filter(t=>t.owner===o.id)})).filter(g=>g.items.length>0);
+  const handoff=(message:string)=>update({},message);
+  return <div className="page my-work-page">
+    <div className="page-heading"><div><p className="eyebrow">Personal workspace</p><h1>My work</h1><p>Tasks assigned across this engagement's team, synced from AssurePro.</p></div></div>
+    <div className="work-toolbar">
+      <div className="work-tabs">{(["All","My tasks"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
+      <div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tasks..."/></div>
+      <button className="primary-btn" onClick={()=>handoff("Opening AssurePro to create a new task — simulated handoff")}><Plus size={15}/>New task</button>
+    </div>
+    <div className="task-groups">
+      {groups.map(group=><section className="task-group" key={group.id}>
+        <button className="task-group-head" aria-expanded={!collapsed[group.id]} onClick={()=>setCollapsed(c=>({...c,[group.id]:!c[group.id]}))}>
+          <ChevronDown className={collapsed[group.id]?"collapsed":""}/>
+          <span className="avatar">{group.id}</span>
+          <strong>{group.name}</strong>
+          <b>{group.items.length}</b>
+        </button>
+        {!collapsed[group.id]&&<div className="task-group-body">
+          {group.items.map(task=><div className="task-row" key={task.id}>
+            <button className="task-checkbox" aria-label="Mark task complete" title="Mark complete" onClick={()=>handoff("Task completion is managed in AssurePro — open the task there to update its status")}><Circle/></button>
+            <button className="task-main" onClick={()=>navigate(`/engagement/bbawc/planning/${task.route}`)}><strong>{task.title}</strong><small>{engagement.shortName} · {task.area}</small></button>
+            <span className={`task-due ${task.overdue?"overdue":""}`}><CalendarDays size={12}/>{task.due}</span>
+            <span className={`status-pill ${priorityTone(task.priority)}`}>{task.priority}</span>
+            <span className="status-pill neutral">{task.stage}</span>
+          </div>)}
+          <button className="task-add" onClick={()=>handoff("Opening AssurePro to add a task — simulated handoff")}><Plus size={13}/>Add task</button>
+        </div>}
+      </section>)}
+      {groups.length===0&&<div className="work-empty"><CheckCircle2/><h3>No tasks found</h3><p>Try a different search or switch tabs.</p></div>}
+    </div>
   </div>;
 }
 
