@@ -179,10 +179,17 @@ test("isolates live-preview and production-build caches", async () => {
   assert.match(pkg, /NEXT_OUTPUT_DIR=\.next-build next build/);
 });
 
-test("keeps the notification count visible and accessible", async () => {
+test("keeps the notification count visible, accessible, and deep-links by item", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /Open notifications, \$\{items\.length\} unread/);
-  assert.match(page, /<i>\{items\.length\}<\/i>/);
+  // The bell badge and aria-label must reflect unread count, not total item count, now that
+  // notifications can be individually marked read — these two must never drift apart.
+  assert.match(page, /Open notifications, \$\{unreadCount\} unread/);
+  assert.match(page, /<i>\{unreadCount}<\/i>/);
+  assert.match(page, /const \[notifTab, setNotifTab\] = useState/);
+  // Every notification must route to the specific step that resolves it, not always the
+  // generic Planning home regardless of which item was clicked.
+  assert.match(page, /function notificationRoute\(item: string\)/);
+  assert.doesNotMatch(page, /navigate\("\/engagement\/bbawc\/planning"\); \}\}><AlertCircle/);
 });
 
 test("keeps financial year and Guide as persistent platform controls", async () => {

@@ -9,7 +9,7 @@ import {
   FolderOpen, Gauge, History, Home as HomeIcon, Info, LayoutDashboard, Link2, ListChecks,
   LockKeyhole, Menu, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
-  Sparkles, Table2, UploadCloud, UserRound, Users, X, Zap
+  Sparkles, Table2, Trash2, UploadCloud, UserRound, Users, X, Zap
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip,
@@ -158,6 +158,22 @@ function attentionItems(state: DemoState) {
   ].filter(Boolean) as string[];
 }
 
+// Routes each notification to the specific step that resolves it, instead of always opening
+// the generic Planning home regardless of which item was clicked.
+function notificationRoute(item: string) {
+  if (item.includes("Safeguards")) return "/engagement/bbawc/planning/setup";
+  if (item.includes("independence")) return "/engagement/bbawc/planning/setup";
+  if (item.includes("response gap")) return "/engagement/bbawc/planning/responses";
+  if (item.includes("mapping review")) return "/engagement/bbawc/ingest/map-accounts";
+  if (item.includes("Control totals")) return "/engagement/bbawc/ingest/validate";
+  if (item.includes("flagged for investigation")) return "/engagement/bbawc/ingest/reconcile";
+  if (item.includes("client request")) return "/client-portal";
+  if (item.includes("declined")) return "/engagement/bbawc/planning/setup";
+  return "/engagement/bbawc/planning";
+}
+const NOTIF_ACTORS = ["Jasmine Alvarez", "Meera Kapoor", "Oscar Owner", "Leo Chen"];
+const NOTIF_TIMES = ["18 min ago", "2h ago", "Yesterday", "3h ago"];
+
 function nextOpenPhase(state: DemoState) {
   return getPhases(state).find(p => p.status !== "Complete" && p.status !== "Locked");
 }
@@ -298,7 +314,7 @@ export default function Home() {
           <IngestWorkspace path={path} navigate={navigate} state={state} update={update}/>
         ) : planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/documents" ? <AllDocuments navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/documents" ? <AllDocuments navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <ClientDocumentsPage client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>} 
       {toast && <div className="toast sync-toast" role="status"><span className="toast-success"><Check/></span><div><strong>{/AssurePro|QuickBooks|sync|connector|connection/i.test(toast)?"Connected platform updated":"Action completed"}</strong><span>{toast}</span></div><button aria-label="Dismiss notification" onClick={()=>setToast("")}><X/></button></div>}
@@ -317,14 +333,14 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
   useEffect(()=>{ if(inIngest) setIngestOpen(true); }, [inIngest]);
   const ingestSteps=["Details","System","Trial balance","General ledger","Validate","Map accounts","Reconcile","Materiality"];
   return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`} style={{transform: mobileNav ? "none" : undefined}}>
-    <div className="product-switcher"><button className="brand" aria-expanded={productOpen} onClick={()=>setProductOpen(!productOpen)}><div className="brand-mark">A</div><div><strong>assure</strong><span>audit</span></div><ChevronDown size={15}/></button>{productOpen&&<div className="product-menu"><small>Assure platform</small><button className="active" onClick={()=>setProductOpen(false)}><ShieldCheck/>AssureAudit <Check/></button><button onClick={()=>{setProductOpen(false);update({},"Return to AssurePro (simulated)")}}><BriefcaseBusiness/>AssurePro</button></div>}<button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
+    <div className="product-switcher"><button className="brand" aria-expanded={productOpen} onClick={()=>setProductOpen(!productOpen)}><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><ChevronDown size={15}/></button>{productOpen&&<div className="product-menu"><small>Assure platform</small><button className="active" onClick={()=>setProductOpen(false)}><ShieldCheck/>AssureAudit <Check/></button><button onClick={()=>{setProductOpen(false);update({},"Return to AssurePro (simulated)")}}><BriefcaseBusiness/>AssurePro</button></div>}<button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
     <nav>
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/clients" || path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/clients")}><Users/><span>Clients</span></button>
       <button className={`nav-item ${path === "/documents" ? "active" : ""}`} onClick={() => navigate("/documents")}><FolderOpen/><span>Documents</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
       {!clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav workspace-preview"><button className="select-client-nav" onClick={()=>navigate("/clients")}><Search/><span>Select a client</span><ChevronRight/></button><button disabled><HomeIcon/><span>Overview</span><LockKeyhole className="branch-lock"/></button><button disabled><FolderOpen/><span>Documents</span><LockKeyhole className="branch-lock"/></button><button disabled><Database/><span>Data ingest</span><LockKeyhole className="branch-lock"/></button><button disabled><ClipboardCheck/><span>Workpapers</span><LockKeyhole className="branch-lock"/></button><button disabled><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button disabled><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></div></>}
-      {clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav"><button className={path.startsWith(`/clients/${clientSlug}`)||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button onClick={()=>{navigate(`/clients/${clientSlug}`);window.setTimeout(()=>document.getElementById("documents")?.scrollIntoView({behavior:"smooth",block:"start"}),0)}}><FolderOpen/><span>Documents</span><b>{client.documents}</b></button><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. */}<button className={active==="planning"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i/><span>Overview</span></button><button className={active==="setup"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/setup`)}><i className="approved"/><span>Commence</span></button><button className={active==="entity-controls"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/entity-controls`)}><i className="progress"/><span>Understand</span></button><button className={active==="risks"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/risks`)}><i/><span>Risk assessment</span></button></div>}<button onClick={()=>update({},"Fieldwork unlocks after workpaper approval")}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></>}</div></>}
+      {clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav"><button className={path===`/clients/${clientSlug}`||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button className={path===`/clients/${clientSlug}/documents`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}/documents`)}><FolderOpen/><span>Documents</span><b>{client.documents}</b></button><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. */}<button className={active==="planning"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i/><span>Overview</span></button><button className={active==="setup"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/setup`)}><i className="approved"/><span>Commence</span></button><button className={active==="entity-controls"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/entity-controls`)}><i className="progress"/><span>Understand</span></button><button className={active==="risks"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/risks`)}><i/><span>Risk assessment</span></button></div>}<button onClick={()=>update({},"Fieldwork unlocks after workpaper approval")}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></>}</div></>}
       <p className="nav-label practice">Firm</p><button className="nav-item" onClick={()=>update({},"Firm audit log opened (simulated)")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>{state.role}</span></div></div>
@@ -333,10 +349,17 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
 
 function Topbar({ path, state, update, navigate, onMenu, demoOpen, setDemoOpen }: { path:string; state: DemoState; update: (p: Partial<DemoState>, m?: string) => void; navigate: (p: string) => void; onMenu: () => void; demoOpen: boolean; setDemoOpen: (v: boolean) => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifTab, setNotifTab] = useState<"All"|"Unread">("All");
+  const [readNotifs, setReadNotifs] = useState<Set<string>>(new Set());
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const items = attentionItems(state);
+  const notifications = items.map((text,i)=>({text,route:notificationRoute(text),actor:NOTIF_ACTORS[i%NOTIF_ACTORS.length],time:NOTIF_TIMES[i%NOTIF_TIMES.length],read:readNotifs.has(text)}));
+  const unreadCount = notifications.filter(n=>!n.read).length;
+  const visibleNotifs = notifTab==="All"?notifications:notifications.filter(n=>!n.read);
+  const markRead = (text:string)=>setReadNotifs(r=>new Set(r).add(text));
+  const openNotification = (n:{text:string;route:string})=>{ markRead(n.text); setNotifOpen(false); navigate(n.route); };
   const searchItems = [
     { kind:"Page", title:"Firm dashboard", detail:"Portfolio, deadlines and review workload", route:"/dashboard", icon:LayoutDashboard },
     { kind:"Page", title:"Clients", detail:"All clients and assurance engagements", route:"/clients", icon:Users },
@@ -385,10 +408,14 @@ function Topbar({ path, state, update, navigate, onMenu, demoOpen, setDemoOpen }
       {path!=="/dashboard"&&<button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "AssurePro sync is current" : "Connection restored")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "AssurePro synced" : "Reconnect"}</button>}
       <label className="year-select"><CalendarDays size={16}/><select aria-label="Financial year" value={state.fiscalYear} onChange={e=>update({fiscalYear:e.target.value},`Dashboard changed to ${e.target.value}`)}><option>FY 2026</option><option>FY 2025</option><option>FY 2024</option></select><ChevronDown size={14}/></label>
       <div className="topbar-popover">
-        <button className="icon-btn notification" aria-label={`Open notifications, ${items.length} unread`} aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); closeSearch(); }}><Bell size={18}/>{items.length > 0 && <i>{items.length}</i>}</button>
+        <button className="icon-btn notification" aria-label={`Open notifications, ${unreadCount} unread`} aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); closeSearch(); }}><Bell size={18}/>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
         {notifOpen && <div className="dropdown-menu notif-menu">
-          <div className="dropdown-head"><strong>Notifications</strong><span>{items.length} open item{items.length === 1 ? "" : "s"}</span></div>
-          {items.length === 0 ? <div className="dropdown-empty">Nothing needs attention right now.</div> : items.map((it, i) => <button key={i} className="dropdown-item" onClick={() => { setNotifOpen(false); navigate("/engagement/bbawc/planning"); }}><AlertCircle size={14}/><span>{it}</span></button>)}
+          <div className="dropdown-head"><strong>Notifications</strong><span>{unreadCount} unread</span></div>
+          <div className="notif-tabs">{(["All","Unread"] as const).map(t=><button key={t} className={notifTab===t?"active":""} onClick={()=>setNotifTab(t)}>{t}{t==="Unread"&&unreadCount>0&&<b>{unreadCount}</b>}</button>)}</div>
+          {visibleNotifs.length === 0 ? <div className="dropdown-empty">{notifTab==="Unread"?"You're all caught up.":"Nothing needs attention right now."}</div> : visibleNotifs.map((n, i) => <div key={i} className={`notif-row ${n.read?"":"unread"}`}>
+            <button className="notif-row-main" onClick={() => openNotification(n)}><AlertCircle size={14}/><span><strong>{n.text}</strong><small>{n.actor} · {n.time}</small></span></button>
+            {!n.read && <button className="icon-btn notif-dismiss" title="Mark as read" onClick={()=>markRead(n.text)}><Check size={13}/></button>}
+          </div>)}
         </div>}
       </div>
       <div className="topbar-popover">
@@ -429,7 +456,7 @@ function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: 
     <div className="page-heading"><div><p className="eyebrow">Firm overview · {state.fiscalYear}</p><h1>Audit portfolio</h1><p>Every client, deadline and engagement stage in one view.</p></div><button className="primary-btn" onClick={()=>navigate("/clients")}><Users/>View clients</button></div>
     <section className="portfolio-kpis"><article><span>Active engagements</span><strong>6</strong><small>Across 6 clients</small></article><article><span>Need attention</span><strong>4</strong><small>2 due today</small></article><article><span>In data ingest</span><strong>2</strong><small>10 source files received</small></article><article><span>Awaiting review</span><strong>1</strong><small>Partner review due Aug 14</small></article></section>
     <div className="portfolio-grid">
-      <section className="portfolio-card pipeline-card"><div className="section-title"><div><h2>Engagement pipeline</h2><p>Current stage across active engagements.</p></div><button className="text-link" onClick={()=>navigate("/clients")}>All clients <ArrowRight/></button></div><div className="pipeline-body"><div className="portfolio-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pipeline} dataKey="value" innerRadius={64} outerRadius={91} paddingAngle={2}>{pipeline.map(x=><Cell key={x.name} fill={x.color}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer><span><strong>6</strong><small>engagements</small></span></div><div className="pipeline-legend">{pipeline.map(x=><div key={x.name}><i style={{background:x.color}}/><span>{x.name}</span><strong>{x.value}</strong></div>)}</div></div></section>
+      <section className="portfolio-card pipeline-card"><div className="section-title"><div><h2>Engagement pipeline</h2><p>Current stage across active engagements.</p></div><button className="text-link" onClick={()=>navigate("/clients")}>All clients <ArrowRight/></button></div><div className="pipeline-body"><div className="portfolio-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pipeline} dataKey="value" innerRadius={64} outerRadius={91} paddingAngle={2} isAnimationActive={false}>{pipeline.map(x=><Cell key={x.name} fill={x.color}/>)}</Pie></PieChart></ResponsiveContainer><span><strong>6</strong><small>engagements</small></span></div><div className="pipeline-legend">{pipeline.map(x=><div key={x.name}><i style={{background:x.color}}/><span>{x.name}</span><strong>{x.value}</strong></div>)}</div></div></section>
       <section className="portfolio-card due-card"><div className="section-title"><div><h2>Work by due date</h2><p>Open actions across the firm.</p></div><InfoTip title="Work by due date" text="Counts assigned audit actions, review notes and data requests by their next due date." standard="Firm workflow"/></div><div className="firm-due-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={due} layout="vertical" margin={{left:8,right:22}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="name" width={78} tickLine={false} axisLine={false}/><Tooltip/><Bar dataKey="value" radius={[0,7,7,0]}>{due.map((_,i)=><Cell key={i} fill={["#6B46FF","#8164FF","#A38FFF","#D2C7FF"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div></section>
     </div>
     <section className="portfolio-card client-portfolio-card"><div className="section-title"><div><h2>Client portfolio</h2><p>Open a client to see its overview, documents and engagement workflow.</p></div><button className="secondary-btn" onClick={()=>navigate("/clients")}>View all <ArrowRight/></button></div><div className="portfolio-table-head"><span>Client</span><span>Current stage</span><span>Progress</span><span>Owner</span><span>Next due</span><span/></div>{CLIENTS.slice(0,5).map(c=><button className="portfolio-row" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span><span><em className={`stage-badge ${c.stage==="Complete"?"complete":c.stage==="Setup required"?"setup":""}`}>{c.stage}</em></span><span className="row-progress"><i><b style={{width:`${c.progress}%`}}/></i><strong>{c.progress}%</strong></span><span>{c.owner}</span><span className={c.due==="Aug 14"||c.due==="Aug 16"?"due-soon":""}>{c.due}</span><ChevronRight/></button>)}</section>
@@ -439,22 +466,151 @@ function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: 
 function Engagements({ navigate, update, state }: { navigate: (p: string) => void; update: (p: Partial<DemoState>, m?: string) => void; state: DemoState }) {
   const [newOpen, setNewOpen] = useState(false);
   const [query,setQuery]=useState(""); const [industry,setIndustry]=useState("All industries");
+  const [view,setView]=useState<"list"|"card">("list");
   const rows=CLIENTS.filter(c=>(industry==="All industries"||c.industry===industry)&&`${c.name} ${c.auditType} ${c.subIndustry}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="page clients-page"><div className="page-heading"><div><p className="eyebrow">Firm portfolio</p><h1>Clients</h1><p>Select a client to open its audit overview, documents and engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
-    <section className="clients-toolbar"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search client, industry or audit type"/></div><select value={industry} onChange={e=>setIndustry(e.target.value)}><option>All industries</option>{Object.keys(INDUSTRY_OPTIONS).map(x=><option key={x}>{x}</option>)}</select><span>{rows.length} clients</span></section>
-    <section className="clients-grid">{rows.map(c=>{const team=CLIENT_TEAMS[c.slug];const people=[...team.firm,...team.client];return <button className="client-card" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><div className="client-card-head"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.industry} · {c.subIndustry}</small></span><ChevronRight/></div><div className="client-card-engagement"><span>{c.auditType}</span><strong>{state.fiscalYear}</strong><small>Period ended {c.period}</small></div><div className="client-card-progress"><div><span>{c.stage}</span><strong>{c.progress}%</strong></div><i><b style={{width:`${c.progress}%`}}/></i></div><div className="client-card-team"><span className="mini-avatar-stack">{people.slice(0,4).map(p=><i key={`${c.slug}-${p.initials}`}>{p.initials}</i>)}</span><span><strong>{people.length} team members</strong><small>{team.firm.length} firm · {team.client.length} client</small></span></div><div className="client-card-foot"><span><FileText/>{c.documents} documents</span><span className={c.openItems?"attention":""}>{c.openItems?`${c.openItems} need attention`:"Up to date"}</span></div></button>})}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</section>
+    <section className="clients-toolbar"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search client, industry or audit type"/></div><select value={industry} onChange={e=>setIndustry(e.target.value)}><option>All industries</option>{Object.keys(INDUSTRY_OPTIONS).map(x=><option key={x}>{x}</option>)}</select><span>{rows.length} clients</span><div className="view-toggle" role="group" aria-label="Change view"><button aria-label="List view" className={view==="list"?"active":""} onClick={()=>setView("list")}><ListChecks size={15}/></button><button aria-label="Card view" className={view==="card"?"active":""} onClick={()=>setView("card")}><LayoutDashboard size={15}/></button></div></section>
+    {view==="list"?<div className="table-card"><div className="portfolio-table-head"><span>Client</span><span>Current stage</span><span>Progress</span><span>Owner</span><span>Next due</span><span/></div>{rows.map(c=><button className="portfolio-row" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span><span><em className={`stage-badge ${c.stage==="Complete"?"complete":c.stage==="Setup required"?"setup":""}`}>{c.stage}</em></span><span className="row-progress"><i><b style={{width:`${c.progress}%`}}/></i><strong>{c.progress}%</strong></span><span>{c.owner}</span><span className={c.due==="Aug 14"||c.due==="Aug 16"?"due-soon":""}>{c.due}</span><ChevronRight/></button>)}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</div>:<section className="clients-grid">{rows.map(c=>{const team=CLIENT_TEAMS[c.slug];const people=[...team.firm,...team.client];return <button className="client-card" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><div className="client-card-head"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.industry} · {c.subIndustry}</small></span><ChevronRight/></div><div className="client-card-engagement"><span>{c.auditType}</span><strong>{state.fiscalYear}</strong><small>Period ended {c.period}</small></div><div className="client-card-progress"><div><span>{c.stage}</span><strong>{c.progress}%</strong></div><i><b style={{width:`${c.progress}%`}}/></i></div><div className="client-card-team"><span className="mini-avatar-stack">{people.slice(0,4).map(p=><i key={`${c.slug}-${p.initials}`}>{p.initials}</i>)}</span><span><strong>{people.length} team members</strong><small>{team.firm.length} firm · {team.client.length} client</small></span></div><div className="client-card-foot"><span><FileText/>{c.documents} documents</span><span className={c.openItems?"attention":""}>{c.openItems?`${c.openItems} need attention`:"Up to date"}</span></div></button>})}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</section>}
     {newOpen && <NewEngagementWizard onClose={() => setNewOpen(false)} update={update}/>}
   </div>;
 }
 
-function docsForClient(client:ClientRecord){
+type DocRecord={id:number;name:string;category:string;type:string;status:string;date:string;tone:string;due:string;assignee:string;attachments:number;description:string;clientUpload:boolean;comments:{author:string;text:string}[]};
+function docsForClient(client:ClientRecord):DocRecord[]{
   return [
-    {name:`${client.name.split(" ")[0]} Trial Balance — FY 2025.xlsx`,type:"Trial balance",status:"Validated",date:"Aug 11"},
-    {name:"General Ledger Detail.csv",type:"General ledger",status:"Processed",date:"Aug 11"},
-    {name:"Signed engagement letter.pdf",type:"Engagement",status:"Synced",date:"Aug 4"},
-    {name:"Board minutes — Q4.pdf",type:"Client upload",status:client.openItems>0?"New":"Reviewed",date:"Aug 13"},
+    {id:1,name:`${client.name.split(" ")[0]} Trial Balance — FY 2025.xlsx`,category:"Client-provided records",type:"Trial balance",status:"Validated",date:"Aug 11",tone:"approved",due:"Complete",assignee:client.owner,attachments:1,clientUpload:false,description:`Reconciled trial balance used across ${client.name}'s Planning.`,comments:[]},
+    {id:2,name:"General Ledger Detail.csv",category:"Client-provided records",type:"General ledger",status:"Processed",date:"Aug 11",tone:"approved",due:"Complete",assignee:client.owner,attachments:1,clientUpload:false,description:"Transaction-level general ledger detail for the current period.",comments:[]},
+    {id:3,name:"Signed engagement letter.pdf",category:"Engagement & governance",type:"Engagement",status:"Synced",date:"Aug 4",tone:"approved",due:"Complete",assignee:"Oscar Owner",attachments:1,clientUpload:false,description:"Fully executed engagement letter synchronized from AssurePro.",comments:[]},
+    {id:4,name:"Board minutes — Q4.pdf",category:"Engagement & governance",type:"Client upload",status:client.openItems>0?"New":"Reviewed",date:"Aug 13",tone:client.openItems>0?"warning":"approved",due:client.openItems>0?"Due in 2d":"Complete",assignee:client.owner,attachments:1,clientUpload:true,description:"Board minutes covering the most recent governance decisions.",comments:client.openItems>0?[{author:client.owner,text:"Reviewing before filing."}]:[]},
   ];
 }
+
+const DOC_TONES=["neutral","warning","danger","approved"] as const;
+const TONE_LABEL:Record<string,string>={neutral:"No status",warning:"Due soon",danger:"Overdue",approved:"Complete"};
+const STATUS_OPTIONS=[{tone:"neutral",due:"Not started"},{tone:"warning",due:"Due in 3d"},{tone:"danger",due:"Overdue"},{tone:"approved",due:"Complete"}];
+const WORKPAPER_REFS=[
+  {id:201,title:"Independence confirmations",route:"details"},
+  {id:202,title:"Understanding the entity",route:"details"},
+  {id:203,title:"Trial balance mapping",route:"map-accounts"},
+  {id:204,title:"Reconciliation review",route:"reconcile"},
+  {id:205,title:"Materiality workpaper",route:"materiality"},
+];
+
+function ClientDocumentsPage({client,navigate,update}:{client:ClientRecord;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
+  const [query,setQuery]=useState("");
+  const [toneFilters,setToneFilters]=useState<string[]>([]);
+  const [collapsedGroups,setCollapsedGroups]=useState<Record<string,boolean>>({});
+  const [selectedId,setSelectedId]=useState<number|null>(null);
+  const [requestOpen,setRequestOpen]=useState(false);
+  const [categoryOpen,setCategoryOpen]=useState(false);
+  const [folders,setFolders]=useState<string[]>([]);
+  const [tab,setTab]=useState<"Files"|"Requests">("Files");
+  const [documents,setDocuments]=useState<DocRecord[]>(()=>docsForClient(client));
+  const visible=documents.filter(doc=>(toneFilters.length===0||toneFilters.includes(doc.tone))&&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
+  const grouped:Record<string,DocRecord[]>={};
+  visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
+  const toggleTone=(tone:string)=>setToneFilters(f=>f.includes(tone)?f.filter(t=>t!==tone):[...f,tone]);
+  const toggleGroup=(cat:string)=>setCollapsedGroups(g=>({...g,[cat]:!g[cat]}));
+  const updateDoc=(id:number,patch:Partial<DocRecord>)=>setDocuments(docs=>docs.map(d=>d.id===id?{...d,...patch}:d));
+  const removeDoc=(id:number)=>{setDocuments(docs=>docs.filter(d=>d.id!==id));setSelectedId(null)};
+  const addCategory=(name:string)=>{setFolders(f=>[...f,name]);setCategoryOpen(false);update({},`"${name}" category created for ${client.name}`)};
+  const selectedDoc=documents.find(d=>d.id===selectedId)||null;
+  const requestsPending=1;
+  return <div className="page documents-page">
+    <div className="breadcrumbs"><button onClick={()=>navigate(`/clients/${client.slug}`)}>{client.name}</button><ChevronRight/><span>Documents</span></div>
+    <div className="page-heading"><div><p className="eyebrow">Client document library</p><h1>Documents</h1><p>{client.name} · {documents.length} documents on file</p></div></div>
+    <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
+    <section className="documents-main">
+      <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{documents.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
+      {tab==="Files"?<>
+        <div className="documents-toolbar-row">
+          <div className="search no-margin"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search documents or type"/></div>
+          <div className="tone-filter-row">{DOC_TONES.map(t=><button key={t} title={TONE_LABEL[t]} aria-label={`Filter: ${TONE_LABEL[t]}`} className={`tone-dot ${t} ${toneFilters.includes(t)?"active":""}`} onClick={()=>toggleTone(t)}/>)}</div>
+          <button className="icon-btn" title="Recent activity" onClick={()=>update({},"Recent activity opened (simulated)")}><History size={16}/></button>
+          <button className="secondary-btn" onClick={()=>update({},`Documents for ${client.name} exported as documents.csv (simulated)`)}><Download size={15}/>Export</button>
+          <button className="secondary-btn" onClick={()=>setCategoryOpen(true)}><Plus size={15}/>Create Category</button>
+          <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button>
+        </div>
+        <div className="documents-grouped-list">
+          {Object.entries(grouped).map(([cat,docs])=><section className="doc-group" key={cat}>
+            <button className="doc-group-head" onClick={()=>toggleGroup(cat)}><ChevronDown className={collapsedGroups[cat]?"collapsed":""}/><strong>{cat}</strong><b className="count">{docs.length}</b></button>
+            {!collapsedGroups[cat]&&docs.map(doc=><button className="doc-row-v2" key={doc.id} onClick={()=>setSelectedId(doc.id)}>
+              <i className={`tone-dot ${doc.tone}`}/>
+              <span className="doc-id">{doc.id}</span>
+              <span className="doc-row-title"><strong>{doc.name}</strong><small>{doc.type}</small></span>
+              <span className={`status-pill ${doc.tone}`}>{doc.due}</span>
+              <span className="doc-row-meta"><MessageSquare size={13}/>{doc.comments.length}</span>
+              <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
+            </button>)}
+          </section>)}
+          {folders.map(name=>!grouped[name]&&<section className="doc-group" key={name}><button className="doc-group-head" disabled><strong>{name}</strong><b className="count">0</b></button></section>)}
+          {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the filters or search to see the full client library.</p></div>}
+        </div>
+      </>:<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>}
+    </section>
+    {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)}/>}
+    {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name}/>}
+    {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
+  </div>;
+}
+
+function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[]}){
+  const [tab,setTab]=useState<"Request Info"|"Client Docs"|"Comments"|"Activity">("Request Info");
+  const [statusMenuOpen,setStatusMenuOpen]=useState(false);
+  const [assignOpen,setAssignOpen]=useState(false);
+  const [commentDraft,setCommentDraft]=useState("");
+  const setStatus=(tone:string,due:string)=>{onUpdate({tone,due});setStatusMenuOpen(false);update({},`${doc.name} marked ${due}`)};
+  const addComment=()=>{if(!commentDraft.trim())return;onUpdate({comments:[...doc.comments,{author:"Oscar Owner",text:commentDraft.trim()}]});setCommentDraft("")};
+  const assignTo=(name:string)=>{onUpdate({assignee:name});setAssignOpen(false);update({},`${doc.name} assigned to ${name}`)};
+  const uploadDoc=()=>{onUpdate({attachments:doc.attachments+1});update({},`File uploaded to ${doc.name}`)};
+  const tabs=["Request Info","Client Docs","Comments","Activity"] as const;
+  return <div className="detail-drawer document-detail-panel">
+    <div className="drawer-head"><div><span className={`status-pill ${doc.tone}`}>{doc.due}</span><h2>{doc.name}</h2><p>{doc.category} · #{doc.id}</p></div>
+      <div className="drawer-head-actions">
+        <button className="icon-btn" title="Rename" onClick={()=>update({},"Rename not available in this prototype")}><Pencil size={16}/></button>
+        <button className="icon-btn danger" title="Delete" onClick={onDelete}><Trash2 size={16}/></button>
+        <button className="icon-btn" onClick={close}><X/></button>
+      </div>
+    </div>
+    <div className="panel-status-row"><div className="topbar-popover"><button className="secondary-btn" onClick={()=>setStatusMenuOpen(v=>!v)}>Change Status <ChevronDown size={14}/></button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{STATUS_OPTIONS.map(o=><button key={o.due} className="dropdown-item" onClick={()=>setStatus(o.tone,o.due)}><i className={`tone-dot ${o.tone}`}/><span>{o.due}</span></button>)}</div>}</div></div>
+    <div className="drawer-tabs">{tabs.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
+    <div className="drawer-body">
+      {tab==="Request Info"&&<>
+        <p className="drawer-label">Description</p>
+        <p className="panel-description">{doc.description}</p>
+        <div className="panel-meta-row"><div><small>Created by</small><strong>{doc.type}</strong></div><div><small>Due Date</small><strong>{doc.due}</strong></div></div>
+        <div className="panel-assign-row"><div><small>Assignments</small><strong>{doc.assignee||"Unassigned"}</strong></div><div className="topbar-popover"><button className="text-link" onClick={()=>setAssignOpen(v=>!v)}>Assign</button>{assignOpen&&<div className="dropdown-menu">{["Jasmine Alvarez","Meera Kapoor","Oscar Owner","Leo Chen"].map(name=><button key={name} className="dropdown-item" onClick={()=>assignTo(name)}>{name}</button>)}</div>}</div></div>
+        <p className="drawer-label">My Documents</p>
+        {doc.attachments>0?<div className="drawer-file"><FileText/><div><strong>{doc.name}</strong><span>{doc.attachments} file{doc.attachments===1?"":"s"} attached · {doc.date}</span></div></div>:<div className="panel-upload-empty"><p>No documents uploaded yet.</p><button className="secondary-btn" onClick={uploadDoc}><UploadCloud size={15}/>Upload Document</button></div>}
+      </>}
+      {tab==="Client Docs"&&(clientDocs.length?<div className="drawer-comment-list">{clientDocs.map(d=><div className="drawer-file" key={d.id}><FileText/><div><strong>{d.name}</strong><span>{d.date}</span></div></div>)}</div>:<div className="work-empty"><FolderOpen/><h3>No client documents</h3><p>No client-provided files in this category yet.</p></div>)}
+      {tab==="Comments"&&<>{doc.comments.length===0?<p className="panel-empty-text">No comments yet.</p>:<div className="drawer-comment-list">{doc.comments.map((c,i)=><div className="drawer-comment" key={i}><strong>{c.author}</strong><p>{c.text}</p></div>)}</div>}<div className="comment-input"><input value={commentDraft} onChange={e=>setCommentDraft(e.target.value)} placeholder="Add a comment…" onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addComment()}}}/><button className="icon-btn" disabled={!commentDraft.trim()} onClick={addComment}><Send size={15}/></button></div></>}
+      {tab==="Activity"&&<><div className="activity-item"><i/><div><strong>Uploaded · {doc.type}</strong><span>{doc.date}</span></div></div><div className="activity-item"><i/><div><strong>Status set to {doc.due}</strong><span>Updated just now</span></div></div></>}
+    </div>
+  </div>;
+}
+
+function CreateCategoryModal({close,onCreate}:{close:()=>void;onCreate:(name:string)=>void}){
+  const [name,setName]=useState("");
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Create category</h2><p>Add a new folder to organize documents.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <Field label="Category name" required><input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Tax workpapers"/></Field>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!name.trim()} onClick={()=>onCreate(name.trim())}>Create</button></div>
+  </div></div>;
+}
+
+function CreateRequestModalSimple({close,update,clientName}:{close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;clientName:string}){
+  const [title,setTitle]=useState("");
+  const [dueDate,setDueDate]=useState("");
+  const canCreate=title.trim().length>0&&dueDate.trim().length>0;
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Create request</h2><p>Add a new document request for {clientName}.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <Field label="Request title" required><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Bank confirmations"/></Field>
+    <Field label="Due date" required><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></Field>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!canCreate} onClick={()=>{update({},`Request "${title}" sent to ${clientName}`);close()}}>Create</button></div>
+  </div></div>;
+}
+
 function AllDocuments({navigate,update}:{navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
   const [query,setQuery]=useState("");
   const filtered=CLIENTS.filter(c=>`${c.name} ${c.industry} ${c.subIndustry}`.toLowerCase().includes(query.toLowerCase()));
@@ -468,7 +624,7 @@ function AllDocuments({navigate,update}:{navigate:(p:string)=>void;update:(p:Par
       {filtered.map(client=>{
         const docs=docsForClient(client);
         return <section className="client-documents all-documents-group" key={client.slug}>
-          <button className="all-documents-group-head" onClick={()=>navigate(`/clients/${client.slug}`)}>
+          <button className="all-documents-group-head" onClick={()=>navigate(`/clients/${client.slug}/documents`)}>
             <i>{client.initials}</i>
             <span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span>
             <em>{client.documents} document{client.documents===1?"":"s"}</em>
@@ -488,12 +644,12 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
   if(!client.ready)return <div className="page client-overview-page"><div className="client-profile-head"><button className="back-client" onClick={()=>navigate("/clients")}><ArrowLeft/></button><i>{client.initials}</i><div><p className="eyebrow">Client audit workspace</p><h1>{client.name}</h1><span>{client.industry} · {client.subIndustry}</span></div></div><section className="setup-required"><AlertTriangle/><div><p className="eyebrow">Setup required</p><h2>Complete engagement details in AssurePro first</h2><p>Audit data is intentionally hidden until the signed engagement letter provides the period, audit type, reporting framework and responsible team.</p><ul><li>Signed engagement letter</li><li>Audit period and reporting deadline</li><li>Industry and sub-industry</li><li>Engagement partner and manager</li></ul><button className="primary-btn" onClick={()=>navigate("/clients")}>Return to clients</button></div></section><EngagementTeam client={client}/></div>;
   return <div className="page client-overview-page">
     <div className="client-profile-head"><button className="back-client" onClick={()=>navigate("/clients")}><ArrowLeft/></button><i>{client.initials}</i><div><p className="eyebrow">Client audit workspace</p><h1>{client.name}</h1><span>{client.industry} · {client.subIndustry} · US GAAP</span></div><div className="client-head-meta"><span><small>Active engagements</small><strong>1</strong></span><span><small>Documents</small><strong>{client.documents}</strong></span><span><small>Open items</small><strong>{client.openItems}</strong></span></div></div>
-    <nav className="client-tabs"><button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>Overview</button><button onClick={()=>document.getElementById("documents")?.scrollIntoView({behavior:"smooth"})}>Documents</button><button onClick={()=>navigate(`/engagement/${client.slug}/ingest/details`)}>Engagements</button><button onClick={()=>update({},`Audit information for ${client.name} opened from the AssurePro engagement letter (simulated)`) }>Audit information</button><button onClick={()=>document.getElementById("team")?.scrollIntoView({behavior:"smooth"})}>Team</button><button onClick={()=>update({},`Communications for ${client.name} opened from AssurePro (simulated)`) }>Communications</button></nav>
+    <nav className="client-tabs"><button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>Overview</button><button onClick={()=>navigate(`/clients/${client.slug}/documents`)}>Documents</button><button onClick={()=>navigate(`/engagement/${client.slug}/ingest/details`)}>Engagements</button><button onClick={()=>update({},`Audit information for ${client.name} opened from the AssurePro engagement letter (simulated)`) }>Audit information</button><button onClick={()=>document.getElementById("team")?.scrollIntoView({behavior:"smooth"})}>Team</button><button onClick={()=>update({},`Communications for ${client.name} opened from AssurePro (simulated)`) }>Communications</button></nav>
     {client.openItems>0&&<section className="client-attention"><div><AlertCircle/><strong>Needs attention</strong><span>{client.openItems}</span></div><button onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}><strong>Resolve {client.openItems} data-ingest items</strong><span>Validation and account-mapping exceptions</span><ArrowRight/></button></section>}
     <div className="client-overview-grid"><section className="client-engagement-card"><div className="section-title"><div><p className="eyebrow">Current engagement</p><h2>{client.auditType} · {state.fiscalYear}</h2><p>Period ended {client.period}</p></div><span className="status-pill progress">In progress</span></div><div className="engagement-stage-strip">{[{n:"1",t:"Data ingest",p:client.progress},{n:"2",t:"Workpapers",p:0},{n:"3",t:"Fieldwork",p:0},{n:"4",t:"Report",p:0},{n:"5",t:"Completion",p:0}].map((x,i)=><button key={x.t} className={i===0?"active":"locked"} disabled={i>0} onClick={()=>navigate(`/engagement/${client.slug}/ingest/details`)}><i>{i>0?<LockKeyhole/>:x.n}</i><span><strong>{x.t}</strong><small>{i===0?`${x.p}% complete`:"Locked"}</small></span><em><b style={{width:`${x.p}%`}}/></em></button>)}</div><div className="engagement-next-action"><div><Database/><span><small>Continue where the team stopped</small><strong>Review transformed ledger data</strong><p>3 validation checks require auditor judgment before account mapping.</p></span></div><button className="primary-btn" onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}>Continue ingest <ArrowRight/></button></div></section>
       <aside className="client-facts-card"><div className="section-title"><div><h2>Engagement details</h2><p>Synced from AssurePro.</p></div><span className="source-badge"><Check/>Synced</span></div><dl><div><dt>Audit type</dt><dd>{client.auditType}</dd></div><div><dt>Period end</dt><dd>{client.period}</dd></div><div><dt>Reporting deadline</dt><dd>April 30, 2026</dd></div><div><dt>Engagement partner</dt><dd>Oscar Owner</dd></div><div><dt>Engagement manager</dt><dd>Meera Kapoor</dd></div><div><dt>Accounting system</dt><dd>QuickBooks Online</dd></div></dl></aside></div>
     <EngagementTeam client={client}/>
-    <section className="client-documents" id="documents"><div className="section-title"><div><p className="eyebrow">Documents</p><h2>Recent client and engagement files</h2><p>Files collected in AssurePro and source data used by the audit.</p></div><button className="secondary-btn" onClick={()=>update({},`${client.documents} documents opened for ${client.name}`)}>View all {client.documents} <ArrowRight/></button></div><div className="document-list-head"><span>Document</span><span>Type</span><span>Status</span><span>Updated</span><span/></div>{docs.map(d=><button key={d.name} onClick={()=>update({},`${d.name} opened in the connected document viewer (simulated)`)}><span><FileText/><strong>{d.name}</strong></span><span>{d.type}</span><span><em className={d.status==="New"?"new":""}>{d.status}</em></span><span>{d.date}</span><ChevronRight/></button>)}</section>
+    <section className="client-documents" id="documents"><div className="section-title"><div><p className="eyebrow">Documents</p><h2>Recent client and engagement files</h2><p>Files collected in AssurePro and source data used by the audit.</p></div><button className="secondary-btn" onClick={()=>navigate(`/clients/${client.slug}/documents`)}>View all {client.documents} <ArrowRight/></button></div><div className="document-list-head"><span>Document</span><span>Type</span><span>Status</span><span>Updated</span><span/></div>{docs.map(d=><button key={d.name} onClick={()=>update({},`${d.name} opened in the connected document viewer (simulated)`)}><span><FileText/><strong>{d.name}</strong></span><span>{d.type}</span><span><em className={d.status==="New"?"new":""}>{d.status}</em></span><span>{d.date}</span><ChevronRight/></button>)}</section>
   </div>;
 }
 
@@ -1020,7 +1176,7 @@ function ClientPortal({ state,update,onExit }: {state:DemoState;update:(p:Partia
   const counts={All:requests.length,"To do":requests.filter(r=>bucketOf(r.status)==="To do").length,Submitted:requests.filter(r=>bucketOf(r.status)==="Submitted").length,Done:requests.filter(r=>bucketOf(r.status)==="Done").length};
   const visibleRequests=requests.filter(r=>statusFilter==="All"||bucketOf(r.status)===statusFilter);
   const dueSoon=requests.filter(r=>bucketOf(r.status)==="To do");
-  return <div className="client-portal"><header className="client-top"><div className="brand white"><div className="brand-mark">A</div><div><strong>assure</strong><span>audit</span></div><em>Client Portal</em></div><div className="client-actions"><button onClick={()=>update({},"Help center opened (simulated) — support articles for the Client Portal")}><BookOpen/>Help</button><div className="topbar-popover"><button onClick={()=>setNotifOpen(!notifOpen)}><Bell/>{dueSoon.length>0&&<i className="portal-notif-dot"/>}</button>{notifOpen&&<div className="dropdown-menu notif-menu">
+  return <div className="client-portal"><header className="client-top"><div className="brand white"><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><em>Client Portal</em></div><div className="client-actions"><button onClick={()=>update({},"Help center opened (simulated) — support articles for the Client Portal")}><BookOpen/>Help</button><div className="topbar-popover"><button onClick={()=>setNotifOpen(!notifOpen)}><Bell/>{dueSoon.length>0&&<i className="portal-notif-dot"/>}</button>{notifOpen&&<div className="dropdown-menu notif-menu">
         <div className="dropdown-head"><strong>Notifications</strong><span>{dueSoon.length} request{dueSoon.length===1?"":"s"} need action</span></div>
         {dueSoon.length===0?<div className="dropdown-empty">Nothing needs action right now.</div>:dueSoon.map(r=><button key={r.title} className="dropdown-item" onClick={()=>{setNotifOpen(false);openRequest(r.title)}}><AlertCircle size={14}/><span>{r.title} · Due {r.due}</span></button>)}
       </div>}</div><div className="avatar">DC</div><button className="secondary-btn" onClick={onExit}>Return to firm demo</button></div></header><main><div className="client-welcome"><div><p className="eyebrow">{engagement.displayType} · {engagement.fiscalYear}</p><h1>Planning Requests</h1><p>{engagement.clientName} · Requested by CF Joseph CPA PC</p></div><div className="portal-progress"><div><strong>{requests.filter(r=>r.status==="Done").length} of {requests.length}</strong><span>requests complete</span></div><div className="progress-line"><i style={{width:`${requests.filter(r=>r.status==="Done").length/requests.length*100}%`}}/></div></div></div>
