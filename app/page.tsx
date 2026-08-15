@@ -314,7 +314,7 @@ export default function Home() {
           <IngestWorkspace path={path} navigate={navigate} state={state} update={update}/>
         ) : planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/documents" ? <AllDocuments navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <ClientDocumentsPage client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/documents" ? <DocumentsCenter navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <DocumentsCenter initialSlug={clientSlug} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>} 
       {toast && <div className="toast sync-toast" role="status"><span className="toast-success"><Check/></span><div><strong>{/AssurePro|QuickBooks|sync|connector|connection/i.test(toast)?"Connected platform updated":"Action completed"}</strong><span>{toast}</span></div><button aria-label="Dismiss notification" onClick={()=>setToast("")}><X/></button></div>}
@@ -339,8 +339,8 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       <button className={`nav-item ${path === "/clients" || path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/clients")}><Users/><span>Clients</span></button>
       <button className={`nav-item ${path === "/documents" ? "active" : ""}`} onClick={() => navigate("/documents")}><FolderOpen/><span>Documents</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
-      {!clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav workspace-preview"><button className="select-client-nav" onClick={()=>navigate("/clients")}><Search/><span>Select a client</span><ChevronRight/></button><button disabled><HomeIcon/><span>Overview</span><LockKeyhole className="branch-lock"/></button><button disabled><FolderOpen/><span>Documents</span><LockKeyhole className="branch-lock"/></button><button disabled><Database/><span>Data ingest</span><LockKeyhole className="branch-lock"/></button><button disabled><ClipboardCheck/><span>Workpapers</span><LockKeyhole className="branch-lock"/></button><button disabled><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button disabled><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></div></>}
-      {clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav"><button className={path===`/clients/${clientSlug}`||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button className={path===`/clients/${clientSlug}/documents`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}/documents`)}><FolderOpen/><span>Documents</span><b>{client.documents}</b></button><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. */}<button className={active==="planning"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i/><span>Overview</span></button><button className={active==="setup"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/setup`)}><i className="approved"/><span>Commence</span></button><button className={active==="entity-controls"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/entity-controls`)}><i className="progress"/><span>Understand</span></button><button className={active==="risks"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/risks`)}><i/><span>Risk assessment</span></button></div>}<button onClick={()=>update({},"Fieldwork unlocks after workpaper approval")}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></>}</div></>}
+      {!clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav workspace-preview"><button className="select-client-nav" onClick={()=>navigate("/clients")}><Search/><span>Select a client</span><ChevronRight/></button><button disabled><HomeIcon/><span>Overview</span><LockKeyhole className="branch-lock"/></button><button disabled><Database/><span>Data ingest</span><LockKeyhole className="branch-lock"/></button><button disabled><ClipboardCheck/><span>Workpapers</span><LockKeyhole className="branch-lock"/></button><button disabled><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button disabled><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></div></>}
+      {clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav"><button className={path===`/clients/${clientSlug}`||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. */}<button className={active==="planning"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i/><span>Overview</span></button><button className={active==="setup"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/setup`)}><i className="approved"/><span>Commence</span></button><button className={active==="entity-controls"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/entity-controls`)}><i className="progress"/><span>Understand</span></button><button className={active==="risks"?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning/risks`)}><i/><span>Risk assessment</span></button></div>}<button onClick={()=>update({},"Fieldwork unlocks after workpaper approval")}><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></>}</div></>}
       <p className="nav-label practice">Firm</p><button className="nav-item" onClick={()=>update({},"Firm audit log opened (simulated)")}><History/><span>Firm audit log</span></button>
     </nav>
     <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>{state.role}</span></div></div>
@@ -496,7 +496,31 @@ const WORKPAPER_REFS=[
   {id:205,title:"Materiality workpaper",route:"materiality"},
 ];
 
-function ClientDocumentsPage({client,navigate,update}:{client:ClientRecord;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
+function DocumentsCenter({initialSlug,navigate,update}:{initialSlug?:string;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
+  const [selectedSlug,setSelectedSlug]=useState(initialSlug||CLIENTS[0].slug);
+  const [clientQuery,setClientQuery]=useState("");
+  const client=CLIENTS.find(c=>c.slug===selectedSlug)||CLIENTS[0];
+  const filteredClients=CLIENTS.filter(c=>`${c.name} ${c.industry}`.toLowerCase().includes(clientQuery.toLowerCase()));
+  return <div className="page documents-center-page">
+    <div className="page-heading"><div><p className="eyebrow">Firm portfolio</p><h1>Documents</h1><p>One document center for every client — select a client to view its library.</p></div></div>
+    <div className="documents-center-layout">
+      <aside className="documents-center-clients">
+        <div className="search"><Search/><input value={clientQuery} onChange={e=>setClientQuery(e.target.value)} placeholder="Search clients…"/></div>
+        <div className="documents-center-client-list">
+          {filteredClients.map(c=><button key={c.slug} className={c.slug===selectedSlug?"active":""} onClick={()=>setSelectedSlug(c.slug)}>
+            <i>{c.initials}</i>
+            <span><strong>{c.name}</strong><small>{c.documents} documents{c.openItems>0?` · ${c.openItems} pending`:""}</small></span>
+            {c.openItems>0&&<b className="pending-dot"/>}
+          </button>)}
+          {filteredClients.length===0&&<div className="dropdown-empty">No clients match.</div>}
+        </div>
+      </aside>
+      <ClientDocumentsMain key={client.slug} client={client} navigate={navigate} update={update}/>
+    </div>
+  </div>;
+}
+
+function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
   const [query,setQuery]=useState("");
   const [toneFilters,setToneFilters]=useState<string[]>([]);
   const [collapsedGroups,setCollapsedGroups]=useState<Record<string,boolean>>({});
@@ -516,11 +540,10 @@ function ClientDocumentsPage({client,navigate,update}:{client:ClientRecord;navig
   const addCategory=(name:string)=>{setFolders(f=>[...f,name]);setCategoryOpen(false);update({},`"${name}" category created for ${client.name}`)};
   const selectedDoc=documents.find(d=>d.id===selectedId)||null;
   const requestsPending=1;
-  return <div className="page documents-page">
-    <div className="breadcrumbs"><button onClick={()=>navigate(`/clients/${client.slug}`)}>{client.name}</button><ChevronRight/><span>Documents</span></div>
-    <div className="page-heading"><div><p className="eyebrow">Client document library</p><h1>Documents</h1><p>{client.name} · {documents.length} documents on file</p></div></div>
+  return <>
+    <section className="documents-main documents-center-main">
+    <div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
-    <section className="documents-main">
       <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{documents.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
       {tab==="Files"?<>
         <div className="documents-toolbar-row">
@@ -551,7 +574,7 @@ function ClientDocumentsPage({client,navigate,update}:{client:ClientRecord;navig
     {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)}/>}
     {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
-  </div>;
+  </>;
 }
 
 function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[]}){
@@ -611,33 +634,6 @@ function CreateRequestModalSimple({close,update,clientName}:{close:()=>void;upda
   </div></div>;
 }
 
-function AllDocuments({navigate,update}:{navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
-  const [query,setQuery]=useState("");
-  const filtered=CLIENTS.filter(c=>`${c.name} ${c.industry} ${c.subIndustry}`.toLowerCase().includes(query.toLowerCase()));
-  const totalDocs=CLIENTS.reduce((sum,c)=>sum+c.documents,0);
-  const flaggedClients=CLIENTS.filter(c=>c.openItems>0).length;
-  return <div className="page all-documents-page">
-    <div className="page-heading"><div><p className="eyebrow">Firm portfolio</p><h1>Client documents</h1><p>Every client's document library in one place — open a client to see its full workspace.</p></div></div>
-    <section className="portfolio-kpis"><article><span>Total documents</span><strong>{totalDocs}</strong><small>Across {CLIENTS.length} clients</small></article><article><span>Clients with new items</span><strong>{flaggedClients}</strong><small>Documents need review</small></article></section>
-    <section className="clients-toolbar"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search client, industry or audit type"/></div><span>{filtered.length} clients</span></section>
-    <div className="all-documents-list">
-      {filtered.map(client=>{
-        const docs=docsForClient(client);
-        return <section className="client-documents all-documents-group" key={client.slug}>
-          <button className="all-documents-group-head" onClick={()=>navigate(`/clients/${client.slug}/documents`)}>
-            <i>{client.initials}</i>
-            <span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span>
-            <em>{client.documents} document{client.documents===1?"":"s"}</em>
-            <ChevronRight/>
-          </button>
-          <div className="document-list-head"><span>Document</span><span>Type</span><span>Status</span><span>Updated</span><span/></div>
-          {docs.map(d=><button key={d.name} onClick={()=>update({},`${d.name} opened in the connected document viewer (simulated)`)}><span><FileText/><strong>{d.name}</strong></span><span>{d.type}</span><span><em className={d.status==="New"?"new":""}>{d.status}</em></span><span>{d.date}</span><ChevronRight/></button>)}
-        </section>;
-      })}
-      {filtered.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}
-    </div>
-  </div>;
-}
 
 function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navigate:(p:string)=>void;state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void}) {
   const docs=docsForClient(client);
@@ -649,7 +645,14 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
     <div className="client-overview-grid"><section className="client-engagement-card"><div className="section-title"><div><p className="eyebrow">Current engagement</p><h2>{client.auditType} · {state.fiscalYear}</h2><p>Period ended {client.period}</p></div><span className="status-pill progress">In progress</span></div><div className="engagement-stage-strip">{[{n:"1",t:"Data ingest",p:client.progress},{n:"2",t:"Workpapers",p:0},{n:"3",t:"Fieldwork",p:0},{n:"4",t:"Report",p:0},{n:"5",t:"Completion",p:0}].map((x,i)=><button key={x.t} className={i===0?"active":"locked"} disabled={i>0} onClick={()=>navigate(`/engagement/${client.slug}/ingest/details`)}><i>{i>0?<LockKeyhole/>:x.n}</i><span><strong>{x.t}</strong><small>{i===0?`${x.p}% complete`:"Locked"}</small></span><em><b style={{width:`${x.p}%`}}/></em></button>)}</div><div className="engagement-next-action"><div><Database/><span><small>Continue where the team stopped</small><strong>Review transformed ledger data</strong><p>3 validation checks require auditor judgment before account mapping.</p></span></div><button className="primary-btn" onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}>Continue ingest <ArrowRight/></button></div></section>
       <aside className="client-facts-card"><div className="section-title"><div><h2>Engagement details</h2><p>Synced from AssurePro.</p></div><span className="source-badge"><Check/>Synced</span></div><dl><div><dt>Audit type</dt><dd>{client.auditType}</dd></div><div><dt>Period end</dt><dd>{client.period}</dd></div><div><dt>Reporting deadline</dt><dd>April 30, 2026</dd></div><div><dt>Engagement partner</dt><dd>Oscar Owner</dd></div><div><dt>Engagement manager</dt><dd>Meera Kapoor</dd></div><div><dt>Accounting system</dt><dd>QuickBooks Online</dd></div></dl></aside></div>
     <EngagementTeam client={client}/>
-    <section className="client-documents" id="documents"><div className="section-title"><div><p className="eyebrow">Documents</p><h2>Recent client and engagement files</h2><p>Files collected in AssurePro and source data used by the audit.</p></div><button className="secondary-btn" onClick={()=>navigate(`/clients/${client.slug}/documents`)}>View all {client.documents} <ArrowRight/></button></div><div className="document-list-head"><span>Document</span><span>Type</span><span>Status</span><span>Updated</span><span/></div>{docs.map(d=><button key={d.name} onClick={()=>update({},`${d.name} opened in the connected document viewer (simulated)`)}><span><FileText/><strong>{d.name}</strong></span><span>{d.type}</span><span><em className={d.status==="New"?"new":""}>{d.status}</em></span><span>{d.date}</span><ChevronRight/></button>)}</section>
+    <section className="client-documents" id="documents"><div className="section-title"><div><p className="eyebrow">Documents</p><h2>Recent client and engagement files</h2><p>Files collected in AssurePro and source data used by the audit.</p></div><button className="secondary-btn" onClick={()=>navigate(`/clients/${client.slug}/documents`)}>View all {client.documents} <ArrowRight/></button></div>{docs.map(d=><button className="doc-row-v2" key={d.id} onClick={()=>navigate(`/clients/${client.slug}/documents`)}>
+      <i className={`tone-dot ${d.tone}`}/>
+      <span className="doc-id">{d.id}</span>
+      <span className="doc-row-title"><strong>{d.name}</strong><small>{d.type}</small></span>
+      <span className={`status-pill ${d.tone}`}>{d.due}</span>
+      <span className="doc-row-meta"><MessageSquare size={13}/>{d.comments.length}</span>
+      <span className="doc-row-meta"><Paperclip size={13}/>{d.attachments}</span>
+    </button>)}</section>
   </div>;
 }
 
