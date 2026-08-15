@@ -496,6 +496,15 @@ const WORKPAPER_REFS=[
   {id:205,title:"Materiality workpaper",route:"materiality"},
 ];
 
+type ClientRequest={id:number;title:string;type:string;status:"To do"|"Submitted"|"Done";due:string};
+function requestsForClient(client:ClientRecord):ClientRequest[]{
+  const requests:ClientRequest[]=[
+    {id:1,title:"Signed engagement letter (current year)",type:"File upload",status:"Done",due:"Complete"},
+  ];
+  if(client.openItems>0)requests.push({id:2,title:"Clarify Board minutes — Q4 governance note",type:"Clarification",status:"To do",due:"Due in 2d"});
+  return requests;
+}
+
 function DocumentsCenter({initialSlug,navigate,update}:{initialSlug?:string;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
   const [selectedSlug,setSelectedSlug]=useState(initialSlug||CLIENTS[0].slug);
   const [clientQuery,setClientQuery]=useState("");
@@ -530,6 +539,7 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const [folders,setFolders]=useState<string[]>([]);
   const [tab,setTab]=useState<"Files"|"Requests">("Files");
   const [documents,setDocuments]=useState<DocRecord[]>(()=>docsForClient(client));
+  const [requests,setRequests]=useState<ClientRequest[]>(()=>requestsForClient(client));
   const visible=documents.filter(doc=>(toneFilters.length===0||toneFilters.includes(doc.tone))&&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
   const grouped:Record<string,DocRecord[]>={};
   visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
@@ -539,10 +549,12 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const removeDoc=(id:number)=>{setDocuments(docs=>docs.filter(d=>d.id!==id));setSelectedId(null)};
   const addCategory=(name:string)=>{setFolders(f=>[...f,name]);setCategoryOpen(false);update({},`"${name}" category created for ${client.name}`)};
   const selectedDoc=documents.find(d=>d.id===selectedId)||null;
-  const requestsPending=1;
+  const requestsPending=requests.filter(r=>r.status!=="Done").length;
+  const addRequest=(title:string,due:string)=>setRequests(r=>[{id:Math.max(0,...r.map(x=>x.id))+1,title,type:"File upload",status:"To do",due},...r]);
   return <>
     <section className="documents-main documents-center-main">
     <div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>
+    <div className="chip-row-label"><span>Linked workpapers</span><InfoTip title="Linked workpapers" text="Numbered cross-references (201–205) to the specific Data Ingest and Workpapers step that produced or relies on this client's documents. Click a chip to jump straight to that step." standard="Cross-reference · Planning workflow"/></div>
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
       <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{documents.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
       {tab==="Files"?<>
@@ -569,10 +581,10 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
           {folders.map(name=>!grouped[name]&&<section className="doc-group" key={name}><button className="doc-group-head" disabled><strong>{name}</strong><b className="count">0</b></button></section>)}
           {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the filters or search to see the full client library.</p></div>}
         </div>
-      </>:<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>}
+      </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list">{requests.map(r=><button key={r.id} onClick={()=>update({},`${r.title} — ${r.status}`)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div><span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
     </section>
     {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)}/>}
-    {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name}/>}
+    {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name} onCreate={addRequest}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
   </>;
 }
@@ -622,7 +634,7 @@ function CreateCategoryModal({close,onCreate}:{close:()=>void;onCreate:(name:str
   </div></div>;
 }
 
-function CreateRequestModalSimple({close,update,clientName}:{close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;clientName:string}){
+function CreateRequestModalSimple({close,update,clientName,onCreate}:{close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;clientName:string;onCreate:(title:string,due:string)=>void}){
   const [title,setTitle]=useState("");
   const [dueDate,setDueDate]=useState("");
   const canCreate=title.trim().length>0&&dueDate.trim().length>0;
@@ -630,7 +642,7 @@ function CreateRequestModalSimple({close,update,clientName}:{close:()=>void;upda
     <div className="modal-head"><div><h2>Create request</h2><p>Add a new document request for {clientName}.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
     <Field label="Request title" required><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Bank confirmations"/></Field>
     <Field label="Due date" required><input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></Field>
-    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!canCreate} onClick={()=>{update({},`Request "${title}" sent to ${clientName}`);close()}}>Create</button></div>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!canCreate} onClick={()=>{onCreate(title,dueDate);update({},`Request "${title}" sent to ${clientName}`);close()}}>Create</button></div>
   </div></div>;
 }
 
@@ -1116,6 +1128,10 @@ function GlobalGuide({path,open,setOpen}:{path:string;open:boolean;setOpen:(v:bo
     ["Find the right client","Search by client, industry or audit type, then use the industry filter to narrow the list."],
     ["Review ownership","Each card shows the current stage, assigned firm and client team, documents and open items."],
     ["Start an engagement","New engagement collects workflow, industry, risk and accountability before anything enters Data Ingest."],
+  ]}:path==="/documents"||(clientPath&&path.endsWith("/documents"))?{title:"Documents",steps:[
+    ["Switch clients from one place","One document center serves every client — use the list on the left to move between libraries without leaving the page."],
+    ["Files vs. Requests","Files groups documents by category with status and comment counts. Requests tracks what's still outstanding from the client — the pending count on the tab always matches what's in the list."],
+    ["Trace back to the source workpaper","The numbered chips (201–205) link each document category to the Data Ingest or Workpapers step that produced it — click one to jump straight there."],
   ]}:clientPath?{title:"Client overview",steps:[
     ["Review the client first","This page combines engagement details, attention items, documents and the approval hierarchy for one client."],
     ["Continue the workflow","The current-stage card opens the next available Data Ingest or Workpapers action."],

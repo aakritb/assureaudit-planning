@@ -254,6 +254,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .documents-tabs button b{background:#f0eef4;color:var(--muted);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700}
 .documents-tabs button b.warn{background:var(--amber-soft);color:var(--amber)}
 .documents-main{background:transparent}
+.chip-row-label{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-2);font-weight:700}
 .workpaper-chip-row{display:flex;gap:8px;overflow-x:auto;padding:12px 17px;background:#fff;border:1px solid var(--line);border-radius:13px;margin-bottom:14px}
 .workpaper-chip-row button{flex:none;display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);background:#faf9fc;border-radius:10px;padding:8px 12px;text-align:left;min-width:120px}
 .workpaper-chip-row button:hover{border-color:#cfc7ee;background:#fbfaff}
