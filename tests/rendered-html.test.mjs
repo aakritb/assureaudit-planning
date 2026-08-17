@@ -162,7 +162,8 @@ test("uses consistent contextual info icons and actionable confirmations", async
   assert.match(page, /title="Workpapers Content Pack"/);
   assert.match(page, /Connected platform updated/);
   assert.match(page, /Dismiss notification/);
-  assert.match(page, /Four account-mapping exceptions opened for review/);
+  assert.match(page, /function MappingExceptionsModal/);
+  assert.match(page, /function TransformDetailModal/);
 });
 
 test("isolates live-preview and production-build caches", async () => {

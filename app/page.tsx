@@ -682,6 +682,16 @@ function IngestWorkspace({path,navigate,state,update}:{path:string;navigate:(p:s
   const requested=path.split("/").pop()||"details"; const active=Math.max(0,INGEST_STEPS.findIndex(s=>s.id===requested)); const step=INGEST_STEPS[active];
   const clientSlug=path.split("/")[2]||"bbawc"; const client=CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0];
   const [system,setSystem]=useState("QuickBooks Online"); const [method,setMethod]=useState("Cloud connector"); const [mapping,setMapping]=useState("Reuse prior-year mapping");
+  const [splitResolved,setSplitResolved]=useState(false);
+  const [transformDetail,setTransformDetail]=useState<{n:string;s:string;d:string}|null>(null);
+  const [mappingExceptionsOpen,setMappingExceptionsOpen]=useState(false);
+  const [mappedExceptions,setMappedExceptions]=useState(0);
+  const transformCards=[
+    {n:"Unbalanced combinations",s:"Pass",d:"0 unresolved transaction groups"},
+    {n:"Global concatenation",s:"Applied",d:"318 document lines combined"},
+    {n:"Transaction splitting",s:splitResolved?"Approved":"Review",d:splitResolved?"3 batches approved by auditor":"3 batches require auditor review"},
+    {n:"Identical transactions",s:"Pass",d:"No duplicate identifiers"},
+  ];
   const next=()=>active<7&&navigate(`/engagement/${clientSlug}/ingest/${INGEST_STEPS[active+1].id}`); const back=()=>active>0&&navigate(`/engagement/${clientSlug}/ingest/${INGEST_STEPS[active-1].id}`);
   return <div className="ingest-workspace"><header className="ingest-header"><div><div className="breadcrumbs"><button onClick={()=>navigate(`/clients/${clientSlug}`)}>{client.name}</button><ChevronRight/><span>Data ingest</span></div><div className="title-line"><h1>{step.label}</h1><span className="status-pill progress">Step {active+1} of 8</span></div><p>{client.auditType} · {state.fiscalYear} · Period ended {client.period}</p></div><button className="secondary-btn" onClick={()=>navigate(`/clients/${clientSlug}`)}><X/>Close ingest</button></header>
     <div className="ingest-body"><aside className="ingest-stepper"><div><p className="eyebrow">Data ingest</p><strong>{client.progress}% complete</strong><i><b style={{width:`${client.progress}%`}}/></i></div>{INGEST_STEPS.map((s,i)=><button key={s.id} className={`${i===active?"active":""} ${i<active?"done":""}`} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${s.id}`)}><i>{i<active?<Check/>:i+1}</i><span><strong>{s.label}</strong><small>{i<active?"Complete":i===active?"In progress":"Not started"}</small></span></button>)}</aside>
@@ -690,15 +700,65 @@ function IngestWorkspace({path,navigate,state,update}:{path:string;navigate:(p:s
         {active===1&&<><div className="system-picker"><Field label="Accounting system" required><select value={system} onChange={e=>setSystem(e.target.value)}><option>QuickBooks Online</option><option>Xero</option><option>Sage Intacct</option><option>Microsoft Dynamics 365</option><option>Other</option></select></Field><span className="recommended-system"><Sparkles/>Recommended connection available</span></div><div className="method-cards">{[{n:"Cloud connector",d:"Secure, read-only connection with automated refresh.",tag:"Recommended"},{n:"Guided file upload",d:"Use system-specific TB and GL templates.",tag:"Supported"},{n:"System backup",d:"Upload a supported database backup for specialist processing.",tag:"Specialist review"}].map(x=><button key={x.n} className={method===x.n?"active":""} onClick={()=>setMethod(x.n)}><Cloud/><strong>{x.n}</strong><p>{x.d}</p><span>{x.tag}</span></button>)}</div></>}
         {active===2&&<div className="source-file-stack"><SourceFile name="Current-year Trial Balance.xlsx" detail="184 accounts · $9.6M revenue" status="Validated" update={update}/><SourceFile name="Prior-year Closing Trial Balance.xlsx" detail="176 accounts · rolled forward" status="Validated" update={update}/><div className="validation-note"><Info/><span><strong>Required columns</strong>Account code, account description and closing net balance.</span></div></div>}
         {active===3&&<div className="source-file-stack"><SourceFile name="General Ledger Detail.csv" detail="1,204 transactions · Jan 1–Dec 31" status="Processed" update={update}/><div className="cdm-grid"><span><Check/>Account code</span><span><Check/>Transaction ID</span><span><Check/>Net amount</span><span><Check/>Effective date</span><span><Check/>Created date</span><span><Check/>Document type</span><span><Check/>User ID</span><span><Check/>Reference</span><span><Check/>Journal description</span><span><Check/>Line description</span></div><p className="ingest-help">Account code, transaction ID and net amount are mandatory. Optional fields increase the quality of analytics and sampling.</p></div>}
-        {active===4&&<><div className="transform-cards">{[{n:"Unbalanced combinations",s:"Pass",d:"0 unresolved transaction groups"},{n:"Global concatenation",s:"Applied",d:"318 document lines combined"},{n:"Transaction splitting",s:"Review",d:"3 batches require auditor review"},{n:"Identical transactions",s:"Pass",d:"No duplicate identifiers"}].map(x=><article key={x.n}><span className={`status-pill ${x.s==="Review"?"warning":"approved"}`}>{x.s}</span><strong>{x.n}</strong><p>{x.d}</p><button className="text-link" onClick={()=>update({},`${x.n} details opened in the transformation review (simulated)`)}>View details <ArrowRight/></button></article>)}</div><Banner tone="warning" title="Auditor judgment required" text="Three batch-posting transformations must be reviewed before mapping. Source rows remain preserved." action="Review 3 items" onAction={()=>update({},"Transformation review opened")}/></>}
-        {active===5&&<><div className="mapping-choice">{["Reuse prior-year mapping","Drag-and-drop mapping","Excel mapping template"].map((x,i)=><button key={x} className={mapping===x?"active":""} onClick={()=>setMapping(x)}><i>{i+1}</i><span><strong>{x}</strong><small>{i===0?"176 codes matched automatically":i===1?"Best for remaining exceptions":"Best for high-volume remapping"}</small></span>{mapping===x&&<Check/>}</button>)}</div><div className="mapping-status"><div><span>Mapped accounts</span><strong>180 / 184</strong></div><i><b style={{width:"98%"}}/></i><button className="secondary-btn" onClick={()=>update({},"Four account-mapping exceptions opened for review")}>Review 4 exceptions</button></div></>}
+        {active===4&&<><div className="transform-cards">{transformCards.map(x=><article key={x.n}><span className={`status-pill ${x.s==="Review"?"warning":"approved"}`}>{x.s}</span><strong>{x.n}</strong><p>{x.d}</p><button className="text-link" onClick={()=>setTransformDetail(x)}>View details <ArrowRight/></button></article>)}</div>{!splitResolved&&<Banner tone="warning" title="Auditor judgment required" text="Three batch-posting transformations must be reviewed before mapping. Source rows remain preserved." action="Review 3 items" onAction={()=>setTransformDetail(transformCards[2])}/>}</>}
+        {active===5&&<><div className="mapping-choice">{["Reuse prior-year mapping","Drag-and-drop mapping","Excel mapping template"].map((x,i)=><button key={x} className={mapping===x?"active":""} onClick={()=>setMapping(x)}><i>{i+1}</i><span><strong>{x}</strong><small>{i===0?"176 codes matched automatically":i===1?"Best for remaining exceptions":"Best for high-volume remapping"}</small></span>{mapping===x&&<Check/>}</button>)}</div><div className="mapping-status"><div><span>Mapped accounts</span><strong>{180+mappedExceptions} / 184</strong></div><i><b style={{width:`${((180+mappedExceptions)/184*100).toFixed(1)}%`}}/></i>{mappedExceptions<4?<button className="secondary-btn" onClick={()=>setMappingExceptionsOpen(true)}>Review {4-mappedExceptions} exception{4-mappedExceptions===1?"":"s"}</button>:<span className="status-pill approved"><Check size={13}/> All accounts mapped</span>}</div></>}
         {active===6&&<><div className="reconcile-summary"><article><span>TB control total</span><strong>$2,210,480</strong><small className="pass"><Check/>Agrees to mapped accounts</small></article><article><span>GL movement</span><strong>$9,602,114</strong><small className="pass"><Check/>Agrees to transaction detail</small></article><article><span>Open exceptions</span><strong>2</strong><small className="warn"><AlertTriangle/>Explanation required</small></article></div><div className="reconcile-table"><div><strong>Issue</strong><strong>Result</strong><strong>Auditor conclusion</strong></div><div><span>2 accounts do not reconcile to closing TB</span><em>Investigate</em><input defaultValue="Timing differences traced to approved adjustments."/></div><div><span>Blank effective dates</span><em className="pass">Accepted</em><input defaultValue="Not used by the client's reporting system."/></div></div><Banner tone="info" title="Authorization" text="When enabled by firm policy, the engagement manager authorizes accepted reconciliation exceptions before completion."/></>}
         {active===7&&<Materiality state={state} update={update} embedded onBack={back} onComplete={()=>{update({materialityLocked:true},"Materiality locked and Data Ingest completed — Workpapers unlocked");navigate(`/engagement/${clientSlug}/planning`)}}/>}
       </section>{active<7&&<footer className="ingest-actions"><button className="secondary-btn" disabled={active===0} onClick={back}><ChevronLeft/>Back</button><span><Check/>Draft saved just now</span><button className="primary-btn" onClick={next}>Save & continue <ArrowRight/></button></footer>}</main>
-    </div></div>;
+    </div>
+    {transformDetail&&<TransformDetailModal check={transformDetail} resolved={splitResolved} close={()=>setTransformDetail(null)} onResolve={()=>{setSplitResolved(true);update({},"3 batch-posting transformations approved");setTransformDetail(null)}}/>}
+    {mappingExceptionsOpen&&<MappingExceptionsModal resolvedCount={mappedExceptions} close={()=>setMappingExceptionsOpen(false)} onResolve={n=>{setMappedExceptions(n);update({},`${n} account mapping${n===1?"":"s"} confirmed`);setMappingExceptionsOpen(false)}}/>}
+    </div>;
 }
 
-function SourceFile({name,detail,status,update}:{name:string;detail:string;status:string;update:(p:Partial<DemoState>,m?:string)=>void}){return <article className="source-file"><span><FileSpreadsheet/></span><div><strong>{name}</strong><small>{detail}</small></div><em className="status-pill approved"><Check/>{status}</em><button className="icon-btn" aria-label={`Open actions for ${name}`} onClick={()=>update({},`${name} actions opened (replace, download and audit history)`) }><MoreHorizontal/></button></article>}
+function TransformDetailModal({check,resolved,close,onResolve}:{check:{n:string;s:string;d:string};resolved:boolean;close:()=>void;onResolve:()=>void}){
+  const batches=[
+    {id:"Batch #114",amount:"$42,180",reason:"Multi-line invoice split across 3 transaction IDs"},
+    {id:"Batch #117",amount:"$18,960",reason:"Payroll journal split by department"},
+    {id:"Batch #122",amount:"$65,410",reason:"Vendor payment batch split by remittance"},
+  ];
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><span className={`status-pill ${check.s==="Review"?"warning":"approved"}`}>{check.s}</span><h2>{check.n}</h2><p>{check.d}</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    {check.n==="Transaction splitting"?<>
+      <p className="panel-description">These transaction batches were split by the transformation engine because a single source document mapped to multiple journal lines. Confirm the split is appropriate before the data moves to account mapping.</p>
+      <div className="drawer-comment-list">{batches.map(b=><div key={b.id} className="drawer-file"><FileText/><div><strong>{b.id} · {b.amount}</strong><span>{b.reason}</span></div></div>)}</div>
+      <div className="modal-actions"><button className="secondary-btn" onClick={close}>Close</button>{!resolved&&<button className="primary-btn" onClick={onResolve}>Approve all 3 <Check size={15}/></button>}</div>
+    </>:<>
+      <p className="panel-description">This check ran automatically during transformation and requires no auditor action.</p>
+      <div className="modal-actions"><button className="primary-btn" onClick={close}>Close</button></div>
+    </>}
+  </div></div>;
+}
+
+function MappingExceptionsModal({resolvedCount,close,onResolve}:{resolvedCount:number;close:()=>void;onResolve:(n:number)=>void}){
+  const accounts=[
+    {code:"6410",name:"Program Supplies — Youth Services",suggested:"Program Expenses"},
+    {code:"6512",name:"Grant Writer Contract Fee",suggested:"Professional Fees"},
+    {code:"7020",name:"In-Kind Facility Use",suggested:"Contributed Support"},
+    {code:"8110",name:"Board Development Costs",suggested:"Governance Expenses"},
+  ];
+  const [choices,setChoices]=useState<Record<string,string>>({});
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Account mapping exceptions</h2><p>4 accounts didn't match the firm chart of accounts automatically. Confirm or reassign each one.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="drawer-comment-list">{accounts.map(a=><div key={a.code} className="drawer-file"><FileText/><div><strong>{a.code} · {a.name}</strong><span>Suggested: {choices[a.code]||a.suggested}</span></div></div>)}</div>
+    <Field label="Apply suggested mapping to all 4"><select onChange={e=>{if(e.target.value==="yes")setChoices(Object.fromEntries(accounts.map(a=>[a.code,a.suggested])))}}><option value="">Choose an action</option><option value="yes">Accept all suggested mappings</option></select></Field>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" onClick={()=>onResolve(4)}>Confirm mappings <Check size={15}/></button></div>
+  </div></div>;
+}
+
+function SourceFile({name,detail,status,update}:{name:string;detail:string;status:string;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const [open,setOpen]=useState(false);
+  return <article className="source-file"><span><FileSpreadsheet/></span><div><strong>{name}</strong><small>{detail}</small></div><em className="status-pill approved"><Check/>{status}</em>
+    <span style={{position:"relative"}}>
+      <button className="icon-btn" aria-label={`Open actions for ${name}`} aria-expanded={open} onClick={()=>setOpen(!open)}><MoreHorizontal/></button>
+      {open&&<div className="dropdown-menu file-actions-menu">
+        <button className="dropdown-item" onClick={()=>{setOpen(false);update({},`Upload a replacement for "${name}" (simulated)`)}}><UploadCloud size={14}/><span>Replace file</span></button>
+        <button className="dropdown-item" onClick={()=>{setOpen(false);update({},`"${name}" downloaded (simulated)`)}}><Download size={14}/><span>Download</span></button>
+        <button className="dropdown-item" onClick={()=>{setOpen(false);update({},`Audit history — "${name}" uploaded by Jasmine Alvarez, validated by Meera Kapoor`)}}><History size={14}/><span>View audit history</span></button>
+      </div>}
+    </span>
+  </article>;
+}
 
 function EngagementHome({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
   const phases = getPhases(state); const declined = state.acceptanceDecision === "decline"; const foundationDone = phases[0].status === "Complete"; const dataDone = phases[1].status === "Complete"; const pct=planningProgressPct(state); const blockers=attentionItems(state).length; const riskList=allRisks(state); const highRiskCount=riskList.filter(r=>r.level==="High").length;
