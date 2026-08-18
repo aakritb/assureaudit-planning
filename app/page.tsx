@@ -484,28 +484,42 @@ function clientToWorkflowStage(stage:string):WorkflowStage{
   if(stage==="Workpapers"||stage==="Review")return "Review";
   return "Delivered";
 }
-type WorkflowCard={id:string;clientSlug:string|null;name:string;type:string;category:string;flagged:boolean;due:string;daysInStage:number;started:string;team:{initials:string;named:boolean}[];stage:WorkflowStage};
+const WORKFLOW_ROLE_LETTERS=["P","R","S","A"] as const;
+function buildTeamSlots(slug:string,assignedCount:number):{initials:string;named:boolean}[]{
+  const firm=CLIENT_TEAMS[slug].firm;
+  return WORKFLOW_ROLE_LETTERS.map((letter,i)=>i<assignedCount&&firm[i]?{initials:firm[i].initials,named:true}:{initials:letter,named:false});
+}
+type WorkflowCard={id:string;clientSlug:string|null;name:string;type:string;category:string;flagged:boolean;overdue:boolean;due:string;daysInStage:number;started:string;value:number;checklistDone:number;checklistTotal:number;team:{initials:string;named:boolean}[];stage:WorkflowStage};
 function seedWorkflowCards():WorkflowCard[]{
   const seed=[
-    {slug:"bbawc",flagged:true,due:"Aug 18",days:5,started:"Aug 12"},
-    {slug:"harbor",flagged:false,due:"Aug 21",days:7,started:"Aug 13"},
-    {slug:"greenfield",flagged:true,due:"Aug 16",days:3,started:"Aug 14"},
-    {slug:"metro",flagged:false,due:"No date",days:1,started:"Aug 17"},
-    {slug:"horizon",flagged:false,due:"Aug 14",days:9,started:"Aug 9"},
-    {slug:"cedar",flagged:false,due:"Complete",days:14,started:"Aug 4"},
+    {slug:"bbawc",flagged:true,overdue:false,due:"Aug 18",days:5,started:"Aug 12",value:42000,done:4,total:7,assigned:4},
+    {slug:"harbor",flagged:false,overdue:false,due:"Aug 21",days:7,started:"Aug 13",value:36500,done:3,total:6,assigned:2},
+    {slug:"greenfield",flagged:false,overdue:true,due:"Aug 16",days:3,started:"Aug 14",value:28750,done:2,total:5,assigned:2},
+    {slug:"metro",flagged:false,overdue:false,due:"No date",days:1,started:"Aug 17",value:18000,done:0,total:3,assigned:0},
+    {slug:"horizon",flagged:false,overdue:false,due:"Aug 14",days:9,started:"Aug 9",value:54000,done:6,total:8,assigned:3},
+    {slug:"cedar",flagged:false,overdue:false,due:"Complete",days:14,started:"Aug 4",value:61200,done:9,total:9,assigned:3},
   ];
   return seed.map(s=>{
     const client=CLIENTS.find(c=>c.slug===s.slug)!;
-    const team=CLIENT_TEAMS[s.slug].firm.slice(0,4).map(m=>({initials:m.initials,named:true}));
-    return {id:s.slug,clientSlug:s.slug,name:client.name,type:client.auditType,category:client.subIndustry,flagged:s.flagged,due:s.due,daysInStage:s.days,started:s.started,team,stage:clientToWorkflowStage(client.stage)};
+    const team=buildTeamSlots(s.slug,s.assigned);
+    return {id:s.slug,clientSlug:s.slug,name:client.name,type:client.auditType,category:client.subIndustry,flagged:s.flagged,overdue:s.overdue,due:s.due,daysInStage:s.days,started:s.started,value:s.value,checklistDone:s.done,checklistTotal:s.total,team,stage:clientToWorkflowStage(client.stage)};
   });
+}
+function WorkflowProgressRing({done,total}:{done:number;total:number}){
+  const pct=total>0?Math.min(1,done/total):0;
+  const r=9,c=2*Math.PI*r;
+  return <span className="workflow-progress-ring">
+    <svg width="22" height="22" viewBox="0 0 22 22">
+      <circle cx="11" cy="11" r={r} fill="none" stroke="var(--line)" strokeWidth="2.5"/>
+      <circle cx="11" cy="11" r={r} fill="none" stroke="var(--violet)" strokeWidth="2.5" strokeDasharray={`${c*pct} ${c}`} strokeLinecap="round" transform="rotate(-90 11 11)"/>
+    </svg>
+    <b>{done}/{total}</b>
+  </span>;
 }
 function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
   const [cards,setCards]=useState<WorkflowCard[]>(seedWorkflowCards);
   const [dragId,setDragId]=useState<string|null>(null);
   const [collapsedCols,setCollapsedCols]=useState<Record<string,boolean>>({});
-  const [quickAddStage,setQuickAddStage]=useState<WorkflowStage|null>(null);
-  const [quickAddValue,setQuickAddValue]=useState("");
   const [query,setQuery]=useState("");
   const [typeFilter,setTypeFilter]=useState("All engagements");
   const [typeOpen,setTypeOpen]=useState(false);
@@ -514,10 +528,11 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
   const displayRef=useDismiss(displayOpen,()=>setDisplayOpen(false));
   const [showAvatars,setShowAvatars]=useState(true);
   const [showCategory,setShowCategory]=useState(true);
-  const nextId=useRef(1000);
 
   const types=Array.from(new Set(cards.map(c=>c.type)));
   const visible=cards.filter(c=>(typeFilter==="All engagements"||c.type===typeFilter)&&c.name.toLowerCase().includes(query.toLowerCase()));
+  const intakeValue=visible.filter(c=>c.stage==="Intake").reduce((s,c)=>s+c.value,0);
+  const newEngagement=()=>update({},"New engagements are created in AssurePro — you'll be redirected there to continue.");
 
   const moveCard=(id:string,to:WorkflowStage)=>{
     const card=cards.find(c=>c.id===id);
@@ -525,14 +540,6 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
     if(!card||card.stage===to)return;
     setCards(cs=>cs.map(c=>c.id===id?{...c,stage:to,daysInStage:0,started:"Today"}:c));
     update({},`Engagement moved — ${card.name} moved from ${card.stage} to ${to}`);
-  };
-  const addCard=(stage:WorkflowStage)=>{
-    if(!quickAddValue.trim())return;
-    const id=`custom-${nextId.current++}`;
-    setCards(cs=>[...cs,{id,clientSlug:null,name:quickAddValue.trim(),type:"Other",category:"",flagged:false,due:"No date",daysInStage:0,started:"Today",team:[{initials:"L",named:false},{initials:"R",named:false},{initials:"S",named:false},{initials:"A",named:false}],stage}]);
-    update({},`"${quickAddValue.trim()}" added to ${stage}`);
-    setQuickAddValue("");
-    setQuickAddStage(null);
   };
 
   return <>
@@ -544,8 +551,9 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
           {types.map(t=><button key={t} className={`dropdown-item ${typeFilter===t?"active":""}`} onClick={()=>{setTypeFilter(t);setTypeOpen(false)}}>{t} <b className="count-inline">{cards.filter(c=>c.type===t).length}</b></button>)}
         </div>}
       </div>
+      <span className="workflow-pipeline-badge">Pipeline <b>{money(intakeValue)}</b></span>
       <div className="search no-margin workflow-search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search engagements…"/></div>
-      <button className="primary-btn" onClick={()=>{setQuickAddStage("Intake");setQuickAddValue("")}}><Plus size={15}/>New Engagement</button>
+      <button className="primary-btn" onClick={newEngagement}><Plus size={15}/>New Engagement</button>
       <div className="topbar-popover" ref={displayRef}>
         <button className="secondary-btn" onClick={()=>setDisplayOpen(v=>!v)}><SlidersHorizontal size={14}/>Display</button>
         {displayOpen&&<div className="dropdown-menu display-menu">
@@ -560,9 +568,8 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
         const rows=visible.filter(c=>c.stage===stage);
         const isCollapsed=collapsedCols[stage];
         return <div key={stage} className={`kanban-column workflow-column ${isCollapsed?"collapsed":""}`} onDragOver={e=>e.preventDefault()} onDrop={()=>dragId&&moveCard(dragId,stage)}>
-          <div className="kanban-column-head"><span><i className={`tone-dot ${WORKFLOW_STAGE_TONE[stage]}`}/>{stage}</span><span className="workflow-col-actions"><b>{rows.length}</b><button className="icon-btn" title={isCollapsed?"Expand column":"Collapse column"} onClick={()=>setCollapsedCols(c=>({...c,[stage]:!c[stage]}))}><ChevronLeft size={13}/></button><button className="icon-btn" title={`Add to ${stage}`} onClick={()=>{setQuickAddStage(stage);setQuickAddValue("")}}><Plus size={13}/></button></span></div>
+          <div className="kanban-column-head"><span><i className={`tone-dot ${WORKFLOW_STAGE_TONE[stage]}`}/>{stage}</span><span className="workflow-col-actions">{stage==="Intake"&&intakeValue>0&&<b className="workflow-col-value">{money(intakeValue)}</b>}<b>{rows.length}</b><button className="icon-btn" title={isCollapsed?"Expand column":"Collapse column"} onClick={()=>setCollapsedCols(c=>({...c,[stage]:!c[stage]}))}><ChevronLeft size={13}/></button><button className="icon-btn" title="New engagement" onClick={newEngagement}><Plus size={13}/></button></span></div>
           {!isCollapsed&&<>
-            {quickAddStage===stage&&<div className="workflow-quickadd"><input autoFocus value={quickAddValue} onChange={e=>setQuickAddValue(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCard(stage);if(e.key==="Escape")setQuickAddStage(null)}} placeholder="Engagement or client name…"/><button className="icon-btn" onClick={()=>addCard(stage)}><Check size={14}/></button><button className="icon-btn" onClick={()=>setQuickAddStage(null)}><X size={14}/></button></div>}
             {rows.map(card=><button key={card.id} className="kanban-card workflow-card" draggable onDragStart={()=>setDragId(card.id)} onClick={()=>card.clientSlug&&navigate(`/clients/${card.clientSlug}`)}>
               {card.flagged&&<span className="workflow-card-flag"><AlertTriangle size={11}/></span>}
               <span className="workflow-card-tag">{card.type}</span>
@@ -570,9 +577,12 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
               {showCategory&&card.category&&<span className="workflow-card-category">{card.category}</span>}
               <span className="workflow-card-row">
                 {showAvatars&&<span className="workflow-avatar-row">{card.team.map((m,i)=><i key={i} className={`workflow-avatar ${m.named?"":"placeholder"}`}>{m.initials}</i>)}</span>}
-                <span className="workflow-due-pill"><CalendarDays size={11}/>{card.due}</span>
+                <span className={`workflow-due-pill ${card.overdue?"danger":""}`}><CalendarDays size={11}/>{card.due}</span>
               </span>
-              <span className="workflow-card-footer"><Clock3 size={11}/>{card.daysInStage}d in stage · Started {card.started}</span>
+              <span className="workflow-card-footer">
+                <span className="workflow-card-footer-text"><Clock3 size={11}/>{card.daysInStage===0?"Today":`${card.daysInStage}d in stage`} · Started {card.started}</span>
+                <WorkflowProgressRing done={card.checklistDone} total={card.checklistTotal}/>
+              </span>
             </button>)}
             {rows.length===0&&<p className="panel-empty-text">No engagements</p>}
           </>}

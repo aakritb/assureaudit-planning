@@ -393,9 +393,9 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .workflow-col-actions{display:flex;align-items:center;gap:4px}
 .workflow-col-actions b{font-weight:700}
 .workflow-col-actions .icon-btn{width:20px;height:20px;padding:0;display:grid;place-items:center}
-.workflow-quickadd{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--violet);border-radius:9px;padding:6px 6px 6px 10px;margin-bottom:8px}
-.workflow-quickadd input{border:0;padding:2px 0;font-size:12px}
-.workflow-quickadd input:focus{box-shadow:none}
+.workflow-pipeline-badge{display:flex;align-items:center;gap:6px;background:#eafaf1;color:#1a8a4c;font-size:12px;font-weight:650;padding:8px 14px;border-radius:9px;white-space:nowrap}
+.workflow-pipeline-badge b{font-weight:750}
+.workflow-col-value{color:#1a8a4c;font-weight:750;margin-right:2px}
 .workflow-card{position:relative;font-size:12px;gap:6px}
 .workflow-card-flag{position:absolute;top:10px;right:10px;background:#e2453c;color:#fff;border-radius:4px;width:16px;height:16px;display:grid;place-items:center}
 .workflow-card-tag{align-self:flex-start;background:var(--violet-soft);color:var(--violet-dark);font-size:10px;font-weight:650;padding:3px 8px;border-radius:6px}
@@ -407,6 +407,9 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .workflow-avatar:first-child{margin-left:0}
 .workflow-avatar.placeholder{background:#f1eff7;color:var(--muted-2);border-style:dashed}
 .workflow-due-pill{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:10.5px;white-space:nowrap}
-.workflow-card-footer{display:flex;align-items:center;gap:4px;color:var(--muted-2);font-size:10.5px;border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+.workflow-due-pill.danger{color:#c0392b;font-weight:700}
+.workflow-card-footer{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--muted-2);font-size:10.5px;border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+.workflow-card-footer-text{display:flex;align-items:center;gap:4px}
+.workflow-progress-ring{display:flex;align-items:center;gap:4px;font-weight:700;color:var(--muted-2);flex:none}
 @media(max-width:1180px){.workflow-kanban-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.workflow-toolbar{flex-direction:column;align-items:stretch}.workflow-kanban-board{grid-template-columns:1fr}}
