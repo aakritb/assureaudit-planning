@@ -468,8 +468,7 @@ function myWorkBadgeCount(state:DemoState):number{
 }
 function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
   const [tasks,setTasks]=useState<WorkTask[]>(WORK_TASKS);
-  const [scope,setScope]=useState<"My tasks"|"All">("My tasks");
-  const [quickFilter,setQuickFilter]=useState<"All"|"Due soon"|"Blocked"|"Urgent">("All");
+  const [scope,setScope]=useState<"All"|"My tasks">("My tasks");
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
   const [displayOpen,setDisplayOpen]=useState(false);
@@ -483,8 +482,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
 
   const inHierarchy=(t:WorkTask)=>!allowedSlugs||!t.clientSlug||allowedSlugs.includes(t.clientSlug);
   const inScope=(t:WorkTask)=>scope==="All"||t.assignee===myName;
-  const passesQuick=(t:WorkTask)=>quickFilter==="Urgent"?t.priority==="Urgent":quickFilter==="Blocked"?t.status==="Blocked":quickFilter==="Due soon"?["Today","Aug 13","Aug 14","Aug 15","Aug 16"].includes(t.due):true;
-  const visible=tasks.filter(t=>inHierarchy(t)&&inScope(t)&&passesQuick(t));
+  const visible=tasks.filter(t=>inHierarchy(t)&&inScope(t));
   const myTasksTotal=tasks.filter(t=>inHierarchy(t)&&t.assignee===myName).length;
   const urgentCount=tasks.filter(t=>inHierarchy(t)&&t.assignee===myName&&t.priority==="Urgent").length;
   const blockedCount=tasks.filter(t=>inHierarchy(t)&&t.assignee===myName&&t.status==="Blocked").length;
@@ -496,6 +494,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
   });
 
   const updateTask=(id:number,patch:Partial<WorkTask>)=>setTasks(ts=>ts.map(t=>t.id===id?{...t,...patch}:t));
+  const toggleDone=(task:WorkTask)=>{const done=task.status==="Done";updateTask(task.id,{status:done?"Todo":"Done"});update({},`"${task.title}" ${done?"reopened":"marked done"}`)};
   const createTask=(t:Omit<WorkTask,"id"|"status">)=>{
     const id=Math.max(0,...tasks.map(x=>x.id))+1;
     setTasks(ts=>[{...t,id,status:"Todo"},...ts]);
@@ -506,7 +505,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
   return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Synced from AssurePro</p><h1>My work</h1><p>Tasks flow from AssurePro's Workflow module and stay in sync — edits here update AssurePro too.</p></div><div className="my-work-summary"><span><strong>{urgentCount}</strong> urgent</span><span><strong>{blockedCount}</strong> blocked</span></div></div>
     {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{next.clientSlug?CLIENTS.find(c=>c.slug===next.clientSlug)?.name:"Firm task"} · {next.stage} · Due {next.due.toLowerCase()}</p></div><span className={`status-pill ${taskStatusTone(next.status)}`}>{next.status}</span><button className="primary-btn" onClick={()=>next.clientSlug&&next.route?navigate(`/engagement/${next.clientSlug}/${next.route}`):setSelectedId(next.id)}>Open task <ArrowRight/></button></section>}
     <div className="my-work-toolbar">
-      <div className="my-work-filters">{(["My tasks","All"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}<i style={{width:1,height:16,background:"var(--line)",margin:"0 4px"}}/>{(["All","Due soon","Blocked","Urgent"] as const).map(f=><button key={f} className={quickFilter===f?"active":""} onClick={()=>setQuickFilter(f)}>{f}</button>)}</div>
+      <div className="my-work-filters">{(["All","My tasks"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}</div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <div className="topbar-popover"><button className="secondary-btn" onClick={()=>setDisplayOpen(!displayOpen)}><Filter size={14}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Grouped by client</strong><span>Matches AssurePro's Workflow &gt; Tasks view</span></div><label className="dropdown-check"><input type="checkbox" checked disabled/><span>Group by client</span></label></div>}</div>
         <button className="primary-btn" onClick={()=>setCreateOpen(true)}><Plus size={15}/>New task</button>
@@ -520,9 +519,9 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
       return <section className="workpaper-stage" key={slug||"__firm"}><button className="stage-toggle" onClick={()=>setCollapsed(c=>({...c,[slug]:isOpen}))}><span><strong>{clientName}</strong><small>{rows.length} task{rows.length===1?"":"s"}</small></span><span className="stage-progress">{isOpen?<ChevronDown/>:<ChevronRight/>}</span></button>
         {isOpen&&<div className="stage-rows">{rows.map(task=><Fragment key={task.id}>
           <button className="work-queue-row" onClick={()=>setSelectedId(selectedId===task.id?null:task.id)}>
-            <span className={`queue-signal ${taskPriorityTone(task.priority)}`}>{task.priority==="Urgent"?<AlertCircle/>:task.type==="Review"?<ClipboardCheck/>:<Clock3/>}</span>
-            <span className="queue-title"><strong>{task.title}</strong><small>{task.type} · {task.stage}</small></span>
-            <span className="queue-progress"><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span></span>
+            <span className={`task-check ${task.status==="Done"?"done":""}`} onClick={e=>{e.stopPropagation();toggleDone(task)}}>{task.status==="Done"?<CheckCircle2/>:<Circle/>}</span>
+            <span className="queue-title"><strong className={task.status==="Done"?"done-strike":""}>{task.title}</strong><small>{task.type} · {task.stage}</small></span>
+            <span className="queue-progress"><span className={`priority-chip ${taskPriorityTone(task.priority)}`}><BarChart3 size={12}/>{task.priority}</span></span>
             <i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>
             <span className="queue-due"><small>Due</small><strong>{task.due}</strong></span>
             <ChevronRight/>
@@ -738,21 +737,23 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
               <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
             </button>)}
           </section>)}
-          {folders.map(name=>!grouped[name]&&<section className="doc-group" key={name}><button className="doc-group-head" disabled><strong>{name}</strong><b className="count">0</b></button></section>)}
+          {folders.map(name=>!grouped[name]&&<section className="doc-group" key={name}><button className="doc-group-head" onClick={()=>toggleGroup(name)}><ChevronDown className={collapsedGroups[name]?"collapsed":""}/><strong>{name}</strong><b className="count">0</b></button>{!collapsedGroups[name]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document below and use "Move" to file it here.</p>}</section>)}
           {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the filters or search to see the full client library.</p></div>}
         </div>
       </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list">{requests.map(r=><button key={r.id} onClick={()=>update({},`${r.title} — ${r.status}`)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div><span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
     </section>
-    {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)}/>}
+    {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/>}
     {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name} onCreate={addRequest}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
   </>;
 }
 
-function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[]}){
+function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,categories}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[];categories:string[]}){
   const [tab,setTab]=useState<"Request Info"|"Client Docs"|"Comments"|"Activity">("Request Info");
   const [statusMenuOpen,setStatusMenuOpen]=useState(false);
   const [assignOpen,setAssignOpen]=useState(false);
+  const [categoryOpen,setCategoryOpen]=useState(false);
+  const moveToCategory=(cat:string)=>{onUpdate({category:cat});setCategoryOpen(false);update({},`${doc.name} moved to "${cat}"`)};
   const [commentDraft,setCommentDraft]=useState("");
   const setStatus=(tone:string,due:string)=>{onUpdate({tone,due});setStatusMenuOpen(false);update({},`${doc.name} marked ${due}`)};
   const addComment=()=>{if(!commentDraft.trim())return;onUpdate({comments:[...doc.comments,{author:"Oscar Owner",text:commentDraft.trim()}]});setCommentDraft("")};
@@ -775,6 +776,7 @@ function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs}:{do
         <p className="panel-description">{doc.description}</p>
         <div className="panel-meta-row"><div><small>Created by</small><strong>{doc.type}</strong></div><div><small>Due Date</small><strong>{doc.due}</strong></div></div>
         <div className="panel-assign-row"><div><small>Assignments</small><strong>{doc.assignee||"Unassigned"}</strong></div><div className="topbar-popover"><button className="text-link" onClick={()=>setAssignOpen(v=>!v)}>Assign</button>{assignOpen&&<div className="dropdown-menu">{["Jasmine Alvarez","Meera Kapoor","Oscar Owner","Leo Chen"].map(name=><button key={name} className="dropdown-item" onClick={()=>assignTo(name)}>{name}</button>)}</div>}</div></div>
+        <div className="panel-assign-row"><div><small>Category</small><strong>{doc.category}</strong></div><div className="topbar-popover"><button className="text-link" onClick={()=>setCategoryOpen(v=>!v)}>Move</button>{categoryOpen&&<div className="dropdown-menu">{categories.filter(c=>c!==doc.category).map(cat=><button key={cat} className="dropdown-item" onClick={()=>moveToCategory(cat)}>{cat}</button>)}{categories.length<=1&&<div className="dropdown-empty">Create another category first.</div>}</div>}</div></div>
         <p className="drawer-label">My Documents</p>
         {doc.attachments>0?<div className="drawer-file"><FileText/><div><strong>{doc.name}</strong><span>{doc.attachments} file{doc.attachments===1?"":"s"} attached · {doc.date}</span></div></div>:<div className="panel-upload-empty"><p>No documents uploaded yet.</p><button className="secondary-btn" onClick={uploadDoc}><UploadCloud size={15}/>Upload Document</button></div>}
       </>}
