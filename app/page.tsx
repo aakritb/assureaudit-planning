@@ -468,6 +468,7 @@ function myWorkBadgeCount(state:DemoState):number{
 }
 function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
   const [tasks,setTasks]=useState<WorkTask[]>(WORK_TASKS);
+  const [view,setView]=useState<"Board"|"List"|"Tasks">("Tasks");
   const [scope,setScope]=useState<"All"|"My tasks">("My tasks");
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
@@ -504,6 +505,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
 
   return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Synced from AssurePro</p><h1>My work</h1><p>Tasks flow from AssurePro's Workflow module and stay in sync — edits here update AssurePro too.</p></div><div className="my-work-summary"><span><strong>{urgentCount}</strong> urgent</span><span><strong>{blockedCount}</strong> blocked</span></div></div>
     {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{next.clientSlug?CLIENTS.find(c=>c.slug===next.clientSlug)?.name:"Firm task"} · {next.stage} · Due {next.due.toLowerCase()}</p></div><span className={`status-pill ${taskStatusTone(next.status)}`}>{next.status}</span><button className="primary-btn" onClick={()=>next.clientSlug&&next.route?navigate(`/engagement/${next.clientSlug}/${next.route}`):setSelectedId(next.id)}>Open task <ArrowRight/></button></section>}
+    <div className="subtabs">{(["Board","List","Tasks"] as const).map(v=><button key={v} className={view===v?"active":""} onClick={()=>setView(v)}>{v}</button>)}</div>
     <div className="my-work-toolbar">
       <div className="my-work-filters">{(["All","My tasks"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}</div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -511,8 +513,8 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
         <button className="primary-btn" onClick={()=>setCreateOpen(true)}><Plus size={15}/>New task</button>
       </div>
     </div>
-    {groups.length===0&&<div className="work-empty"><CheckCircle2/><h3>No work in this view</h3><p>Choose another filter to see assigned tasks.</p></div>}
-    {groups.map(slug=>{
+    {visible.length===0&&<div className="work-empty"><CheckCircle2/><h3>No work in this view</h3><p>Choose another filter to see assigned tasks.</p></div>}
+    {view==="Tasks"&&groups.map(slug=>{
       const rows=visible.filter(t=>t.clientSlug===slug);
       const clientName=slug?CLIENTS.find(c=>c.slug===slug)?.name||slug:"Firm tasks (no client)";
       const isOpen=!collapsed[slug];
@@ -530,13 +532,26 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
         </Fragment>)}</div>}
       </section>;
     })}
+    {view==="Board"&&<div className="kanban-board">{TASK_STATUSES.map(status=>{
+      const rows=visible.filter(t=>t.status===status);
+      return <div className="kanban-column" key={status}><div className="kanban-column-head"><span><i className={`tone-dot ${taskStatusTone(status)}`}/>{status}</span><b>{rows.length}</b></div>
+        {rows.map(task=><button className="kanban-card" key={task.id} onClick={()=>setSelectedId(task.id)}>
+          <span className="kanban-card-title">{task.title}</span>
+          <span className="kanban-card-meta"><span>{task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug)?.name.split(" ")[0]:"Firm"}</span><i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i></span>
+          <span className="kanban-card-meta"><span className={`priority-chip ${taskPriorityTone(task.priority)}`}><BarChart3 size={11}/>{task.priority}</span><span>{task.due}</span></span>
+        </button>)}
+        {rows.length===0&&<p className="panel-empty-text">No tasks</p>}
+      </div>;
+    })}</div>}
+    {view==="List"&&<div className="table-card"><div className="portfolio-table-head"><span>Task</span><span>Client</span><span>Priority</span><span>Status</span><span>Due</span><span/></div>{visible.map(task=><button className="portfolio-row" key={task.id} onClick={()=>setSelectedId(task.id)}><span className="portfolio-client"><i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i><span><strong className={task.status==="Done"?"done-strike":""}>{task.title}</strong><small>{task.type} · {task.stage}</small></span></span><span>{task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug)?.name:"Firm task"}</span><span><span className={`priority-chip ${taskPriorityTone(task.priority)}`}><BarChart3 size={11}/>{task.priority}</span></span><span><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span></span><span>{task.due}</span><ChevronRight/></button>)}</div>}
+    {selectedId&&view!=="Tasks"&&(()=>{const task=tasks.find(t=>t.id===selectedId);return task?<TaskDetailInline task={task} canReassign={canReassign} teamOptions={teamOptions} onUpdate={patch=>updateTask(task.id,patch)} navigate={navigate} update={update} close={()=>setSelectedId(null)}/>:null})()}
     {createOpen&&<CreateTaskModal close={()=>setCreateOpen(false)} onCreate={createTask} restrictAssigneeToSelf={!canReassign} defaultAssignee={myName||"Oscar Owner"} teamOptions={teamOptions}/>}
   </div>;
 }
-function TaskDetailInline({task,canReassign,teamOptions,onUpdate,navigate,update}:{task:WorkTask;canReassign:boolean;teamOptions:string[];onUpdate:(p:Partial<WorkTask>)=>void;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
+function TaskDetailInline({task,canReassign,teamOptions,onUpdate,navigate,update,close}:{task:WorkTask;canReassign:boolean;teamOptions:string[];onUpdate:(p:Partial<WorkTask>)=>void;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void;close?:()=>void}){
   const [description,setDescription]=useState(task.description);
   const client=task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug):null;
-  return <div className="task-detail-inline">
+  const fields=<>
     <div className="field-block"><span>Engagement</span>{client?<button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>{client.name} <ArrowRight size={13}/></button>:<strong>Standalone (no engagement)</strong>}</div>
     <div className="field-block"><span>Assignee</span>{canReassign?<select value={task.assignee} onChange={e=>onUpdate({assignee:e.target.value})}>{teamOptions.map(n=><option key={n}>{n}</option>)}</select>:<strong>{task.assignee} <LockKeyhole size={11}/></strong>}</div>
     <div className="field-block"><span>Priority</span><select value={task.priority} onChange={e=>onUpdate({priority:e.target.value as WorkTask["priority"]})}>{TASK_PRIORITIES.map(p=><option key={p}>{p}</option>)}</select></div>
@@ -548,7 +563,12 @@ function TaskDetailInline({task,canReassign,teamOptions,onUpdate,navigate,update
     {task.route&&client&&<div className="field-block"><span>Workpaper</span><button className="text-link" onClick={()=>navigate(`/engagement/${client.slug}/${task.route}`)}>Open in Planning <ArrowRight size={13}/></button></div>}
     <textarea value={description} onChange={e=>setDescription(e.target.value)} onBlur={()=>onUpdate({description})} placeholder="Add a description…"/>
     {!canReassign&&<p className="restriction-note"><LockKeyhole size={12}/>Preparers can update status and notes, but reassigning tasks requires a Manager or Partner.</p>}
-  </div>;
+  </>;
+  if(close)return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span><h2>{task.title}</h2></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="task-detail-inline" style={{margin:0}}>{fields}</div>
+  </div></div>;
+  return <div className="task-detail-inline">{fields}</div>;
 }
 function CreateTaskModal({close,onCreate,restrictAssigneeToSelf,defaultAssignee,teamOptions}:{close:()=>void;onCreate:(t:Omit<WorkTask,"id"|"status">)=>void;restrictAssigneeToSelf:boolean;defaultAssignee:string;teamOptions:string[]}){
   const [title,setTitle]=useState("");
