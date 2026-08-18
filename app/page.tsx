@@ -516,7 +516,7 @@ function WorkflowProgressRing({done,total}:{done:number;total:number}){
     <b>{done}/{total}</b>
   </span>;
 }
-function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
+function WorkflowEngagements({view,navigate,update}:{view:"Board"|"List";navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
   const [cards,setCards]=useState<WorkflowCard[]>(seedWorkflowCards);
   const [dragId,setDragId]=useState<string|null>(null);
   const [collapsedCols,setCollapsedCols]=useState<Record<string,boolean>>({});
@@ -563,7 +563,7 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
         </div>}
       </div>
     </div>
-    <div className="kanban-board workflow-kanban-board">
+    {view==="Board"?<div className="kanban-board workflow-kanban-board">
       {WORKFLOW_STAGES.map(stage=>{
         const rows=visible.filter(c=>c.stage===stage);
         const isCollapsed=collapsedCols[stage];
@@ -588,7 +588,19 @@ function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Pa
           </>}
         </div>;
       })}
-    </div>
+    </div>:<div className="table-card">
+      <div className="workflow-list-head"><span>Engagement</span><span>Stage</span>{showAvatars&&<span>Team</span>}<span>Value</span><span>Progress</span><span>Due</span><span/></div>
+      {[...visible].sort((a,b)=>WORKFLOW_STAGES.indexOf(a.stage)-WORKFLOW_STAGES.indexOf(b.stage)).map(card=><button key={card.id} className="workflow-list-row" onClick={()=>card.clientSlug&&navigate(`/clients/${card.clientSlug}`)}>
+        <span className="portfolio-client">{card.flagged&&<AlertTriangle size={13} className="workflow-list-flag"/>}<span><strong>{card.name}</strong><small>{card.type}{showCategory&&card.category?` · ${card.category}`:""}</small></span></span>
+        <span className="workflow-list-stage"><i className={`tone-dot ${WORKFLOW_STAGE_TONE[card.stage]}`}/>{card.stage}</span>
+        {showAvatars&&<span className="workflow-avatar-row">{card.team.map((m,i)=><i key={i} className={`workflow-avatar ${m.named?"":"placeholder"}`}>{m.initials}</i>)}</span>}
+        <span>{money(card.value)}</span>
+        <span><WorkflowProgressRing done={card.checklistDone} total={card.checklistTotal}/></span>
+        <span className={card.overdue?"workflow-due-pill danger":""}>{card.due}</span>
+        <ChevronRight/>
+      </button>)}
+      {visible.length===0&&<div className="clients-empty"><Search/><h3>No engagements match</h3><p>Clear filters or search to see the full pipeline.</p></div>}
+    </div>}
   </>;
 }
 function myWorkBadgeCount(state:DemoState):number{
@@ -638,7 +650,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
   return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Synced from AssurePro</p><h1>My work</h1><p>Tasks flow from AssurePro's Workflow module and stay in sync — edits here update AssurePro too.</p></div>{view!=="Board"&&<div className="my-work-summary"><span><strong>{urgentCount}</strong> urgent</span><span><strong>{blockedCount}</strong> blocked</span></div>}</div>
     {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{next.clientSlug?CLIENTS.find(c=>c.slug===next.clientSlug)?.name:"Firm task"} · {next.stage} · Due {next.due.toLowerCase()}</p></div><span className={`status-pill ${taskStatusTone(next.status)}`}>{next.status}</span><button className="primary-btn" onClick={()=>next.clientSlug&&next.route?navigate(`/engagement/${next.clientSlug}/${next.route}`):setSelectedId(next.id)}>Open task <ArrowRight/></button></section>}
     <div className="subtabs">{(["Board","List","Tasks"] as const).map(v=><button key={v} className={view===v?"active":""} onClick={()=>setView(v)}>{v}</button>)}</div>
-    {view==="Board"?<WorkflowBoard navigate={navigate} update={update}/>:<>
+    {(view==="Board"||view==="List")?<WorkflowEngagements view={view} navigate={navigate} update={update}/>:<>
     <div className="my-work-toolbar">
       <div className="my-work-filters">{(["All","My tasks"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}</div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -647,7 +659,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
       </div>
     </div>
     {visible.length===0&&<div className="work-empty"><CheckCircle2/><h3>No work in this view</h3><p>Choose another filter to see assigned tasks.</p></div>}
-    {view==="Tasks"&&groups.map(slug=>{
+    {groups.map(slug=>{
       const rows=visible.filter(t=>t.clientSlug===slug);
       const clientName=slug?CLIENTS.find(c=>c.slug===slug)?.name||slug:"Firm tasks (no client)";
       const isOpen=!collapsed[slug];
@@ -665,8 +677,6 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
         </Fragment>)}</div>}
       </section>;
     })}
-    {view==="List"&&<div className="table-card"><div className="portfolio-table-head"><span>Task</span><span>Client</span><span>Priority</span><span>Status</span><span>Due</span><span/></div>{visible.map(task=><button className="portfolio-row" key={task.id} onClick={()=>setSelectedId(task.id)}><span className="portfolio-client"><i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i><span><strong className={task.status==="Done"?"done-strike":""}>{task.title}</strong><small>{task.type} · {task.stage}</small></span></span><span>{task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug)?.name:"Firm task"}</span><span><span className={`priority-chip ${taskPriorityTone(task.priority)}`}><BarChart3 size={11}/>{task.priority}</span></span><span><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span></span><span>{task.due}</span><ChevronRight/></button>)}</div>}
-    {selectedId&&view!=="Tasks"&&(()=>{const task=tasks.find(t=>t.id===selectedId);return task?<TaskDetailInline task={task} canReassign={canReassign} teamOptions={teamOptions} onUpdate={patch=>updateTask(task.id,patch)} navigate={navigate} update={update} close={()=>setSelectedId(null)}/>:null})()}
     {createOpen&&<CreateTaskModal close={()=>setCreateOpen(false)} onCreate={createTask} restrictAssigneeToSelf={!canReassign} defaultAssignee={myName||"Oscar Owner"} teamOptions={teamOptions}/>}
     </>}
   </div>;
@@ -725,16 +735,22 @@ function CreateTaskModal({close,onCreate,restrictAssigneeToSelf,defaultAssignee,
 }
 
 function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
-  const pipeline=[{name:"Data ingest",value:2,color:"#6B46FF"},{name:"Workpapers",value:1,color:"#8164FF"},{name:"Review",value:1,color:"#A38FFF"},{name:"Complete",value:1,color:"#C1B3FF"},{name:"Setup",value:1,color:"#E0D9FF"}];
+  const stageCount=(s:WorkflowStage)=>CLIENTS.filter(c=>clientToWorkflowStage(c.stage)===s).length;
+  const pipeline=[
+    {name:"Intake",value:stageCount("Intake"),color:"#E0D9FF"},
+    {name:"Ingest",value:stageCount("Ingest"),color:"#6B46FF"},
+    {name:"Review",value:stageCount("Review"),color:"#A38FFF"},
+    {name:"Delivered",value:stageCount("Delivered"),color:"#C1B3FF"},
+  ].filter(s=>s.value>0);
   const due=[{name:"Overdue",value:2},{name:"0–7 days",value:5},{name:"8–14 days",value:3},{name:"15+ days",value:1}];
   return <div className="page firm-dashboard">
     <div className="page-heading"><div><p className="eyebrow">Firm overview · {state.fiscalYear}</p><h1>Audit portfolio</h1><p>Every client, deadline and engagement stage in one view.</p></div><button className="primary-btn" onClick={()=>navigate("/clients")}><Users/>View clients</button></div>
     <section className="portfolio-kpis"><article><span>Active engagements</span><strong>6</strong><small>Across 6 clients</small></article><article><span>Need attention</span><strong>4</strong><small>2 due today</small></article><article><span>In data ingest</span><strong>2</strong><small>10 source files received</small></article><article><span>Awaiting review</span><strong>1</strong><small>Partner review due Aug 14</small></article></section>
     <div className="portfolio-grid">
-      <section className="portfolio-card pipeline-card"><div className="section-title"><div><h2>Engagement pipeline</h2><p>Current stage across active engagements.</p></div><button className="text-link" onClick={()=>navigate("/clients")}>All clients <ArrowRight/></button></div><div className="pipeline-body"><div className="portfolio-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pipeline} dataKey="value" innerRadius={64} outerRadius={91} paddingAngle={2} isAnimationActive={false}>{pipeline.map(x=><Cell key={x.name} fill={x.color}/>)}</Pie><Tooltip position={{x:16,y:-36}} formatter={(v:any,name:any)=>[`${v} engagement${v===1?"":"s"}`,name]}/></PieChart></ResponsiveContainer><span><strong>6</strong><small>engagements</small></span></div><div className="pipeline-legend">{pipeline.map(x=><div key={x.name}><i style={{background:x.color}}/><span>{x.name}</span><strong>{x.value}</strong></div>)}</div></div></section>
+      <section className="portfolio-card pipeline-card"><div className="section-title"><div><h2>Engagement pipeline</h2><p>Current stage across active engagements.</p></div><button className="text-link" onClick={()=>navigate("/clients")}>All clients <ArrowRight/></button></div><div className="pipeline-body"><div className="portfolio-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pipeline} dataKey="value" innerRadius={64} outerRadius={91} paddingAngle={2} isAnimationActive={false}>{pipeline.map(x=><Cell key={x.name} fill={x.color}/>)}</Pie><Tooltip position={{x:16,y:-36}} formatter={(v:any,name:any)=>[`${v} engagement${v===1?"":"s"}`,name]}/></PieChart></ResponsiveContainer><span><strong>{CLIENTS.length}</strong><small>engagements</small></span></div><div className="pipeline-legend">{pipeline.map(x=><div key={x.name}><i style={{background:x.color}}/><span>{x.name}</span><strong>{x.value}</strong></div>)}</div></div></section>
       <section className="portfolio-card due-card"><div className="section-title"><div><h2>Work by due date</h2><p>Open actions across the firm.</p></div><InfoTip title="Work by due date" text="Counts assigned audit actions, review notes and data requests by their next due date." standard="Firm workflow"/></div><div className="firm-due-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={due} layout="vertical" margin={{left:8,right:22}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="name" width={78} tickLine={false} axisLine={false}/><Tooltip/><Bar dataKey="value" radius={[0,7,7,0]}>{due.map((_,i)=><Cell key={i} fill={["#6B46FF","#8164FF","#A38FFF","#D2C7FF"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div></section>
     </div>
-    <section className="portfolio-card client-portfolio-card"><div className="section-title"><div><h2>Client portfolio</h2><p>Open a client to see its overview, documents and engagement workflow.</p></div><button className="secondary-btn" onClick={()=>navigate("/clients")}>View all <ArrowRight/></button></div><div className="portfolio-table-head"><span>Client</span><span>Current stage</span><span>Team</span><span>Owner</span><span>Next due</span><span/></div>{CLIENTS.slice(0,5).map(c=><button className="portfolio-row" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span><span><em className={`stage-badge ${c.stage==="Complete"?"complete":c.stage==="Setup required"?"setup":""}`}>{c.stage}</em></span>{clientCell(c,"team")}<span>{c.owner}</span><span className={c.due==="Aug 14"||c.due==="Aug 16"?"due-soon":""}>{c.due}</span><ChevronRight/></button>)}</section>
+    <section className="portfolio-card client-portfolio-card"><div className="section-title"><div><h2>Client portfolio</h2><p>Open a client to see its overview, documents and engagement workflow.</p></div><button className="secondary-btn" onClick={()=>navigate("/clients")}>View all <ArrowRight/></button></div><div className="portfolio-table-head"><span>Client</span><span>Current stage</span><span>Team</span><span>Owner</span><span>Next due</span><span/></div>{CLIENTS.slice(0,5).map(c=><button className="portfolio-row" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span><span><em className={`status-pill ${WORKFLOW_STAGE_TONE[clientToWorkflowStage(c.stage)]}`}>{clientToWorkflowStage(c.stage)}</em></span>{clientCell(c,"team")}<span>{c.owner}</span><span className={c.due==="Aug 14"||c.due==="Aug 16"?"due-soon":""}>{c.due}</span><ChevronRight/></button>)}</section>
   </div>;
 }
 
@@ -750,7 +766,7 @@ const CLIENT_COLUMNS=[
 ];
 const CLIENT_COLUMNS_DEFAULT=["stage","progress","owner","due"];
 function clientCell(c:ClientRecord,key:string){
-  if(key==="stage")return <span key={key}><em className={`stage-badge ${c.stage==="Complete"?"complete":c.stage==="Setup required"?"setup":""}`}>{c.stage}</em></span>;
+  if(key==="stage")return <span key={key}><em className={`status-pill ${WORKFLOW_STAGE_TONE[clientToWorkflowStage(c.stage)]}`}>{clientToWorkflowStage(c.stage)}</em></span>;
   if(key==="progress")return <span className="row-progress" key={key}><i><b style={{width:`${c.progress}%`}}/></i><strong>{c.progress}%</strong></span>;
   if(key==="owner")return <span key={key}>{c.owner}</span>;
   if(key==="due")return <span key={key} className={c.due==="Aug 14"||c.due==="Aug 16"?"due-soon":""}>{c.due}</span>;
@@ -773,7 +789,7 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
   const rows=CLIENTS.filter(c=>(industry==="All industries"||c.industry===industry)&&`${c.name} ${c.auditType} ${c.subIndustry}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="page clients-page"><div className="page-heading"><div><p className="eyebrow">Firm portfolio</p><h1>Clients</h1><p>Select a client to open its audit overview, documents and engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
     <section className="clients-toolbar"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search client, industry or audit type"/></div><select value={industry} onChange={e=>setIndustry(e.target.value)}><option>All industries</option>{Object.keys(INDUSTRY_OPTIONS).map(x=><option key={x}>{x}</option>)}</select><span>{rows.length} clients</span>{view==="list"&&<div className="topbar-popover" ref={displayRef}><button className={`filter-btn ${displayOpen?"active":""}`} onClick={()=>setDisplayOpen(!displayOpen)}><SlidersHorizontal size={15}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Display properties</strong><span>Choose which columns to show</span></div>{CLIENT_COLUMNS.map(col=><label className="dropdown-check" key={col.key}><input type="checkbox" checked={visibleCols.includes(col.key)} onChange={()=>toggleCol(col.key)}/><span>{col.label}</span></label>)}<button className="dropdown-item" onClick={()=>setVisibleCols(CLIENT_COLUMNS_DEFAULT)}><RotateCcw size={14}/><span>Reset to default</span></button></div>}</div>}<div className="view-toggle" role="group" aria-label="Change view"><button aria-label="List view" className={view==="list"?"active":""} onClick={()=>setView("list")}><ListChecks size={15}/></button><button aria-label="Card view" className={view==="card"?"active":""} onClick={()=>setView("card")}><LayoutDashboard size={15}/></button></div></section>
-    {view==="list"?<div className="table-card"><div className="portfolio-table-head" style={{gridTemplateColumns:gridTemplate}}><span>Client</span>{cols.map(col=><span key={col.key}>{col.label}</span>)}<span/></div>{rows.map(c=><button className="portfolio-row" key={c.slug} style={{gridTemplateColumns:gridTemplate}} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span>{cols.map(col=>clientCell(c,col.key))}<ChevronRight/></button>)}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</div>:<section className="clients-grid">{rows.map(c=>{const team=CLIENT_TEAMS[c.slug];const people=[...team.firm,...team.client];return <button className="client-card" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><div className="client-card-head"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.industry} · {c.subIndustry}</small></span><ChevronRight/></div><div className="client-card-engagement"><span>{c.auditType}</span><strong>{state.fiscalYear}</strong><small>Period ended {c.period}</small></div><div className="client-card-progress"><div><span>{c.stage}</span><strong>{c.progress}%</strong></div><i><b style={{width:`${c.progress}%`}}/></i></div><div className="client-card-team"><span className="mini-avatar-stack">{people.slice(0,4).map(p=><i key={`${c.slug}-${p.initials}`}>{p.initials}</i>)}</span><span><strong>{people.length} team members</strong><small>{team.firm.length} firm · {team.client.length} client</small></span></div><div className="client-card-foot"><span><FileText/>{c.documents} documents</span><span className={c.openItems?"attention":""}>{c.openItems?`${c.openItems} need attention`:"Up to date"}</span></div></button>})}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</section>}
+    {view==="list"?<div className="table-card"><div className="portfolio-table-head" style={{gridTemplateColumns:gridTemplate}}><span>Client</span>{cols.map(col=><span key={col.key}>{col.label}</span>)}<span/></div>{rows.map(c=><button className="portfolio-row" key={c.slug} style={{gridTemplateColumns:gridTemplate}} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span>{cols.map(col=>clientCell(c,col.key))}<ChevronRight/></button>)}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</div>:<section className="clients-grid">{rows.map(c=>{const team=CLIENT_TEAMS[c.slug];const people=[...team.firm,...team.client];return <button className="client-card" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><div className="client-card-head"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.industry} · {c.subIndustry}</small></span><ChevronRight/></div><div className="client-card-engagement"><span>{c.auditType}</span><strong>{state.fiscalYear}</strong><small>Period ended {c.period}</small></div><div className="client-card-progress"><div><span>{clientToWorkflowStage(c.stage)}</span><strong>{c.progress}%</strong></div><i><b style={{width:`${c.progress}%`}}/></i></div><div className="client-card-team"><span className="mini-avatar-stack">{people.slice(0,4).map(p=><i key={`${c.slug}-${p.initials}`}>{p.initials}</i>)}</span><span><strong>{people.length} team members</strong><small>{team.firm.length} firm · {team.client.length} client</small></span></div><div className="client-card-foot"><span><FileText/>{c.documents} documents</span><span className={c.openItems?"attention":""}>{c.openItems?`${c.openItems} need attention`:"Up to date"}</span></div></button>})}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</section>}
     {newOpen && <NewEngagementWizard onClose={() => setNewOpen(false)} update={update}/>}
   </div>;
 }
