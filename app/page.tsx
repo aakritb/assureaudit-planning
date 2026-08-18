@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell,
   BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2,
@@ -320,7 +320,7 @@ export default function Home() {
           <FieldworkShell path={path} navigate={navigate} state={state} update={update}/>
         ) : planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} /> : path === "/documents" ? <DocumentsCenter navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <DocumentsCenter initialSlug={clientSlug} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} /> : path === "/documents" ? <DocumentsCenter navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <DocumentsCenter initialSlug={clientSlug} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>} 
       {toast && <div className="toast sync-toast" role="status"><span className="toast-success"><Check/></span><div><strong>{/AssurePro|QuickBooks|sync|connector|connection/i.test(toast)?"Connected platform updated":"Action completed"}</strong><span>{toast}</span></div><button aria-label="Dismiss notification" onClick={()=>setToast("")}><X/></button></div>}
@@ -344,7 +344,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/clients" || path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/clients")}><Users/><span>Clients</span></button>
       <button className={`nav-item ${path === "/documents" ? "active" : ""}`} onClick={() => navigate("/documents")}><FolderOpen/><span>Documents</span></button>
-      <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{attentionItems(state).length}</span></button>
+      <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{myWorkBadgeCount(state)}</span></button>
       {!clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav workspace-preview"><button className="select-client-nav" onClick={()=>navigate("/clients")}><Search/><span>Select a client</span><ChevronRight/></button><button disabled><HomeIcon/><span>Overview</span><LockKeyhole className="branch-lock"/></button><button disabled><Database/><span>Data ingest</span><LockKeyhole className="branch-lock"/></button><button disabled><ClipboardCheck/><span>Workpapers</span><LockKeyhole className="branch-lock"/></button><button disabled><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button disabled><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></div></>}
       {clientContext&&<><p className="nav-label branch-label">Client workspace</p><button className="sidebar-client-chip" onClick={()=>navigate(`/clients/${clientSlug}`)} title={`${client.name} — back to overview`}><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry}</small></span></button><div className="client-workspace-nav"><button className={path===`/clients/${clientSlug}`||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. Planning's own workpaper board and insight rail already link to every sub-view (setup, entity-controls, risks, responses, publish), so this is a single entry rather than a partial duplicate list. */}<button className={inPlanning?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i className={inPlanning?"progress":""}/><span>Planning</span><b>{planningProgressPct(state)}%</b></button><button className={inFieldwork?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/fieldwork`)}><i className={inFieldwork?"progress":state.fieldworkSynced?"approved":""}/><span>Fieldwork</span>{state.fieldworkSynced&&<b>Synced</b>}</button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><i/><span>Report</span><LockKeyhole className="branch-lock"/></button></div>}</>}</div></>}
       <p className="nav-label practice">Firm</p><button className="nav-item" onClick={()=>update({},"Firm audit log opened (simulated)")}><History/><span>Firm audit log</span></button><button className="nav-item" disabled title="Template Library — coming soon. A firm-wide library of pre-defined engagement letter and service templates, ready to preview and add to any engagement."><FileText/><span>Template Library</span><LockKeyhole className="branch-lock"/></button>
@@ -436,23 +436,150 @@ function Topbar({ path, state, update, navigate, onMenu, demoOpen, setDemoOpen }
   </header>;
 }
 
-function MyWork({ navigate, state }: { navigate:(p:string)=>void; state:DemoState }) {
-  const [filter,setFilter]=useState<"My priorities"|"Due soon"|"In review"|"All">("My priorities");
-  const tasks=[
-    {title:"Complete independence confirmations",area:"Commence · Independence",status:"Due today",tone:"danger",due:"Today",progress:85,route:"setup",priority:1,review:false},
-    {title:"Resolve audit-plan response gap",area:"Respond · Audit plan",status:"Needs attention",tone:"danger",due:"Aug 18",progress:58,route:"responses",priority:1,review:false},
-    {title:"Review risk assessment",area:"Identify & assess · Risk assessment",status:"In review",tone:"warning",due:"Aug 16",progress:78,route:"risks",priority:2,review:true},
-    {title:"Validate entity understanding",area:"Understand · Client response",status:"In progress",tone:"progress",due:"Aug 14",progress:70,route:"entity-controls",priority:2,review:false},
-    {title:"Review account mapping exceptions",area:"Data ingest · Trial balance",status:"4 exceptions",tone:"warning",due:"Aug 13",progress:96,route:"data",priority:2,review:false},
-    {title:"Approve planning communications",area:"Approve · Communications",status:"Not started",tone:"neutral",due:"Aug 20",progress:0,route:"publish",priority:3,review:true},
-  ];
-  const visible=tasks.filter(t=>filter==="All"||filter==="My priorities"&&t.priority<=2||filter==="Due soon"&&["Today","Aug 13","Aug 14"].includes(t.due)||filter==="In review"&&t.review);
-  const next=visible[0];
-  return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Personal workspace</p><h1>My work</h1><p>Only the work that needs your action, ordered by urgency.</p></div><div className="my-work-summary"><span><strong>{tasks.filter(t=>t.priority===1).length}</strong> urgent</span><span><strong>{tasks.filter(t=>t.review).length}</strong> to review</span></div></div>
-    {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{engagement.shortName} · {next.area} · Due {next.due.toLowerCase()}</p></div><div className="next-work-progress"><strong>{next.progress}%</strong><i><em style={{width:`${next.progress}%`}}/></i></div><button className="primary-btn" onClick={()=>navigate(`/engagement/bbawc/planning/${next.route}`)}>Open task <ArrowRight/></button></section>}
-    <div className="my-work-toolbar"><div className="my-work-filters">{(["My priorities","Due soon","In review","All"] as const).map(f=><button key={f} className={filter===f?"active":""} onClick={()=>setFilter(f)}>{f}{f==="My priorities"&&<span>{tasks.filter(t=>t.priority<=2).length}</span>}</button>)}</div><span>{visible.length} task{visible.length===1?"":"s"}</span></div>
-    <section className="work-queue">{visible.map(task=><button key={task.title} className="work-queue-row" onClick={()=>navigate(`/engagement/bbawc/planning/${task.route}`)}><span className={`queue-signal ${task.tone}`}>{task.tone==="danger"?<AlertCircle/>:task.review?<ClipboardCheck/>:<Clock3/>}</span><span className="queue-title"><strong>{task.title}</strong><small>{engagement.shortName} · {task.area}</small></span><span className="queue-progress"><small>Progress</small><i><em style={{width:`${task.progress}%`}}/></i><b>{task.progress}%</b></span><span className={`status-pill ${task.tone}`}>{task.status}</span><span className="queue-due"><small>Due</small><strong>{task.due}</strong></span><ChevronRight/></button>)}{visible.length===0&&<div className="work-empty"><CheckCircle2/><h3>No work in this view</h3><p>Choose another filter to see assigned tasks.</p></div>}</section>
+type WorkTask={id:number;title:string;clientSlug:string;type:"Collect"|"Prepare"|"Review"|"Approve"|"Admin";assignee:string;priority:"Urgent"|"High"|"Medium"|"Low";status:"Todo"|"In Progress"|"Blocked"|"Done";waitingOn:string;due:string;billable:boolean;description:string;stage:string;route?:string};
+const ROLE_ASSIGNEE:Record<string,string>={"Auditor / Preparer":"Jasmine Alvarez","Manager":"Meera Kapoor","Partner":"Oscar Owner"};
+function staffedClientSlugs(name:string):string[]{return CLIENTS.filter(c=>CLIENT_TEAMS[c.slug]?.firm.some(m=>m.name===name)).map(c=>c.slug)}
+const TASK_TYPES=["Collect","Prepare","Review","Approve","Admin"] as const;
+const TASK_PRIORITIES=["Urgent","High","Medium","Low"] as const;
+const TASK_STATUSES=["Todo","In Progress","Blocked","Done"] as const;
+function taskPriorityTone(p:string){return p==="Urgent"?"danger":p==="High"?"warning":p==="Medium"?"progress":"neutral"}
+function taskStatusTone(s:string){return s==="Done"?"approved":s==="Blocked"?"danger":s==="In Progress"?"progress":"neutral"}
+const WORK_TASKS:WorkTask[]=[
+  {id:1,title:"Complete independence confirmations",clientSlug:"bbawc",type:"Approve",assignee:"Jasmine Alvarez",priority:"Urgent",status:"In Progress",waitingOn:"Not blocked",due:"Today",billable:true,description:"2 team confirmations remain outstanding before Commence can close.",stage:"Commence",route:"planning/setup"},
+  {id:2,title:"Resolve audit-plan response gap",clientSlug:"bbawc",type:"Prepare",assignee:"Jasmine Alvarez",priority:"Urgent",status:"Blocked",waitingOn:"Risk assessment sign-off",due:"Aug 18",billable:true,description:"One significant risk has no responsive procedure yet.",stage:"Respond",route:"planning/responses"},
+  {id:3,title:"Review risk assessment",clientSlug:"bbawc",type:"Review",assignee:"Meera Kapoor",priority:"High",status:"In Progress",waitingOn:"Not blocked",due:"Aug 16",billable:true,description:"78% complete — confirm significant and fraud risk flags before sign-off.",stage:"Identify & assess",route:"planning/risks"},
+  {id:4,title:"Validate entity understanding",clientSlug:"bbawc",type:"Prepare",assignee:"Jasmine Alvarez",priority:"High",status:"In Progress",waitingOn:"Client response",due:"Aug 14",billable:true,description:"Client questionnaire response received; cross-check against policy handbook.",stage:"Understand",route:"planning/entity-controls"},
+  {id:5,title:"Review account mapping exceptions",clientSlug:"bbawc",type:"Review",assignee:"Jasmine Alvarez",priority:"High",status:"In Progress",waitingOn:"Not blocked",due:"Aug 13",billable:true,description:"4 accounts still need mapping review before reconciliation.",stage:"Data ingest",route:"ingest/map-accounts"},
+  {id:6,title:"Approve planning communications",clientSlug:"bbawc",type:"Approve",assignee:"Oscar Owner",priority:"Medium",status:"Todo",waitingOn:"Manager approval",due:"Aug 20",billable:false,description:"Final Partner sign-off once Manager review is complete.",stage:"Approve",route:"planning/publish"},
+  {id:7,title:"Prepare workpaper index for review",clientSlug:"harbor",type:"Prepare",assignee:"Ravi Patel",priority:"Medium",status:"In Progress",waitingOn:"Not blocked",due:"Aug 21",billable:true,description:"Assemble completed workpapers for Manager review.",stage:"Workpapers"},
+  {id:8,title:"Review workpapers for FY 2025",clientSlug:"harbor",type:"Review",assignee:"Meera Kapoor",priority:"Medium",status:"Todo",waitingOn:"Ravi Patel · workpaper index",due:"Aug 22",billable:true,description:"Second-level review of prepared workpapers.",stage:"Workpapers"},
+  {id:9,title:"Resolve 6 data-ingest validation exceptions",clientSlug:"greenfield",type:"Collect",assignee:"Jasmine Alvarez",priority:"Urgent",status:"In Progress",waitingOn:"Not blocked",due:"Aug 16",billable:true,description:"Transaction-splitting batches need auditor review before mapping.",stage:"Data ingest",route:"ingest/validate"},
+  {id:10,title:"Follow up on trial balance upload",clientSlug:"greenfield",type:"Collect",assignee:"Leo Chen",priority:"High",status:"Blocked",waitingOn:"Client upload",due:"Aug 15",billable:false,description:"Client has not yet uploaded the prior-year closing trial balance.",stage:"Data ingest"},
+  {id:11,title:"Complete engagement setup in AssurePro",clientSlug:"metro",type:"Admin",assignee:"Oscar Owner",priority:"High",status:"Todo",waitingOn:"Not blocked",due:"Not set",billable:false,description:"Engagement letter, period and team assignment are still required before Data Ingest can open.",stage:"Setup"},
+  {id:12,title:"Complete Manager review sign-off",clientSlug:"horizon",type:"Review",assignee:"Meera Kapoor",priority:"Medium",status:"In Progress",waitingOn:"Not blocked",due:"Aug 14",billable:true,description:"Workpapers are 81% complete; sign off remaining EBP procedures.",stage:"Review"},
+  {id:13,title:"Confirm plan administrator representations",clientSlug:"horizon",type:"Collect",assignee:"Leo Chen",priority:"Low",status:"Todo",waitingOn:"Client response",due:"Aug 19",billable:true,description:"Awaiting signed representation letter from Jordan Taylor.",stage:"Completion"},
+  {id:14,title:"Archive engagement file",clientSlug:"cedar",type:"Admin",assignee:"Meera Kapoor",priority:"Low",status:"Todo",waitingOn:"Not blocked",due:"Not set",billable:false,description:"Engagement is complete; finalize retention and archive per firm policy.",stage:"Completion"},
+];
+function myWorkBadgeCount(state:DemoState):number{
+  const name=ROLE_ASSIGNEE[state.role];
+  if(!name)return 0;
+  const allowed=staffedClientSlugs(name);
+  return WORK_TASKS.filter(t=>(!t.clientSlug||allowed.includes(t.clientSlug))&&t.assignee===name&&(t.priority==="Urgent"||t.status==="Blocked")).length;
+}
+function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+  const [tasks,setTasks]=useState<WorkTask[]>(WORK_TASKS);
+  const [scope,setScope]=useState<"My tasks"|"All">("My tasks");
+  const [quickFilter,setQuickFilter]=useState<"All"|"Due soon"|"Blocked"|"Urgent">("All");
+  const [selectedId,setSelectedId]=useState<number|null>(null);
+  const [createOpen,setCreateOpen]=useState(false);
+  const [displayOpen,setDisplayOpen]=useState(false);
+  const [collapsed,setCollapsed]=useState<Record<string,boolean>>({});
+
+  const myName=ROLE_ASSIGNEE[state.role]||"";
+  const isAdmin=state.role==="Firm Administrator";
+  const canReassign=state.role==="Manager"||state.role==="Partner"||isAdmin;
+  const allowedSlugs=isAdmin?null:staffedClientSlugs(myName);
+  const teamOptions=Array.from(new Set(Object.values(CLIENT_TEAMS).flatMap(t=>t.firm.map(m=>m.name))));
+
+  const inHierarchy=(t:WorkTask)=>!allowedSlugs||!t.clientSlug||allowedSlugs.includes(t.clientSlug);
+  const inScope=(t:WorkTask)=>scope==="All"||t.assignee===myName;
+  const passesQuick=(t:WorkTask)=>quickFilter==="Urgent"?t.priority==="Urgent":quickFilter==="Blocked"?t.status==="Blocked":quickFilter==="Due soon"?["Today","Aug 13","Aug 14","Aug 15","Aug 16"].includes(t.due):true;
+  const visible=tasks.filter(t=>inHierarchy(t)&&inScope(t)&&passesQuick(t));
+  const myTasksTotal=tasks.filter(t=>inHierarchy(t)&&t.assignee===myName).length;
+  const urgentCount=tasks.filter(t=>inHierarchy(t)&&t.assignee===myName&&t.priority==="Urgent").length;
+  const blockedCount=tasks.filter(t=>inHierarchy(t)&&t.assignee===myName&&t.status==="Blocked").length;
+  const next=[...visible].filter(t=>t.status!=="Done").sort((a,b)=>TASK_PRIORITIES.indexOf(a.priority)-TASK_PRIORITIES.indexOf(b.priority))[0];
+
+  const groups=Array.from(new Set(visible.map(t=>t.clientSlug))).sort((a,b)=>{
+    const an=a?CLIENTS.find(c=>c.slug===a)?.name||a:"Firm tasks"; const bn=b?CLIENTS.find(c=>c.slug===b)?.name||b:"Firm tasks";
+    return an.localeCompare(bn);
+  });
+
+  const updateTask=(id:number,patch:Partial<WorkTask>)=>setTasks(ts=>ts.map(t=>t.id===id?{...t,...patch}:t));
+  const createTask=(t:Omit<WorkTask,"id"|"status">)=>{
+    const id=Math.max(0,...tasks.map(x=>x.id))+1;
+    setTasks(ts=>[{...t,id,status:"Todo"},...ts]);
+    update({},`Task "${t.title}" created and assigned to ${t.assignee}`);
+    setCreateOpen(false);
+  };
+
+  return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Synced from AssurePro</p><h1>My work</h1><p>Tasks flow from AssurePro's Workflow module and stay in sync — edits here update AssurePro too.</p></div><div className="my-work-summary"><span><strong>{urgentCount}</strong> urgent</span><span><strong>{blockedCount}</strong> blocked</span></div></div>
+    {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{next.clientSlug?CLIENTS.find(c=>c.slug===next.clientSlug)?.name:"Firm task"} · {next.stage} · Due {next.due.toLowerCase()}</p></div><span className={`status-pill ${taskStatusTone(next.status)}`}>{next.status}</span><button className="primary-btn" onClick={()=>next.clientSlug&&next.route?navigate(`/engagement/${next.clientSlug}/${next.route}`):setSelectedId(next.id)}>Open task <ArrowRight/></button></section>}
+    <div className="my-work-toolbar">
+      <div className="my-work-filters">{(["My tasks","All"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}<i style={{width:1,height:16,background:"var(--line)",margin:"0 4px"}}/>{(["All","Due soon","Blocked","Urgent"] as const).map(f=><button key={f} className={quickFilter===f?"active":""} onClick={()=>setQuickFilter(f)}>{f}</button>)}</div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div className="topbar-popover"><button className="secondary-btn" onClick={()=>setDisplayOpen(!displayOpen)}><Filter size={14}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Grouped by client</strong><span>Matches AssurePro's Workflow &gt; Tasks view</span></div><label className="dropdown-check"><input type="checkbox" checked disabled/><span>Group by client</span></label></div>}</div>
+        <button className="primary-btn" onClick={()=>setCreateOpen(true)}><Plus size={15}/>New task</button>
+      </div>
+    </div>
+    {groups.length===0&&<div className="work-empty"><CheckCircle2/><h3>No work in this view</h3><p>Choose another filter to see assigned tasks.</p></div>}
+    {groups.map(slug=>{
+      const rows=visible.filter(t=>t.clientSlug===slug);
+      const clientName=slug?CLIENTS.find(c=>c.slug===slug)?.name||slug:"Firm tasks (no client)";
+      const isOpen=!collapsed[slug];
+      return <section className="workpaper-stage" key={slug||"__firm"}><button className="stage-toggle" onClick={()=>setCollapsed(c=>({...c,[slug]:isOpen}))}><span><strong>{clientName}</strong><small>{rows.length} task{rows.length===1?"":"s"}</small></span><span className="stage-progress">{isOpen?<ChevronDown/>:<ChevronRight/>}</span></button>
+        {isOpen&&<div className="stage-rows">{rows.map(task=><Fragment key={task.id}>
+          <button className="work-queue-row" onClick={()=>setSelectedId(selectedId===task.id?null:task.id)}>
+            <span className={`queue-signal ${taskPriorityTone(task.priority)}`}>{task.priority==="Urgent"?<AlertCircle/>:task.type==="Review"?<ClipboardCheck/>:<Clock3/>}</span>
+            <span className="queue-title"><strong>{task.title}</strong><small>{task.type} · {task.stage}</small></span>
+            <span className="queue-progress"><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span></span>
+            <i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>
+            <span className="queue-due"><small>Due</small><strong>{task.due}</strong></span>
+            <ChevronRight/>
+          </button>
+          {selectedId===task.id&&<TaskDetailInline task={task} canReassign={canReassign} teamOptions={teamOptions} onUpdate={patch=>updateTask(task.id,patch)} navigate={navigate} update={update}/>}
+        </Fragment>)}</div>}
+      </section>;
+    })}
+    {createOpen&&<CreateTaskModal close={()=>setCreateOpen(false)} onCreate={createTask} restrictAssigneeToSelf={!canReassign} defaultAssignee={myName||"Oscar Owner"} teamOptions={teamOptions}/>}
   </div>;
+}
+function TaskDetailInline({task,canReassign,teamOptions,onUpdate,navigate,update}:{task:WorkTask;canReassign:boolean;teamOptions:string[];onUpdate:(p:Partial<WorkTask>)=>void;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const [description,setDescription]=useState(task.description);
+  const client=task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug):null;
+  return <div className="task-detail-inline">
+    <div className="field-block"><span>Engagement</span>{client?<button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>{client.name} <ArrowRight size={13}/></button>:<strong>Standalone (no engagement)</strong>}</div>
+    <div className="field-block"><span>Assignee</span>{canReassign?<select value={task.assignee} onChange={e=>onUpdate({assignee:e.target.value})}>{teamOptions.map(n=><option key={n}>{n}</option>)}</select>:<strong>{task.assignee} <LockKeyhole size={11}/></strong>}</div>
+    <div className="field-block"><span>Priority</span><select value={task.priority} onChange={e=>onUpdate({priority:e.target.value as WorkTask["priority"]})}>{TASK_PRIORITIES.map(p=><option key={p}>{p}</option>)}</select></div>
+    <div className="field-block"><span>Status</span><select value={task.status} onChange={e=>{onUpdate({status:e.target.value as WorkTask["status"]});update({},`"${task.title}" marked ${e.target.value}`)}}>{TASK_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
+    <div className="field-block"><span>Type</span><strong>{task.type}</strong></div>
+    <div className="field-block"><span>Waiting on</span><input value={task.waitingOn} onChange={e=>onUpdate({waitingOn:e.target.value})}/></div>
+    <div className="field-block"><span>Due</span><input value={task.due} onChange={e=>onUpdate({due:e.target.value})}/></div>
+    <div className="field-block"><span>Billable</span><label className="checkbox-row"><input type="checkbox" checked={task.billable} onChange={e=>onUpdate({billable:e.target.checked})}/><span>{task.billable?"Billable":"Non-billable"}</span></label></div>
+    {task.route&&client&&<div className="field-block"><span>Workpaper</span><button className="text-link" onClick={()=>navigate(`/engagement/${client.slug}/${task.route}`)}>Open in Planning <ArrowRight size={13}/></button></div>}
+    <textarea value={description} onChange={e=>setDescription(e.target.value)} onBlur={()=>onUpdate({description})} placeholder="Add a description…"/>
+    {!canReassign&&<p className="restriction-note"><LockKeyhole size={12}/>Preparers can update status and notes, but reassigning tasks requires a Manager or Partner.</p>}
+  </div>;
+}
+function CreateTaskModal({close,onCreate,restrictAssigneeToSelf,defaultAssignee,teamOptions}:{close:()=>void;onCreate:(t:Omit<WorkTask,"id"|"status">)=>void;restrictAssigneeToSelf:boolean;defaultAssignee:string;teamOptions:string[]}){
+  const [title,setTitle]=useState("");
+  const [type,setType]=useState<WorkTask["type"]>("Prepare");
+  const [clientSlug,setClientSlug]=useState("");
+  const [assignee,setAssignee]=useState(defaultAssignee);
+  const [priority,setPriority]=useState<WorkTask["priority"]>("Medium");
+  const [due,setDue]=useState("");
+  const [waitingOn,setWaitingOn]=useState("Not blocked");
+  const [notes,setNotes]=useState("");
+  const client=CLIENTS.find(c=>c.slug===clientSlug);
+  return <div className="modal-backdrop"><div className="modal">
+    <div className="modal-head"><div><h2>Create task</h2><p>Adds a task to the firm workflow — syncs to AssurePro.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <Field label="Title" required><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Collect bank statements"/></Field>
+    <div className="form-grid">
+      <Field label="Type"><select value={type} onChange={e=>setType(e.target.value as WorkTask["type"])}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></Field>
+      <Field label="Client (optional)"><select value={clientSlug} onChange={e=>setClientSlug(e.target.value)}><option value="">Standalone (no client)</option>{CLIENTS.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}</select></Field>
+    </div>
+    <div className="form-grid">
+      <Field label="Assign to">{restrictAssigneeToSelf?<input value={assignee} readOnly/>:<select value={assignee} onChange={e=>setAssignee(e.target.value)}>{teamOptions.map(n=><option key={n}>{n}</option>)}</select>}</Field>
+      <Field label="Priority"><select value={priority} onChange={e=>setPriority(e.target.value as WorkTask["priority"])}>{TASK_PRIORITIES.map(p=><option key={p}>{p}</option>)}</select></Field>
+    </div>
+    <div className="form-grid">
+      <Field label="Due date"><input placeholder="e.g. Aug 25" value={due} onChange={e=>setDue(e.target.value)}/></Field>
+      <Field label="Waiting on"><input value={waitingOn} onChange={e=>setWaitingOn(e.target.value)} placeholder="Not blocked"/></Field>
+    </div>
+    <Field label="Notes"><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional notes…"/></Field>
+    {restrictAssigneeToSelf&&<p className="restriction-note"><LockKeyhole size={12}/>Preparers can only create tasks assigned to themselves — ask a Manager or Partner to assign work to others.</p>}
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!title.trim()} onClick={()=>onCreate({title,type,clientSlug,assignee,priority,due:due.trim()||"No date",waitingOn,billable:true,description:notes,stage:client?"Intake":"Admin"})}>Create task</button></div>
+  </div></div>;
 }
 
 function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
