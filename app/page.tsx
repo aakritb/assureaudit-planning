@@ -701,6 +701,84 @@ function requestsForClient(client:ClientRecord):ClientRequest[]{
   return requests;
 }
 
+type TimelineAction={label:string;icon:"assign"|"request"|"comment"|"upload"|"status"|"approve";time:string;detail?:string};
+type TimelineEntry={id:number;actor:string;dateLabel:string;time:string;read:boolean;itemTitle:string;actions:TimelineAction[];target?:{tab:"Files"|"Requests";id:number}};
+function timelineForClient(client:ClientRecord):TimelineEntry[]{
+  const team=CLIENT_TEAMS[client.slug];
+  const partner=team.firm.find(m=>m.role.toLowerCase().includes("partner"))?.name||"Oscar Owner";
+  const manager=team.firm.find(m=>m.role.toLowerCase().includes("manager"))?.name||partner;
+  const senior=team.firm[team.firm.length-1]?.name||partner;
+  const clientContact=team.client[0]?.name||"the client";
+  const requests=requestsForClient(client);
+  const docs=docsForClient(client);
+  const openRequest=requests.find(r=>r.status!=="Done")||requests[0];
+  const reviewDoc=docs.find(d=>d.clientUpload)||docs[0];
+  return [
+    {id:1,actor:partner,dateLabel:"Today",time:"4:02 PM",read:false,itemTitle:`${openRequest.id} ${openRequest.title}`,actions:[{label:"Changed Assignments",icon:"assign",time:"4:02 PM",detail:`${partner} assigned — Team: ${team.firm.map(m=>m.name).join(", ")} | Client: ${clientContact}.`}],target:{tab:"Requests",id:openRequest.id}},
+    {id:2,actor:manager,dateLabel:"Today",time:"4:01 PM",read:false,itemTitle:`${openRequest.id} ${openRequest.title}`,actions:[{label:"Created Request",icon:"request",time:"4:01 PM"}],target:{tab:"Requests",id:openRequest.id}},
+    {id:3,actor:clientContact,dateLabel:"1 week ago",time:"9:16 PM",read:true,itemTitle:openRequest.title,actions:[{label:"Submitted Response",icon:"upload",time:"9:16 PM"}],target:{tab:"Requests",id:openRequest.id}},
+    {id:4,actor:senior,dateLabel:"1 week ago",time:"2:52 PM",read:true,itemTitle:reviewDoc.name,actions:[{label:"Added Comment",icon:"comment",time:"2:52 PM",detail:reviewDoc.comments[0]?.text||"Reviewing before filing."}],target:{tab:"Files",id:reviewDoc.id}},
+    {id:5,actor:manager,dateLabel:"2 weeks ago",time:"11:04 AM",read:true,itemTitle:docs[0].name,actions:[{label:`Status changed to ${docs[0].due}`,icon:"status",time:"11:04 AM"}],target:{tab:"Files",id:docs[0].id}},
+    {id:6,actor:partner,dateLabel:"2 weeks ago",time:"10:20 AM",read:true,itemTitle:docs[2]?.name||docs[0].name,actions:[{label:"Approved",icon:"approve",time:"10:20 AM"}],target:{tab:"Files",id:docs[2]?.id||docs[0].id}},
+  ];
+}
+function TimelineActionIcon({kind}:{kind:TimelineAction["icon"]}){
+  const size=13;
+  if(kind==="assign")return <Users size={size}/>;
+  if(kind==="request")return <Send size={size}/>;
+  if(kind==="comment")return <MessageSquare size={size}/>;
+  if(kind==="upload")return <UploadCloud size={size}/>;
+  if(kind==="approve")return <Check size={size}/>;
+  return <RefreshCw size={size}/>;
+}
+function EngagementTimeline({client,close,onGoTo}:{client:ClientRecord;close:()=>void;onGoTo:(entry:TimelineEntry)=>void}){
+  const [entries,setEntries]=useState<TimelineEntry[]>(()=>timelineForClient(client));
+  const [query,setQuery]=useState("");
+  const [filterOpen,setFilterOpen]=useState(false);
+  const filterRef=useDismiss(filterOpen,()=>setFilterOpen(false));
+  const [typeFilters,setTypeFilters]=useState<string[]>([]);
+  const toggleTypeFilter=(t:string)=>setTypeFilters(f=>f.includes(t)?f.filter(x=>x!==t):[...f,t]);
+  const markRead=(id:number)=>setEntries(es=>es.map(e=>e.id===id?{...e,read:true}:e));
+  const allTypes=Array.from(new Set(entries.flatMap(e=>e.actions.map(a=>a.label))));
+  const visible=entries.filter(e=>(typeFilters.length===0||e.actions.some(a=>typeFilters.includes(a.label)))&&`${e.actor} ${e.itemTitle} ${e.actions.map(a=>a.label).join(" ")}`.toLowerCase().includes(query.toLowerCase()));
+  const unread=entries.filter(e=>!e.read).length;
+  const groups:{dateLabel:string;items:TimelineEntry[]}[]=[];
+  visible.forEach(e=>{const g=groups[groups.length-1];if(g&&g.dateLabel===e.dateLabel)g.items.push(e);else groups.push({dateLabel:e.dateLabel,items:[e]})});
+  return <div className="detail-drawer timeline-drawer">
+    <div className="drawer-head"><h2>Engagement Timeline</h2><div className="timeline-head-actions"><span className="timeline-unread"><strong>{unread}</strong> Unread of {entries.length}</span><button className="icon-btn" onClick={close}><X/></button></div></div>
+    <div className="timeline-toolbar">
+      <div className="topbar-popover" ref={filterRef}>
+        <button className="secondary-btn" onClick={()=>setFilterOpen(v=>!v)}><Filter size={14}/>Filters<ChevronRight size={14}/></button>
+        {filterOpen&&<div className="dropdown-menu">
+          <div className="dropdown-head"><strong>Filter by action</strong><span>Show only matching activity</span></div>
+          {allTypes.map(t=><label className="dropdown-check" key={t}><input type="checkbox" checked={typeFilters.includes(t)} onChange={()=>toggleTypeFilter(t)}/><span>{t}</span></label>)}
+          {typeFilters.length>0&&<button className="dropdown-item" onClick={()=>setTypeFilters([])}><RotateCcw size={14}/><span>Clear filters</span></button>}
+        </div>}
+      </div>
+      <div className="search no-margin"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search"/></div>
+    </div>
+    <div className="drawer-body timeline-body">
+      {groups.map((g,gi)=><Fragment key={gi}>
+        <div className="timeline-date-divider"><span>{g.dateLabel}</span></div>
+        {g.items.map(e=><div key={e.id} className={`timeline-card ${e.read?"":"unread"}`} onClick={()=>markRead(e.id)}>
+          <div className="timeline-card-head"><strong>{e.actor}</strong><span className={`status-pill ${e.read?"neutral":"warning"}`}>{e.read?"Read":"Unread"}</span></div>
+          <p className="timeline-meta">{e.actions.length} Action{e.actions.length===1?"":"s"} · {e.time}</p>
+          <p className="timeline-item-title">{e.itemTitle}</p>
+          {e.actions.map((a,i)=><div className="timeline-action" key={i}>
+            <div className="timeline-action-row">
+              <span className="timeline-action-label"><TimelineActionIcon kind={a.icon}/>{a.label}</span>
+              <span className="timeline-action-time">{a.time}</span>
+              {e.target&&<button className="goto-btn" onClick={ev=>{ev.stopPropagation();onGoTo(e)}}>Go to this request</button>}
+            </div>
+            {a.detail&&<p className="timeline-action-detail">{a.detail}</p>}
+          </div>)}
+        </div>)}
+      </Fragment>)}
+      {visible.length===0&&<div className="work-empty"><Search/><h3>No matching activity</h3><p>Try a different search or clear filters.</p></div>}
+    </div>
+  </div>;
+}
+
 function DocumentsCenter({initialSlug,navigate,update}:{initialSlug?:string;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
   const [selectedSlug,setSelectedSlug]=useState(initialSlug||CLIENTS[0].slug);
   const [clientQuery,setClientQuery]=useState("");
@@ -736,6 +814,13 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const [tab,setTab]=useState<"Files"|"Requests">("Files");
   const [documents,setDocuments]=useState<DocRecord[]>(()=>docsForClient(client));
   const [requests,setRequests]=useState<ClientRequest[]>(()=>requestsForClient(client));
+  const [timelineOpen,setTimelineOpen]=useState(false);
+  const goToTimelineTarget=(entry:TimelineEntry)=>{
+    if(!entry.target)return;
+    if(entry.target.tab==="Files"){setTab("Files");setSelectedId(entry.target.id)}
+    else{setTab("Requests");update({},`Opened request: ${entry.itemTitle}`)}
+    setTimelineOpen(false);
+  };
   const visible=documents.filter(doc=>(toneFilters.length===0||toneFilters.includes(doc.tone))&&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
   const grouped:Record<string,DocRecord[]>={};
   visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
@@ -757,7 +842,7 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
         <div className="documents-toolbar-row">
           <div className="search no-margin"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search documents or type"/></div>
           <div className="tone-filter-row">{DOC_TONES.map(t=><button key={t} title={TONE_LABEL[t]} aria-label={`Filter: ${TONE_LABEL[t]}`} className={`tone-dot ${t} ${toneFilters.includes(t)?"active":""}`} onClick={()=>toggleTone(t)}/>)}</div>
-          <button className="icon-btn" title="Recent activity" onClick={()=>update({},"Recent activity opened (simulated)")}><History size={16}/></button>
+          <button className="icon-btn" title="Engagement Timeline" onClick={()=>setTimelineOpen(true)}><History size={16}/></button>
           <button className="secondary-btn" onClick={()=>update({},`Documents for ${client.name} exported as documents.csv (simulated)`)}><Download size={15}/>Export</button>
           <button className="secondary-btn" onClick={()=>setCategoryOpen(true)}><Plus size={15}/>Create Category</button>
           <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button>
@@ -782,6 +867,7 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
     {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/>}
     {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name} onCreate={addRequest}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
+    {timelineOpen&&<EngagementTimeline client={client} close={()=>setTimelineOpen(false)} onGoTo={goToTimelineTarget}/>}
   </>;
 }
 
