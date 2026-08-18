@@ -383,3 +383,30 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .goto-btn{position:absolute;right:64px;top:50%;transform:translateY(-50%);background:#1e1b34;color:#fff;font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;border:0;opacity:0;pointer-events:none;transition:opacity .12s}
 .timeline-action-row:hover .goto-btn{opacity:1;pointer-events:auto}
 @media(max-width:600px){.timeline-drawer{width:100%}}
+.workflow-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.workflow-search{flex:1;min-width:200px}
+.count-inline{background:var(--violet-soft);color:var(--violet-dark);border-radius:6px;padding:1px 6px;font-size:11px;margin:0 2px}
+.dropdown-item.active{background:var(--violet-soft);color:var(--violet-dark)}
+.workflow-kanban-board{grid-template-columns:repeat(4,minmax(0,1fr));align-items:start}
+.workflow-column{transition:width .12s}
+.workflow-column.collapsed{padding-bottom:12px}
+.workflow-col-actions{display:flex;align-items:center;gap:4px}
+.workflow-col-actions b{font-weight:700}
+.workflow-col-actions .icon-btn{width:20px;height:20px;padding:0;display:grid;place-items:center}
+.workflow-quickadd{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--violet);border-radius:9px;padding:6px 6px 6px 10px;margin-bottom:8px}
+.workflow-quickadd input{border:0;padding:2px 0;font-size:12px}
+.workflow-quickadd input:focus{box-shadow:none}
+.workflow-card{position:relative;font-size:12px;gap:6px}
+.workflow-card-flag{position:absolute;top:10px;right:10px;background:#e2453c;color:#fff;border-radius:4px;width:16px;height:16px;display:grid;place-items:center}
+.workflow-card-tag{align-self:flex-start;background:var(--violet-soft);color:var(--violet-dark);font-size:10px;font-weight:650;padding:3px 8px;border-radius:6px}
+.workflow-card-name{font-weight:650;font-size:13px;color:var(--ink);line-height:1.35}
+.workflow-card-category{color:var(--muted);font-size:11px;margin-top:-4px}
+.workflow-card-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.workflow-avatar-row{display:flex}
+.workflow-avatar{width:22px;height:22px;border-radius:50%;background:var(--violet);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;margin-left:-6px;border:1.5px solid #fff}
+.workflow-avatar:first-child{margin-left:0}
+.workflow-avatar.placeholder{background:#f1eff7;color:var(--muted-2);border-style:dashed}
+.workflow-due-pill{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:10.5px;white-space:nowrap}
+.workflow-card-footer{display:flex;align-items:center;gap:4px;color:var(--muted-2);font-size:10.5px;border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+@media(max-width:1180px){.workflow-kanban-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.workflow-toolbar{flex-direction:column;align-items:stretch}.workflow-kanban-board{grid-template-columns:1fr}}

@@ -475,6 +475,112 @@ const WORK_TASKS:WorkTask[]=[
   {id:13,title:"Confirm plan administrator representations",clientSlug:"horizon",type:"Collect",assignee:"Leo Chen",priority:"Low",status:"Todo",waitingOn:"Client response",due:"Aug 19",billable:true,description:"Awaiting signed representation letter from Jordan Taylor.",stage:"Completion"},
   {id:14,title:"Archive engagement file",clientSlug:"cedar",type:"Admin",assignee:"Meera Kapoor",priority:"Low",status:"Todo",waitingOn:"Not blocked",due:"Not set",billable:false,description:"Engagement is complete; finalize retention and archive per firm policy.",stage:"Completion"},
 ];
+const WORKFLOW_STAGES=["Intake","Ingest","Review","Delivered"] as const;
+type WorkflowStage=typeof WORKFLOW_STAGES[number];
+const WORKFLOW_STAGE_TONE:Record<WorkflowStage,string>={Intake:"danger",Ingest:"progress",Review:"warning",Delivered:"approved"};
+function clientToWorkflowStage(stage:string):WorkflowStage{
+  if(stage==="Setup required")return "Intake";
+  if(stage==="Data ingest")return "Ingest";
+  if(stage==="Workpapers"||stage==="Review")return "Review";
+  return "Delivered";
+}
+type WorkflowCard={id:string;clientSlug:string|null;name:string;type:string;category:string;flagged:boolean;due:string;daysInStage:number;started:string;team:{initials:string;named:boolean}[];stage:WorkflowStage};
+function seedWorkflowCards():WorkflowCard[]{
+  const seed=[
+    {slug:"bbawc",flagged:true,due:"Aug 18",days:5,started:"Aug 12"},
+    {slug:"harbor",flagged:false,due:"Aug 21",days:7,started:"Aug 13"},
+    {slug:"greenfield",flagged:true,due:"Aug 16",days:3,started:"Aug 14"},
+    {slug:"metro",flagged:false,due:"No date",days:1,started:"Aug 17"},
+    {slug:"horizon",flagged:false,due:"Aug 14",days:9,started:"Aug 9"},
+    {slug:"cedar",flagged:false,due:"Complete",days:14,started:"Aug 4"},
+  ];
+  return seed.map(s=>{
+    const client=CLIENTS.find(c=>c.slug===s.slug)!;
+    const team=CLIENT_TEAMS[s.slug].firm.slice(0,4).map(m=>({initials:m.initials,named:true}));
+    return {id:s.slug,clientSlug:s.slug,name:client.name,type:client.auditType,category:client.subIndustry,flagged:s.flagged,due:s.due,daysInStage:s.days,started:s.started,team,stage:clientToWorkflowStage(client.stage)};
+  });
+}
+function WorkflowBoard({navigate,update}:{navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const [cards,setCards]=useState<WorkflowCard[]>(seedWorkflowCards);
+  const [dragId,setDragId]=useState<string|null>(null);
+  const [collapsedCols,setCollapsedCols]=useState<Record<string,boolean>>({});
+  const [quickAddStage,setQuickAddStage]=useState<WorkflowStage|null>(null);
+  const [quickAddValue,setQuickAddValue]=useState("");
+  const [query,setQuery]=useState("");
+  const [typeFilter,setTypeFilter]=useState("All engagements");
+  const [typeOpen,setTypeOpen]=useState(false);
+  const typeRef=useDismiss(typeOpen,()=>setTypeOpen(false));
+  const [displayOpen,setDisplayOpen]=useState(false);
+  const displayRef=useDismiss(displayOpen,()=>setDisplayOpen(false));
+  const [showAvatars,setShowAvatars]=useState(true);
+  const [showCategory,setShowCategory]=useState(true);
+  const nextId=useRef(1000);
+
+  const types=Array.from(new Set(cards.map(c=>c.type)));
+  const visible=cards.filter(c=>(typeFilter==="All engagements"||c.type===typeFilter)&&c.name.toLowerCase().includes(query.toLowerCase()));
+
+  const moveCard=(id:string,to:WorkflowStage)=>{
+    const card=cards.find(c=>c.id===id);
+    setDragId(null);
+    if(!card||card.stage===to)return;
+    setCards(cs=>cs.map(c=>c.id===id?{...c,stage:to,daysInStage:0,started:"Today"}:c));
+    update({},`Engagement moved — ${card.name} moved from ${card.stage} to ${to}`);
+  };
+  const addCard=(stage:WorkflowStage)=>{
+    if(!quickAddValue.trim())return;
+    const id=`custom-${nextId.current++}`;
+    setCards(cs=>[...cs,{id,clientSlug:null,name:quickAddValue.trim(),type:"Other",category:"",flagged:false,due:"No date",daysInStage:0,started:"Today",team:[{initials:"L",named:false},{initials:"R",named:false},{initials:"S",named:false},{initials:"A",named:false}],stage}]);
+    update({},`"${quickAddValue.trim()}" added to ${stage}`);
+    setQuickAddValue("");
+    setQuickAddStage(null);
+  };
+
+  return <>
+    <div className="workflow-toolbar">
+      <div className="topbar-popover" ref={typeRef}>
+        <button className="secondary-btn" onClick={()=>setTypeOpen(v=>!v)}>{typeFilter} <b className="count-inline">{typeFilter==="All engagements"?cards.length:cards.filter(c=>c.type===typeFilter).length}</b><ChevronDown size={14}/></button>
+        {typeOpen&&<div className="dropdown-menu">
+          <button className={`dropdown-item ${typeFilter==="All engagements"?"active":""}`} onClick={()=>{setTypeFilter("All engagements");setTypeOpen(false)}}>All engagements <b className="count-inline">{cards.length}</b></button>
+          {types.map(t=><button key={t} className={`dropdown-item ${typeFilter===t?"active":""}`} onClick={()=>{setTypeFilter(t);setTypeOpen(false)}}>{t} <b className="count-inline">{cards.filter(c=>c.type===t).length}</b></button>)}
+        </div>}
+      </div>
+      <div className="search no-margin workflow-search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search engagements…"/></div>
+      <button className="primary-btn" onClick={()=>{setQuickAddStage("Intake");setQuickAddValue("")}}><Plus size={15}/>New Engagement</button>
+      <div className="topbar-popover" ref={displayRef}>
+        <button className="secondary-btn" onClick={()=>setDisplayOpen(v=>!v)}><SlidersHorizontal size={14}/>Display</button>
+        {displayOpen&&<div className="dropdown-menu display-menu">
+          <div className="dropdown-head"><strong>Display properties</strong><span>Choose what shows on each card</span></div>
+          <label className="dropdown-check"><input type="checkbox" checked={showAvatars} onChange={()=>setShowAvatars(v=>!v)}/><span>Show team avatars</span></label>
+          <label className="dropdown-check"><input type="checkbox" checked={showCategory} onChange={()=>setShowCategory(v=>!v)}/><span>Show category</span></label>
+        </div>}
+      </div>
+    </div>
+    <div className="kanban-board workflow-kanban-board">
+      {WORKFLOW_STAGES.map(stage=>{
+        const rows=visible.filter(c=>c.stage===stage);
+        const isCollapsed=collapsedCols[stage];
+        return <div key={stage} className={`kanban-column workflow-column ${isCollapsed?"collapsed":""}`} onDragOver={e=>e.preventDefault()} onDrop={()=>dragId&&moveCard(dragId,stage)}>
+          <div className="kanban-column-head"><span><i className={`tone-dot ${WORKFLOW_STAGE_TONE[stage]}`}/>{stage}</span><span className="workflow-col-actions"><b>{rows.length}</b><button className="icon-btn" title={isCollapsed?"Expand column":"Collapse column"} onClick={()=>setCollapsedCols(c=>({...c,[stage]:!c[stage]}))}><ChevronLeft size={13}/></button><button className="icon-btn" title={`Add to ${stage}`} onClick={()=>{setQuickAddStage(stage);setQuickAddValue("")}}><Plus size={13}/></button></span></div>
+          {!isCollapsed&&<>
+            {quickAddStage===stage&&<div className="workflow-quickadd"><input autoFocus value={quickAddValue} onChange={e=>setQuickAddValue(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCard(stage);if(e.key==="Escape")setQuickAddStage(null)}} placeholder="Engagement or client name…"/><button className="icon-btn" onClick={()=>addCard(stage)}><Check size={14}/></button><button className="icon-btn" onClick={()=>setQuickAddStage(null)}><X size={14}/></button></div>}
+            {rows.map(card=><button key={card.id} className="kanban-card workflow-card" draggable onDragStart={()=>setDragId(card.id)} onClick={()=>card.clientSlug&&navigate(`/clients/${card.clientSlug}`)}>
+              {card.flagged&&<span className="workflow-card-flag"><AlertTriangle size={11}/></span>}
+              <span className="workflow-card-tag">{card.type}</span>
+              <span className="workflow-card-name">{card.name}</span>
+              {showCategory&&card.category&&<span className="workflow-card-category">{card.category}</span>}
+              <span className="workflow-card-row">
+                {showAvatars&&<span className="workflow-avatar-row">{card.team.map((m,i)=><i key={i} className={`workflow-avatar ${m.named?"":"placeholder"}`}>{m.initials}</i>)}</span>}
+                <span className="workflow-due-pill"><CalendarDays size={11}/>{card.due}</span>
+              </span>
+              <span className="workflow-card-footer"><Clock3 size={11}/>{card.daysInStage}d in stage · Started {card.started}</span>
+            </button>)}
+            {rows.length===0&&<p className="panel-empty-text">No engagements</p>}
+          </>}
+        </div>;
+      })}
+    </div>
+  </>;
+}
 function myWorkBadgeCount(state:DemoState):number{
   const name=ROLE_ASSIGNEE[state.role];
   if(!name)return 0;
@@ -519,9 +625,10 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
     setCreateOpen(false);
   };
 
-  return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Synced from AssurePro</p><h1>My work</h1><p>Tasks flow from AssurePro's Workflow module and stay in sync — edits here update AssurePro too.</p></div><div className="my-work-summary"><span><strong>{urgentCount}</strong> urgent</span><span><strong>{blockedCount}</strong> blocked</span></div></div>
-    {next&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{next.clientSlug?CLIENTS.find(c=>c.slug===next.clientSlug)?.name:"Firm task"} · {next.stage} · Due {next.due.toLowerCase()}</p></div><span className={`status-pill ${taskStatusTone(next.status)}`}>{next.status}</span><button className="primary-btn" onClick={()=>next.clientSlug&&next.route?navigate(`/engagement/${next.clientSlug}/${next.route}`):setSelectedId(next.id)}>Open task <ArrowRight/></button></section>}
+  return <div className="page my-work-page"><div className="page-heading"><div><p className="eyebrow">Synced from AssurePro</p><h1>My work</h1><p>Tasks flow from AssurePro's Workflow module and stay in sync — edits here update AssurePro too.</p></div>{view!=="Board"&&<div className="my-work-summary"><span><strong>{urgentCount}</strong> urgent</span><span><strong>{blockedCount}</strong> blocked</span></div>}</div>
+    {next&&view!=="Board"&&<section className="my-work-next"><div className="next-work-icon"><Zap/></div><div><span>Start here</span><h2>{next.title}</h2><p>{next.clientSlug?CLIENTS.find(c=>c.slug===next.clientSlug)?.name:"Firm task"} · {next.stage} · Due {next.due.toLowerCase()}</p></div><span className={`status-pill ${taskStatusTone(next.status)}`}>{next.status}</span><button className="primary-btn" onClick={()=>next.clientSlug&&next.route?navigate(`/engagement/${next.clientSlug}/${next.route}`):setSelectedId(next.id)}>Open task <ArrowRight/></button></section>}
     <div className="subtabs">{(["Board","List","Tasks"] as const).map(v=><button key={v} className={view===v?"active":""} onClick={()=>setView(v)}>{v}</button>)}</div>
+    {view==="Board"?<WorkflowBoard navigate={navigate} update={update}/>:<>
     <div className="my-work-toolbar">
       <div className="my-work-filters">{(["All","My tasks"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}</div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -548,20 +655,10 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
         </Fragment>)}</div>}
       </section>;
     })}
-    {view==="Board"&&<div className="kanban-board">{TASK_STATUSES.map(status=>{
-      const rows=visible.filter(t=>t.status===status);
-      return <div className="kanban-column" key={status}><div className="kanban-column-head"><span><i className={`tone-dot ${taskStatusTone(status)}`}/>{status}</span><b>{rows.length}</b></div>
-        {rows.map(task=><button className="kanban-card" key={task.id} onClick={()=>setSelectedId(task.id)}>
-          <span className="kanban-card-title">{task.title}</span>
-          <span className="kanban-card-meta"><span>{task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug)?.name.split(" ")[0]:"Firm"}</span><i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i></span>
-          <span className="kanban-card-meta"><span className={`priority-chip ${taskPriorityTone(task.priority)}`}><BarChart3 size={11}/>{task.priority}</span><span>{task.due}</span></span>
-        </button>)}
-        {rows.length===0&&<p className="panel-empty-text">No tasks</p>}
-      </div>;
-    })}</div>}
     {view==="List"&&<div className="table-card"><div className="portfolio-table-head"><span>Task</span><span>Client</span><span>Priority</span><span>Status</span><span>Due</span><span/></div>{visible.map(task=><button className="portfolio-row" key={task.id} onClick={()=>setSelectedId(task.id)}><span className="portfolio-client"><i className="person-avatar violet">{task.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i><span><strong className={task.status==="Done"?"done-strike":""}>{task.title}</strong><small>{task.type} · {task.stage}</small></span></span><span>{task.clientSlug?CLIENTS.find(c=>c.slug===task.clientSlug)?.name:"Firm task"}</span><span><span className={`priority-chip ${taskPriorityTone(task.priority)}`}><BarChart3 size={11}/>{task.priority}</span></span><span><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span></span><span>{task.due}</span><ChevronRight/></button>)}</div>}
     {selectedId&&view!=="Tasks"&&(()=>{const task=tasks.find(t=>t.id===selectedId);return task?<TaskDetailInline task={task} canReassign={canReassign} teamOptions={teamOptions} onUpdate={patch=>updateTask(task.id,patch)} navigate={navigate} update={update} close={()=>setSelectedId(null)}/>:null})()}
     {createOpen&&<CreateTaskModal close={()=>setCreateOpen(false)} onCreate={createTask} restrictAssigneeToSelf={!canReassign} defaultAssignee={myName||"Oscar Owner"} teamOptions={teamOptions}/>}
+    </>}
   </div>;
 }
 function TaskDetailInline({task,canReassign,teamOptions,onUpdate,navigate,update,close}:{task:WorkTask;canReassign:boolean;teamOptions:string[];onUpdate:(p:Partial<WorkTask>)=>void;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void;close?:()=>void}){
