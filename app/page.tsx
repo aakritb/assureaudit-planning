@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell,
   BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2,
@@ -209,6 +209,18 @@ const risks: RiskItem[] = [
 const roleNames: Role[] = ["Auditor / Preparer", "Manager", "Partner", "Client Contact", "Firm Administrator"];
 
 function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
+function useDismiss<T extends HTMLElement = HTMLDivElement>(open: boolean, onClose: () => void) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const escHandler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", escHandler);
+    return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", escHandler); };
+  }, [open, onClose]);
+  return ref;
+}
 function addDays(date: Date, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); }
 
 // Engagement team roster, matching the initials already used across Independence, the risk
@@ -335,11 +347,12 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
   const client=CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0];
   const inPlanning=path.includes("/planning"); const inIngest=path.includes("/ingest"); const inFieldwork=path.includes("/fieldwork"); const active=path.split("/").pop()||"overview";
   const [planningOpen,setPlanningOpen]=useState(inPlanning||inFieldwork); const [ingestOpen,setIngestOpen]=useState(inIngest); const [productOpen,setProductOpen]=useState(false);
+  const productRef=useDismiss(productOpen,()=>setProductOpen(false));
   useEffect(()=>{ if(inPlanning||inFieldwork) setPlanningOpen(true); }, [inPlanning,inFieldwork]);
   useEffect(()=>{ if(inIngest) setIngestOpen(true); }, [inIngest]);
   const ingestSteps=["Details","System","Trial balance","General ledger","Validate","Map accounts","Reconcile","Materiality"];
   return <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`} style={{transform: mobileNav ? "none" : undefined}}>
-    <div className="product-switcher"><button className="brand" aria-expanded={productOpen} onClick={()=>setProductOpen(!productOpen)}><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><ChevronDown size={15}/></button>{productOpen&&<div className="product-menu"><small>Assure platform</small><button className="active" onClick={()=>setProductOpen(false)}><ShieldCheck/>AssureAudit <Check/></button><button onClick={()=>{setProductOpen(false);update({},"Return to AssurePro (simulated)")}}><BriefcaseBusiness/>AssurePro</button></div>}<button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
+    <div className="product-switcher" ref={productRef}><button className="brand" aria-expanded={productOpen} onClick={()=>setProductOpen(!productOpen)}><img className="brand-logo" src="/assureaudit-logo.png" alt="AssureAudit"/><ChevronDown size={15}/></button>{productOpen&&<div className="product-menu"><small>Assure platform</small><button className="active" onClick={()=>setProductOpen(false)}><ShieldCheck/>AssureAudit <Check/></button><button onClick={()=>{setProductOpen(false);update({},"Return to AssurePro (simulated)")}}><BriefcaseBusiness/>AssurePro</button></div>}<button className="icon-btn close-mobile" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
     <nav>
       <button className={`nav-item ${path === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}><LayoutDashboard/><span>Dashboard</span></button>
       <button className={`nav-item ${path === "/clients" || path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/clients")}><Users/><span>Clients</span></button>
@@ -366,6 +379,8 @@ function Topbar({ path, state, update, navigate, onMenu, demoOpen, setDemoOpen }
   const visibleNotifs = notifTab==="All"?notifications:notifications.filter(n=>!n.read);
   const markRead = (text:string)=>setReadNotifs(r=>new Set(r).add(text));
   const openNotification = (n:{text:string;route:string})=>{ markRead(n.text); setNotifOpen(false); navigate(n.route); };
+  const notifRef=useDismiss(notifOpen,()=>setNotifOpen(false));
+  const profileRef=useDismiss(profileOpen,()=>setProfileOpen(false));
   const searchItems = [
     { kind:"Page", title:"Firm dashboard", detail:"Portfolio, deadlines and review workload", route:"/dashboard", icon:LayoutDashboard },
     { kind:"Page", title:"Clients", detail:"All clients and assurance engagements", route:"/clients", icon:Users },
@@ -413,7 +428,7 @@ function Topbar({ path, state, update, navigate, onMenu, demoOpen, setDemoOpen }
     <div className="top-actions">
       {path!=="/dashboard"&&<button className={`outline-action ${state.connector === "Expired" ? "danger-outline" : ""}`} onClick={() => update({ connector: "Connected" }, state.connector === "Connected" ? "AssurePro sync is current" : "Connection restored")}><ShieldCheck size={16}/>{state.connector === "Connected" ? "AssurePro synced" : "Reconnect"}</button>}
       <label className="year-select"><CalendarDays size={16}/><select aria-label="Financial year" value={state.fiscalYear} onChange={e=>update({fiscalYear:e.target.value},`Dashboard changed to ${e.target.value}`)}><option>FY 2026</option><option>FY 2025</option><option>FY 2024</option></select><ChevronDown size={14}/></label>
-      <div className="topbar-popover">
+      <div className="topbar-popover" ref={notifRef}>
         <button className="icon-btn notification" aria-label={`Open notifications, ${unreadCount} unread`} aria-expanded={notifOpen} onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); closeSearch(); }}><Bell size={18}/>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
         {notifOpen && <div className="dropdown-menu notif-menu">
           <div className="dropdown-head"><strong>Notifications</strong><span>{unreadCount} unread</span></div>
@@ -424,7 +439,7 @@ function Topbar({ path, state, update, navigate, onMenu, demoOpen, setDemoOpen }
           </div>)}
         </div>}
       </div>
-      <div className="topbar-popover">
+      <div className="topbar-popover" ref={profileRef}>
         <button className="avatar" aria-label="Open user profile" aria-expanded={profileOpen} title={state.role} onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); closeSearch(); }}>OO</button>
         {profileOpen && <div className="dropdown-menu profile-menu">
           <div className="dropdown-head"><strong>Oscar Owner</strong><span>Viewing as {state.role}</span></div>
@@ -473,6 +488,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
   const [displayOpen,setDisplayOpen]=useState(false);
+  const displayRef=useDismiss(displayOpen,()=>setDisplayOpen(false));
   const [collapsed,setCollapsed]=useState<Record<string,boolean>>({});
 
   const myName=ROLE_ASSIGNEE[state.role]||"";
@@ -509,7 +525,7 @@ function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:
     <div className="my-work-toolbar">
       <div className="my-work-filters">{(["All","My tasks"] as const).map(s=><button key={s} className={scope===s?"active":""} onClick={()=>setScope(s)}>{s}{s==="My tasks"&&<span>{myTasksTotal}</span>}</button>)}</div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <div className="topbar-popover"><button className="secondary-btn" onClick={()=>setDisplayOpen(!displayOpen)}><Filter size={14}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Grouped by client</strong><span>Matches AssurePro's Workflow &gt; Tasks view</span></div><label className="dropdown-check"><input type="checkbox" checked disabled/><span>Group by client</span></label></div>}</div>
+        <div className="topbar-popover" ref={displayRef}><button className="secondary-btn" onClick={()=>setDisplayOpen(!displayOpen)}><Filter size={14}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Grouped by client</strong><span>Matches AssurePro's Workflow &gt; Tasks view</span></div><label className="dropdown-check"><input type="checkbox" checked disabled/><span>Group by client</span></label></div>}</div>
         <button className="primary-btn" onClick={()=>setCreateOpen(true)}><Plus size={15}/>New task</button>
       </div>
     </div>
@@ -564,10 +580,10 @@ function TaskDetailInline({task,canReassign,teamOptions,onUpdate,navigate,update
     <textarea value={description} onChange={e=>setDescription(e.target.value)} onBlur={()=>onUpdate({description})} placeholder="Add a description…"/>
     {!canReassign&&<p className="restriction-note"><LockKeyhole size={12}/>Preparers can update status and notes, but reassigning tasks requires a Manager or Partner.</p>}
   </>;
-  if(close)return <div className="modal-backdrop"><div className="modal">
-    <div className="modal-head"><div><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span><h2>{task.title}</h2></div><button className="icon-btn" onClick={close}><X/></button></div>
-    <div className="task-detail-inline" style={{margin:0}}>{fields}</div>
-  </div></div>;
+  if(close)return <div className="detail-drawer">
+    <div className="drawer-head"><div><span className={`status-pill ${taskStatusTone(task.status)}`}>{task.status}</span><h2>{task.title}</h2></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="drawer-body"><div className="task-detail-inline" style={{margin:0}}>{fields}</div></div>
+  </div>;
   return <div className="task-detail-inline">{fields}</div>;
 }
 function CreateTaskModal({close,onCreate,restrictAssigneeToSelf,defaultAssignee,teamOptions}:{close:()=>void;onCreate:(t:Omit<WorkTask,"id"|"status">)=>void;restrictAssigneeToSelf:boolean;defaultAssignee:string;teamOptions:string[]}){
@@ -642,13 +658,14 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
   const [query,setQuery]=useState(""); const [industry,setIndustry]=useState("All industries");
   const [view,setView]=useState<"list"|"card">("list");
   const [displayOpen,setDisplayOpen]=useState(false);
+  const displayRef=useDismiss(displayOpen,()=>setDisplayOpen(false));
   const [visibleCols,setVisibleCols]=useState<string[]>(CLIENT_COLUMNS_DEFAULT);
   const toggleCol=(key:string)=>setVisibleCols(v=>v.includes(key)?v.filter(k=>k!==key):[...v,key]);
   const cols=CLIENT_COLUMNS.filter(c=>visibleCols.includes(c.key));
   const gridTemplate=`minmax(240px,1fr) ${cols.map(()=>"minmax(100px,.6fr)").join(" ")} 18px`;
   const rows=CLIENTS.filter(c=>(industry==="All industries"||c.industry===industry)&&`${c.name} ${c.auditType} ${c.subIndustry}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="page clients-page"><div className="page-heading"><div><p className="eyebrow">Firm portfolio</p><h1>Clients</h1><p>Select a client to open its audit overview, documents and engagements.</p></div><button className="primary-btn" onClick={() => setNewOpen(true)}><Plus size={17}/>New engagement</button></div>
-    <section className="clients-toolbar"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search client, industry or audit type"/></div><select value={industry} onChange={e=>setIndustry(e.target.value)}><option>All industries</option>{Object.keys(INDUSTRY_OPTIONS).map(x=><option key={x}>{x}</option>)}</select><span>{rows.length} clients</span>{view==="list"&&<div className="topbar-popover"><button className={`filter-btn ${displayOpen?"active":""}`} onClick={()=>setDisplayOpen(!displayOpen)}><SlidersHorizontal size={15}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Display properties</strong><span>Choose which columns to show</span></div>{CLIENT_COLUMNS.map(col=><label className="dropdown-check" key={col.key}><input type="checkbox" checked={visibleCols.includes(col.key)} onChange={()=>toggleCol(col.key)}/><span>{col.label}</span></label>)}<button className="dropdown-item" onClick={()=>setVisibleCols(CLIENT_COLUMNS_DEFAULT)}><RotateCcw size={14}/><span>Reset to default</span></button></div>}</div>}<div className="view-toggle" role="group" aria-label="Change view"><button aria-label="List view" className={view==="list"?"active":""} onClick={()=>setView("list")}><ListChecks size={15}/></button><button aria-label="Card view" className={view==="card"?"active":""} onClick={()=>setView("card")}><LayoutDashboard size={15}/></button></div></section>
+    <section className="clients-toolbar"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search client, industry or audit type"/></div><select value={industry} onChange={e=>setIndustry(e.target.value)}><option>All industries</option>{Object.keys(INDUSTRY_OPTIONS).map(x=><option key={x}>{x}</option>)}</select><span>{rows.length} clients</span>{view==="list"&&<div className="topbar-popover" ref={displayRef}><button className={`filter-btn ${displayOpen?"active":""}`} onClick={()=>setDisplayOpen(!displayOpen)}><SlidersHorizontal size={15}/>Display</button>{displayOpen&&<div className="dropdown-menu display-menu"><div className="dropdown-head"><strong>Display properties</strong><span>Choose which columns to show</span></div>{CLIENT_COLUMNS.map(col=><label className="dropdown-check" key={col.key}><input type="checkbox" checked={visibleCols.includes(col.key)} onChange={()=>toggleCol(col.key)}/><span>{col.label}</span></label>)}<button className="dropdown-item" onClick={()=>setVisibleCols(CLIENT_COLUMNS_DEFAULT)}><RotateCcw size={14}/><span>Reset to default</span></button></div>}</div>}<div className="view-toggle" role="group" aria-label="Change view"><button aria-label="List view" className={view==="list"?"active":""} onClick={()=>setView("list")}><ListChecks size={15}/></button><button aria-label="Card view" className={view==="card"?"active":""} onClick={()=>setView("card")}><LayoutDashboard size={15}/></button></div></section>
     {view==="list"?<div className="table-card"><div className="portfolio-table-head" style={{gridTemplateColumns:gridTemplate}}><span>Client</span>{cols.map(col=><span key={col.key}>{col.label}</span>)}<span/></div>{rows.map(c=><button className="portfolio-row" key={c.slug} style={{gridTemplateColumns:gridTemplate}} onClick={()=>navigate(`/clients/${c.slug}`)}><span className="portfolio-client"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.auditType} · {c.industry}</small></span></span>{cols.map(col=>clientCell(c,col.key))}<ChevronRight/></button>)}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</div>:<section className="clients-grid">{rows.map(c=>{const team=CLIENT_TEAMS[c.slug];const people=[...team.firm,...team.client];return <button className="client-card" key={c.slug} onClick={()=>navigate(`/clients/${c.slug}`)}><div className="client-card-head"><i>{c.initials}</i><span><strong>{c.name}</strong><small>{c.industry} · {c.subIndustry}</small></span><ChevronRight/></div><div className="client-card-engagement"><span>{c.auditType}</span><strong>{state.fiscalYear}</strong><small>Period ended {c.period}</small></div><div className="client-card-progress"><div><span>{c.stage}</span><strong>{c.progress}%</strong></div><i><b style={{width:`${c.progress}%`}}/></i></div><div className="client-card-team"><span className="mini-avatar-stack">{people.slice(0,4).map(p=><i key={`${c.slug}-${p.initials}`}>{p.initials}</i>)}</span><span><strong>{people.length} team members</strong><small>{team.firm.length} firm · {team.client.length} client</small></span></div><div className="client-card-foot"><span><FileText/>{c.documents} documents</span><span className={c.openItems?"attention":""}>{c.openItems?`${c.openItems} need attention`:"Up to date"}</span></div></button>})}{rows.length===0&&<div className="clients-empty"><Search/><h3>No clients match</h3><p>Try a broader name or industry filter.</p></div>}</section>}
     {newOpen && <NewEngagementWizard onClose={() => setNewOpen(false)} update={update}/>}
   </div>;
@@ -771,8 +788,11 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
 function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,categories}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[];categories:string[]}){
   const [tab,setTab]=useState<"Request Info"|"Client Docs"|"Comments"|"Activity">("Request Info");
   const [statusMenuOpen,setStatusMenuOpen]=useState(false);
+  const statusMenuRef=useDismiss(statusMenuOpen,()=>setStatusMenuOpen(false));
   const [assignOpen,setAssignOpen]=useState(false);
+  const assignRef=useDismiss(assignOpen,()=>setAssignOpen(false));
   const [categoryOpen,setCategoryOpen]=useState(false);
+  const categoryRef=useDismiss(categoryOpen,()=>setCategoryOpen(false));
   const moveToCategory=(cat:string)=>{onUpdate({category:cat});setCategoryOpen(false);update({},`${doc.name} moved to "${cat}"`)};
   const [commentDraft,setCommentDraft]=useState("");
   const setStatus=(tone:string,due:string)=>{onUpdate({tone,due});setStatusMenuOpen(false);update({},`${doc.name} marked ${due}`)};
@@ -788,15 +808,15 @@ function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,cate
         <button className="icon-btn" onClick={close}><X/></button>
       </div>
     </div>
-    <div className="panel-status-row"><div className="topbar-popover"><button className="secondary-btn" onClick={()=>setStatusMenuOpen(v=>!v)}>Change Status <ChevronDown size={14}/></button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{STATUS_OPTIONS.map(o=><button key={o.due} className="dropdown-item" onClick={()=>setStatus(o.tone,o.due)}><i className={`tone-dot ${o.tone}`}/><span>{o.due}</span></button>)}</div>}</div></div>
+    <div className="panel-status-row"><div className="topbar-popover" ref={statusMenuRef}><button className="secondary-btn" onClick={()=>setStatusMenuOpen(v=>!v)}>Change Status <ChevronDown size={14}/></button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{STATUS_OPTIONS.map(o=><button key={o.due} className="dropdown-item" onClick={()=>setStatus(o.tone,o.due)}><i className={`tone-dot ${o.tone}`}/><span>{o.due}</span></button>)}</div>}</div></div>
     <div className="drawer-tabs">{tabs.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
     <div className="drawer-body">
       {tab==="Request Info"&&<>
         <p className="drawer-label">Description</p>
         <p className="panel-description">{doc.description}</p>
         <div className="panel-meta-row"><div><small>Created by</small><strong>{doc.type}</strong></div><div><small>Due Date</small><strong>{doc.due}</strong></div></div>
-        <div className="panel-assign-row"><div><small>Assignments</small><strong>{doc.assignee||"Unassigned"}</strong></div><div className="topbar-popover"><button className="text-link" onClick={()=>setAssignOpen(v=>!v)}>Assign</button>{assignOpen&&<div className="dropdown-menu">{["Jasmine Alvarez","Meera Kapoor","Oscar Owner","Leo Chen"].map(name=><button key={name} className="dropdown-item" onClick={()=>assignTo(name)}>{name}</button>)}</div>}</div></div>
-        <div className="panel-assign-row"><div><small>Category</small><strong>{doc.category}</strong></div><div className="topbar-popover"><button className="text-link" onClick={()=>setCategoryOpen(v=>!v)}>Move</button>{categoryOpen&&<div className="dropdown-menu">{categories.filter(c=>c!==doc.category).map(cat=><button key={cat} className="dropdown-item" onClick={()=>moveToCategory(cat)}>{cat}</button>)}{categories.length<=1&&<div className="dropdown-empty">Create another category first.</div>}</div>}</div></div>
+        <div className="panel-assign-row"><div><small>Assignments</small><strong>{doc.assignee||"Unassigned"}</strong></div><div className="topbar-popover" ref={assignRef}><button className="text-link" onClick={()=>setAssignOpen(v=>!v)}>Assign</button>{assignOpen&&<div className="dropdown-menu">{["Jasmine Alvarez","Meera Kapoor","Oscar Owner","Leo Chen"].map(name=><button key={name} className="dropdown-item" onClick={()=>assignTo(name)}>{name}</button>)}</div>}</div></div>
+        <div className="panel-assign-row"><div><small>Category</small><strong>{doc.category}</strong></div><div className="topbar-popover" ref={categoryRef}><button className="text-link" onClick={()=>setCategoryOpen(v=>!v)}>Move</button>{categoryOpen&&<div className="dropdown-menu">{categories.filter(c=>c!==doc.category).map(cat=><button key={cat} className="dropdown-item" onClick={()=>moveToCategory(cat)}>{cat}</button>)}{categories.length<=1&&<div className="dropdown-empty">Create another category first.</div>}</div>}</div></div>
         <p className="drawer-label">My Documents</p>
         {doc.attachments>0?<div className="drawer-file"><FileText/><div><strong>{doc.name}</strong><span>{doc.attachments} file{doc.attachments===1?"":"s"} attached · {doc.date}</span></div></div>:<div className="panel-upload-empty"><p>No documents uploaded yet.</p><button className="secondary-btn" onClick={uploadDoc}><UploadCloud size={15}/>Upload Document</button></div>}
       </>}
@@ -947,8 +967,9 @@ function MappingExceptionsModal({resolvedCount,close,onResolve}:{resolvedCount:n
 
 function SourceFile({name,detail,status,update}:{name:string;detail:string;status:string;update:(p:Partial<DemoState>,m?:string)=>void}){
   const [open,setOpen]=useState(false);
+  const menuRef=useDismiss<HTMLSpanElement>(open,()=>setOpen(false));
   return <article className="source-file"><span><FileSpreadsheet/></span><div><strong>{name}</strong><small>{detail}</small></div><em className="status-pill approved"><Check/>{status}</em>
-    <span style={{position:"relative"}}>
+    <span style={{position:"relative"}} ref={menuRef}>
       <button className="icon-btn" aria-label={`Open actions for ${name}`} aria-expanded={open} onClick={()=>setOpen(!open)}><MoreHorizontal/></button>
       {open&&<div className="dropdown-menu file-actions-menu">
         <button className="dropdown-item" onClick={()=>{setOpen(false);update({},`Upload a replacement for "${name}" (simulated)`)}}><UploadCloud size={14}/><span>Replace file</span></button>
@@ -1106,6 +1127,7 @@ function FieldworkTesting({ state, update, onGoToSync }: { state:DemoState; upda
 
 function FieldworkProcedureDrawer({ procedure, close, onUpdate, update }: { procedure:FieldworkProcedure; close:()=>void; onUpdate:(p:Partial<FieldworkProcedure>)=>void; update:(p:Partial<DemoState>,m?:string)=>void }) {
   const [statusMenuOpen,setStatusMenuOpen]=useState(false);
+  const statusMenuRef=useDismiss(statusMenuOpen,()=>setStatusMenuOpen(false));
   const [exceptions,setExceptions]=useState(procedure.exceptions);
   const nextStatus:Record<string,string>={"Not started":"In progress","In progress":"Ready for review","Ready for review":"Signed off","Signed off":"Signed off"};
   return <div className="detail-drawer"><div className="drawer-head"><div><span className={`status-pill ${fieldworkTone(procedure.status)}`}>{procedure.status}</span><h2>{procedure.title}</h2><p>{procedure.type} · {procedure.assignee}</p></div><button className="icon-btn" onClick={close}><X/></button></div>
@@ -1117,7 +1139,7 @@ function FieldworkProcedureDrawer({ procedure, close, onUpdate, update }: { proc
       {procedure.evidenceCount===0?<div className="panel-upload-empty"><p>No evidence uploaded yet.</p><button className="secondary-btn" onClick={()=>{onUpdate({evidenceCount:1});update({},`Evidence attached to "${procedure.title}"`)}}><UploadCloud size={15}/>Upload evidence</button></div>:<div className="drawer-file"><FileText/><div><strong>{procedure.evidenceCount} evidence file{procedure.evidenceCount===1?"":"s"} attached</strong><span>Workpaper support · testing documentation</span></div></div>}
     </div>
     <div className="drawer-actions">
-      <div className="topbar-popover"><button className="secondary-btn" onClick={()=>setStatusMenuOpen(!statusMenuOpen)}><RefreshCw size={15}/>Change status</button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{["Not started","In progress","Ready for review","Signed off"].map(s=><button key={s} className="dropdown-item" onClick={()=>{setStatusMenuOpen(false);onUpdate({status:s});update({},`"${procedure.title}" marked ${s}`)}}><span className={`tone-dot ${fieldworkTone(s)}`}/><span>{s}</span></button>)}</div>}</div>
+      <div className="topbar-popover" ref={statusMenuRef}><button className="secondary-btn" onClick={()=>setStatusMenuOpen(!statusMenuOpen)}><RefreshCw size={15}/>Change status</button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{["Not started","In progress","Ready for review","Signed off"].map(s=><button key={s} className="dropdown-item" onClick={()=>{setStatusMenuOpen(false);onUpdate({status:s});update({},`"${procedure.title}" marked ${s}`)}}><span className={`tone-dot ${fieldworkTone(s)}`}/><span>{s}</span></button>)}</div>}</div>
       <button className="secondary-btn" onClick={()=>{onUpdate({exceptions});update({},"Conclusion saved to the workpaper")}}>Save conclusion</button>
       <button className="primary-btn" disabled={procedure.status==="Signed off"} onClick={()=>{onUpdate({exceptions,status:nextStatus[procedure.status]});update({},`"${procedure.title}" moved to ${nextStatus[procedure.status]}`)}}>{procedure.status==="Ready for review"?<>Sign off <Check size={15}/></>:<>Move to {nextStatus[procedure.status]} <ArrowRight size={15}/></>}</button>
     </div>
@@ -1259,6 +1281,7 @@ function Materiality({ state, update, embedded=false, onComplete, onBack }: { st
 function RisksView({ state, update, navigate }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; navigate:(p:string)=>void }) {
   const [cell,setCell]=useState<string|null>(null); const [selected,setSelected]=useState<any>(null); const [query,setQuery]=useState("");
   const [filterOpen,setFilterOpen]=useState(false); const [sigOnly,setSigOnly]=useState(false); const [fraudOnly,setFraudOnly]=useState(false);
+  const filterRef=useDismiss(filterOpen,()=>setFilterOpen(false));
   const [addOpen,setAddOpen]=useState(false); const [newTitle,setNewTitle]=useState(""); const [newFsa,setNewFsa]=useState(""); const [newLikelihood,setNewLikelihood]=useState("Moderate"); const [newMagnitude,setNewMagnitude]=useState("Moderate");
   const riskList=allRisks(state);
   const filtered=riskList.filter(r=>(!cell||`${r.likelihood}-${r.magnitude}`===cell)&&(`${r.title} ${r.fsa}`.toLowerCase().includes(query.toLowerCase()))&&(!sigOnly||r.significant)&&(!fraudOnly||r.fraud));
@@ -1276,7 +1299,7 @@ function RisksView({ state, update, navigate }: { state:DemoState; update:(p:Par
     <FluxAnalytics state={state} update={update} navigate={navigate}/>
     <div className="risk-top-grid"><div className="heatmap-card"><div className="section-title"><div><h3>Inherent risk heat map</h3><p>Click a cell to filter the register.</p></div>{cell&&<button className="text-link" onClick={()=>setCell(null)}>Clear filter</button>}</div><div className="heatmap"><span className="axis y">Magnitude</span><div className="axis-labels y-labels"><span>High</span><span>Moderate</span><span>Low</span></div><div className="heat-grid">{cells.map(c=><button key={c} className={`${heatClass(c)} ${cell===c?"selected":""}`} onClick={()=>setCell(cell===c?null:c)}><strong>{counts[c]}</strong><span>{c.replace("-"," / ")}</span></button>)}</div><div className="axis-labels x-labels"><span>High</span><span>Moderate</span><span>Low</span></div><span className="axis x">Likelihood</span></div></div>
       <div className="risk-insights"><div className="section-title"><div><h3>Analytics-driven indicators</h3><p>Signals from GL analytics and planning evidence.</p></div><Sparkles/></div><Insight tone="danger" title="14 late-posted revenue entries" text="$386,200 posted in the first 5 days after period end."/><Insight tone="warning" title="3 unusual weekend journals" text="Posted by privileged users without approval evidence."/><Insight tone="info" title="Contribution concentration increased" text="Top five donors represent 41% of annual contributions."/></div></div>
-    <div className="section-title"><div><h2>Risk register</h2><p>All non-zero FSAs have a documented risk conclusion.</p></div><div className="table-tools"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search risks"/></div><div className="topbar-popover"><button className={`filter-btn ${activeFilterCount>0?"active":""}`} onClick={()=>setFilterOpen(!filterOpen)}><Filter/>Filters{activeFilterCount>0&&<i className="filter-badge"/>}</button>{filterOpen&&<div className="dropdown-menu filter-menu">
+    <div className="section-title"><div><h2>Risk register</h2><p>All non-zero FSAs have a documented risk conclusion.</p></div><div className="table-tools"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search risks"/></div><div className="topbar-popover" ref={filterRef}><button className={`filter-btn ${activeFilterCount>0?"active":""}`} onClick={()=>setFilterOpen(!filterOpen)}><Filter/>Filters{activeFilterCount>0&&<i className="filter-badge"/>}</button>{filterOpen&&<div className="dropdown-menu filter-menu">
         <div className="dropdown-head"><strong>Filter register</strong></div>
         <label className="dropdown-check"><input type="checkbox" checked={sigOnly} onChange={e=>setSigOnly(e.target.checked)}/><span>Significant only</span></label>
         <label className="dropdown-check"><input type="checkbox" checked={fraudOnly} onChange={e=>setFraudOnly(e.target.checked)}/><span>Fraud only</span></label>
@@ -1480,6 +1503,7 @@ const FLUX_SEED=[
 function FluxAnalytics({state,update,navigate}:{state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;navigate:(p:string)=>void}) {
   const [view,setView]=useState<"Flux analysis"|"Automatic scoping"|"Benchmark guidance">("Flux analysis");
   const [thresholdOpen,setThresholdOpen]=useState(false);
+  const thresholdRef=useDismiss(thresholdOpen,()=>setThresholdOpen(false));
   const [thresholdType,setThresholdType]=useState<"pm"|"value"|"percent">("pm");
   const [thresholdValue,setThresholdValue]=useState(100000);
   const [thresholdPercent,setThresholdPercent]=useState(10);
@@ -1504,7 +1528,7 @@ function FluxAnalytics({state,update,navigate}:{state:DemoState;update:(p:Partia
   return <section className="flux-workspace"><div className="flux-head"><div><p className="eyebrow">Planning analytics</p><h2>Flux, materiality & scoping</h2><p>Analytics identify patterns and exceptions for auditor evaluation; they never create a risk conclusion automatically.</p></div><div className="threshold-chips"><span>OM <strong>{money(overall)}</strong></span><span>PM <strong>{money(performance)}</strong></span><span>Trivial <strong>{money(trivial)}</strong></span></div></div><div className="subtabs compact">{(["Flux analysis","Automatic scoping","Benchmark guidance"] as const).map(v=><button key={v} className={view===v?"active":""} onClick={()=>setView(v)}>{v}</button>)}</div>
     {view==="Flux analysis"&&<><div className="analytics-chain"><span>TB / GL</span><ArrowRight/><span>Pattern or exception</span><ArrowRight/><span>Auditor evaluation</span><ArrowRight/><span>Risk</span><ArrowRight/><span>Response</span></div>
       <div className="documents-toolbar-row" style={{borderRadius:0,borderLeft:0,borderRight:0}}>
-        <div className="topbar-popover"><button className="secondary-btn" onClick={()=>setThresholdOpen(!thresholdOpen)}><Settings size={15}/>Unusual movement threshold</button>{thresholdOpen&&<div className="dropdown-menu threshold-menu"><div className="dropdown-head"><strong>Flag movements exceeding</strong><span>Applies to every row below</span></div>
+        <div className="topbar-popover" ref={thresholdRef}><button className="secondary-btn" onClick={()=>setThresholdOpen(!thresholdOpen)}><Settings size={15}/>Unusual movement threshold</button>{thresholdOpen&&<div className="dropdown-menu threshold-menu"><div className="dropdown-head"><strong>Flag movements exceeding</strong><span>Applies to every row below</span></div>
           <label className="dropdown-check"><input type="radio" name="fluxThreshold" checked={thresholdType==="pm"} onChange={()=>setThresholdType("pm")}/><span>Performance materiality ({money(performance)})</span></label>
           <label className="dropdown-check"><input type="radio" name="fluxThreshold" checked={thresholdType==="value"} onChange={()=>setThresholdType("value")}/><span>Custom dollar amount</span></label>
           {thresholdType==="value"&&<div style={{padding:"2px 12px 8px"}}><input type="number" value={thresholdValue} onChange={e=>setThresholdValue(Number(e.target.value))}/></div>}
@@ -1784,7 +1808,8 @@ function CheckRow({title,detail,checked=false}:{title:string;detail:string;check
 function Member({name,role,status,update}:{name:string;role:string;status:string;update?:(p:Partial<DemoState>,m?:string)=>void}){return <div className="member-row"><div className="person-avatar violet">{name.split(" ").map(n=>n[0]).join("")}</div><div><strong>{name}</strong><span>{role}</span></div><span className={`status-pill ${status==="Confirmed"?"approved":"warning"}`}>{status}</span>{status==="Pending"&&<button className="secondary-btn" onClick={()=>update?.({},`Independence confirmation reminder sent to ${name}`)}>Send reminder</button>}</div>}
 function UploadCard({title,file,rows,status,progress,onUpload,update}:{title:string;file:string;rows:string;status:string;progress:number;onUpload:()=>void;update:(p:Partial<DemoState>,m?:string)=>void}){
   const [menuOpen,setMenuOpen]=useState(false);
-  return <div className="upload-card"><div className="upload-title"><div className="file-icon"><FileSpreadsheet/></div><div><span className="card-label">Data source</span><h3>{title}</h3></div><span className="status-pill approved">{status}</span></div><div className="file-detail"><FileCheck2/><div><strong>{file}</strong><span>{rows} · Excel/CSV · FY 2025</span></div><div className="topbar-popover"><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen && <div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);onUpload();update({},`${file} replacement started`)}}><UploadCloud size={14}/><span>Replace file</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update({},`${file} removed from this engagement (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div><div className="upload-progress"><i style={{width:`${progress}%`}}/></div><div className="upload-actions"><button className="text-link" onClick={()=>update({},`${title} import template downloaded`)}><Download/>Download template</button><button className="secondary-btn" onClick={onUpload}><UploadCloud/>Replace file</button></div></div>}
+  const menuRef=useDismiss(menuOpen,()=>setMenuOpen(false));
+  return <div className="upload-card"><div className="upload-title"><div className="file-icon"><FileSpreadsheet/></div><div><span className="card-label">Data source</span><h3>{title}</h3></div><span className="status-pill approved">{status}</span></div><div className="file-detail"><FileCheck2/><div><strong>{file}</strong><span>{rows} · Excel/CSV · FY 2025</span></div><div className="topbar-popover" ref={menuRef}><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen && <div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);onUpload();update({},`${file} replacement started`)}}><UploadCloud size={14}/><span>Replace file</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update({},`${file} removed from this engagement (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div><div className="upload-progress"><i style={{width:`${progress}%`}}/></div><div className="upload-actions"><button className="text-link" onClick={()=>update({},`${title} import template downloaded`)}><Download/>Download template</button><button className="secondary-btn" onClick={onUpload}><UploadCloud/>Replace file</button></div></div>}
 function Question({number,title,tag,children}:{number:string;title:string;tag:string;children:React.ReactNode}){return <article className="question"><div className="question-head"><span>{number}</span><h3>{title}</h3><span className={`status-pill ${statusClass(tag)}`}>{tag}</span></div>{children}</article>}
 function Evidence({file="Accounting Policy Handbook.pdf",pages="4–7",update}:{file?:string;pages?:string;update?:(p:Partial<DemoState>,m?:string)=>void}){return <div className="evidence"><Paperclip/><span><strong>Source evidence</strong>{file} · Pages {pages}</span><button onClick={()=>update?.({},`Opening ${file} (pages ${pages}) — simulated document viewer`)}>Open source <ArrowRight/></button></div>}
 function AiDraft(){return <div className="ai-draft"><Sparkles/><span><strong>AI-assisted draft</strong>Generated from cited evidence · Human validation required</span></div>}
@@ -1801,5 +1826,6 @@ function DrawerNote({title,author,status}:{title:string;author:string;status:str
 function ActivityItem({title,detail}:{title:string;detail:string}){return <div className="activity-item"><i/><div><strong>{title}</strong><span>{detail}</span></div></div>}
 function DrawerFile({name,meta,update}:{name:string;meta:string;update?:(p:Partial<DemoState>,m?:string)=>void}){
   const [menuOpen,setMenuOpen]=useState(false);
-  return <div className="drawer-file"><FileText/><div><strong>{name}</strong><span>{meta}</span></div><div className="topbar-popover"><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen&&<div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} downloaded`)}}><Download size={14}/><span>Download</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} removed from Attachments (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div>}
+  const menuRef=useDismiss(menuOpen,()=>setMenuOpen(false));
+  return <div className="drawer-file"><FileText/><div><strong>{name}</strong><span>{meta}</span></div><div className="topbar-popover" ref={menuRef}><button className="icon-btn" onClick={()=>setMenuOpen(!menuOpen)}><MoreHorizontal/></button>{menuOpen&&<div className="dropdown-menu file-menu"><button className="dropdown-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} downloaded`)}}><Download size={14}/><span>Download</span></button><button className="dropdown-item danger-item" onClick={()=>{setMenuOpen(false);update?.({},`${name} removed from Attachments (simulated)`)}}><X size={14}/><span>Remove</span></button></div>}</div></div>}
 function heatClass(cell:string){const [l,m]=cell.split("-");if(l==="High"&&m==="High")return"critical";if(l==="High"||m==="High")return"high-cell";if(l==="Moderate"||m==="Moderate")return"medium-cell";return"low-cell"}
