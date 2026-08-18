@@ -589,7 +589,7 @@ function myWorkBadgeCount(state:DemoState):number{
 }
 function MyWork({ navigate, state, update }: { navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
   const [tasks,setTasks]=useState<WorkTask[]>(WORK_TASKS);
-  const [view,setView]=useState<"Board"|"List"|"Tasks">("Tasks");
+  const [view,setView]=useState<"Board"|"List"|"Tasks">("Board");
   const [scope,setScope]=useState<"All"|"My tasks">("My tasks");
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
