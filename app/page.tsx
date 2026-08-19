@@ -799,12 +799,19 @@ function Engagements({ navigate, update, state }: { navigate: (p: string) => voi
 type DocRecord={id:number;name:string;category:string;type:string;status:string;date:string;tone:string;due:string;assignee:string;attachments:number;description:string;clientUpload:boolean;comments:{author:string;text:string}[]};
 function docsForClient(client:ClientRecord):DocRecord[]{
   return [
-    {id:1,name:`${client.name.split(" ")[0]} Trial Balance — FY 2025.xlsx`,category:"Client-provided records",type:"Trial balance",status:"Validated",date:"Aug 11",tone:"approved",due:"Complete",assignee:client.owner,attachments:1,clientUpload:false,description:`Reconciled trial balance used across ${client.name}'s Planning.`,comments:[]},
-    {id:2,name:"General Ledger Detail.csv",category:"Client-provided records",type:"General ledger",status:"Processed",date:"Aug 11",tone:"approved",due:"Complete",assignee:client.owner,attachments:1,clientUpload:false,description:"Transaction-level general ledger detail for the current period.",comments:[]},
-    {id:3,name:"Signed engagement letter.pdf",category:"Engagement & governance",type:"Engagement",status:"Synced",date:"Aug 4",tone:"approved",due:"Complete",assignee:"Oscar Owner",attachments:1,clientUpload:false,description:"Fully executed engagement letter synchronized from AssurePro.",comments:[]},
-    {id:4,name:"Board minutes — Q4.pdf",category:"Engagement & governance",type:"Client upload",status:client.openItems>0?"New":"Reviewed",date:"Aug 13",tone:client.openItems>0?"warning":"approved",due:client.openItems>0?"Due in 2d":"Complete",assignee:client.owner,attachments:1,clientUpload:true,description:"Board minutes covering the most recent governance decisions.",comments:client.openItems>0?[{author:client.owner,text:"Reviewing before filing."}]:[]},
+    {id:1,name:`${client.name.split(" ")[0]} Trial Balance — FY 2025.xlsx`,category:"Data ingest",type:"Trial balance",status:"Validated",date:"Aug 11",tone:"approved",due:"Complete",assignee:client.owner,attachments:1,clientUpload:false,description:`Reconciled trial balance used across ${client.name}'s Planning.`,comments:[]},
+    {id:2,name:"General Ledger Detail.csv",category:"Data ingest",type:"General ledger",status:"Processed",date:"Aug 11",tone:"approved",due:"Complete",assignee:client.owner,attachments:1,clientUpload:false,description:"Transaction-level general ledger detail for the current period.",comments:[]},
+    {id:3,name:"Signed engagement letter.pdf",category:"Planning",type:"Engagement",status:"Synced",date:"Aug 4",tone:"approved",due:"Complete",assignee:"Oscar Owner",attachments:1,clientUpload:false,description:"Fully executed engagement letter synchronized from AssurePro.",comments:[]},
+    {id:4,name:"Board minutes — Q4.pdf",category:"Planning",type:"Client upload",status:client.openItems>0?"New":"Reviewed",date:"Aug 13",tone:client.openItems>0?"warning":"approved",due:client.openItems>0?"Due in 2d":"Complete",assignee:client.owner,attachments:1,clientUpload:true,description:"Board minutes covering the most recent governance decisions.",comments:client.openItems>0?[{author:client.owner,text:"Reviewing before filing."}]:[]},
   ];
 }
+// Sub-folders roll up under the same audit stages the sidebar itself uses (Data ingest,
+// Planning, Fieldwork, Report), so Documents reads as one part of the same audit, not a
+// separately-invented filing system. Anything uncategorized (a user's own "Create Category")
+// defaults to Fieldwork, since that's where ad-hoc testing-area folders belong.
+const AUDIT_STAGE_ORDER=["Data ingest","Planning","Fieldwork","Report"];
+const CATEGORY_STAGE:Record<string,string>={"Data ingest":"Data ingest","Planning":"Planning","Financial Reporting":"Report"};
+function stageForCategory(cat:string){return CATEGORY_STAGE[cat]||"Fieldwork"}
 
 // The request pack AssureAudit's "Create Default Requests" seeds — the standard categories a
 // financial-statement audit collects. Mirrors the real product, which reports back how many
@@ -823,7 +830,7 @@ const DEFAULT_REQUEST_PACK:{category:string;items:string[]}[]=[
 ];
 const DOC_PAGE_SIZES=[10,20,50];
 const DOC_TONES=["neutral","warning","danger","approved"] as const;
-const TONE_LABEL:Record<string,string>={neutral:"No status",warning:"Due soon",danger:"Overdue",approved:"Complete"};
+const TONE_LABEL:Record<string,string>={neutral:"Outstanding — not yet provided",warning:"Provided — awaiting review",danger:"Returned — needs revision",approved:"Accepted"};
 const STATUS_OPTIONS=[{tone:"neutral",due:"Not started"},{tone:"warning",due:"Due in 3d"},{tone:"danger",due:"Overdue"},{tone:"approved",due:"Complete"}];
 const WORKPAPER_REFS=[
   {id:201,title:"Independence confirmations",route:"details"},
@@ -843,7 +850,7 @@ function requestsForClient(client:ClientRecord):ClientRequest[]{
 }
 
 type TimelineAction={label:string;icon:"assign"|"request"|"comment"|"upload"|"status"|"approve";time:string;detail?:string};
-type TimelineEntry={id:number;actor:string;dateLabel:string;time:string;read:boolean;itemTitle:string;actions:TimelineAction[];target?:{tab:"Files"|"Requests";id:number}};
+type TimelineEntry={id:number;actor:string;dateLabel:string;time:string;read:boolean;itemTitle:string;category:string;actions:TimelineAction[];target?:{tab:"Files"|"Requests";id:number}};
 function timelineForClient(client:ClientRecord):TimelineEntry[]{
   const team=CLIENT_TEAMS[client.slug];
   const partner=team.firm.find(m=>m.role.toLowerCase().includes("partner"))?.name||"Oscar Owner";
@@ -855,13 +862,20 @@ function timelineForClient(client:ClientRecord):TimelineEntry[]{
   const openRequest=requests.find(r=>r.status!=="Done")||requests[0];
   const reviewDoc=docs.find(d=>d.clientUpload)||docs[0];
   return [
-    {id:1,actor:partner,dateLabel:"Today",time:"4:02 PM",read:false,itemTitle:`${openRequest.id} ${openRequest.title}`,actions:[{label:"Changed Assignments",icon:"assign",time:"4:02 PM",detail:`${partner} assigned — Team: ${team.firm.map(m=>m.name).join(", ")} | Client: ${clientContact}.`}],target:{tab:"Requests",id:openRequest.id}},
-    {id:2,actor:manager,dateLabel:"Today",time:"4:01 PM",read:false,itemTitle:`${openRequest.id} ${openRequest.title}`,actions:[{label:"Created Request",icon:"request",time:"4:01 PM"}],target:{tab:"Requests",id:openRequest.id}},
-    {id:3,actor:clientContact,dateLabel:"1 week ago",time:"9:16 PM",read:true,itemTitle:openRequest.title,actions:[{label:"Submitted Response",icon:"upload",time:"9:16 PM"}],target:{tab:"Requests",id:openRequest.id}},
-    {id:4,actor:senior,dateLabel:"1 week ago",time:"2:52 PM",read:true,itemTitle:reviewDoc.name,actions:[{label:"Added Comment",icon:"comment",time:"2:52 PM",detail:reviewDoc.comments[0]?.text||"Reviewing before filing."}],target:{tab:"Files",id:reviewDoc.id}},
-    {id:5,actor:manager,dateLabel:"2 weeks ago",time:"11:04 AM",read:true,itemTitle:docs[0].name,actions:[{label:`Status changed to ${docs[0].due}`,icon:"status",time:"11:04 AM"}],target:{tab:"Files",id:docs[0].id}},
-    {id:6,actor:partner,dateLabel:"2 weeks ago",time:"10:20 AM",read:true,itemTitle:docs[2]?.name||docs[0].name,actions:[{label:"Approved",icon:"approve",time:"10:20 AM"}],target:{tab:"Files",id:docs[2]?.id||docs[0].id}},
+    {id:1,actor:partner,dateLabel:"Today",time:"4:02 PM",read:false,itemTitle:`${openRequest.id} ${openRequest.title}`,category:"Requests",actions:[{label:"Changed Assignments",icon:"assign",time:"4:02 PM",detail:`${partner} assigned — Team: ${team.firm.map(m=>m.name).join(", ")} | Client: ${clientContact}.`}],target:{tab:"Requests",id:openRequest.id}},
+    {id:2,actor:manager,dateLabel:"Today",time:"4:01 PM",read:false,itemTitle:`${openRequest.id} ${openRequest.title}`,category:"Requests",actions:[{label:"Created Request",icon:"request",time:"4:01 PM"}],target:{tab:"Requests",id:openRequest.id}},
+    {id:3,actor:clientContact,dateLabel:"1 week ago",time:"9:16 PM",read:true,itemTitle:openRequest.title,category:"Requests",actions:[{label:"Submitted Response",icon:"upload",time:"9:16 PM"}],target:{tab:"Requests",id:openRequest.id}},
+    {id:4,actor:senior,dateLabel:"1 week ago",time:"2:52 PM",read:true,itemTitle:reviewDoc.name,category:reviewDoc.category,actions:[{label:"Added Comment",icon:"comment",time:"2:52 PM",detail:reviewDoc.comments[0]?.text||"Reviewing before filing."}],target:{tab:"Files",id:reviewDoc.id}},
+    {id:5,actor:manager,dateLabel:"2 weeks ago",time:"11:04 AM",read:true,itemTitle:docs[0].name,category:docs[0].category,actions:[{label:`Status changed to ${docs[0].due}`,icon:"status",time:"11:04 AM"}],target:{tab:"Files",id:docs[0].id}},
+    {id:6,actor:partner,dateLabel:"2 weeks ago",time:"10:20 AM",read:true,itemTitle:docs[2]?.name||docs[0].name,category:docs[2]?.category||docs[0].category,actions:[{label:"Approved",icon:"approve",time:"10:20 AM"}],target:{tab:"Files",id:docs[2]?.id||docs[0].id}},
   ];
+}
+function TimelineFilterSelect({label,options,value,onChange,open,setOpen,outerRef}:{label:string;options:string[];value:string;onChange:(v:string)=>void;open:boolean;setOpen:(v:boolean)=>void;outerRef:React.RefObject<HTMLDivElement|null>}){
+  return <div className="timeline-filter-field" ref={outerRef}>
+    <label>{label}</label>
+    <button className="timeline-filter-select" onClick={()=>setOpen(!open)}><span>{value}</span><ChevronDown size={14} className={open?"":"collapsed"}/></button>
+    {open&&<div className="dropdown-menu timeline-filter-options">{options.map(o=><button key={o} className="dropdown-item" onClick={()=>{onChange(o);setOpen(false)}}>{o}{o===value&&<Check size={14}/>}</button>)}</div>}
+  </div>;
 }
 function TimelineActionIcon({kind}:{kind:TimelineAction["icon"]}){
   const size=13;
@@ -877,11 +891,33 @@ function EngagementTimeline({client,close,onGoTo}:{client:ClientRecord;close:()=
   const [query,setQuery]=useState("");
   const [filterOpen,setFilterOpen]=useState(false);
   const filterRef=useDismiss(filterOpen,()=>setFilterOpen(false));
-  const [typeFilters,setTypeFilters]=useState<string[]>([]);
-  const toggleTypeFilter=(t:string)=>setTypeFilters(f=>f.includes(t)?f.filter(x=>x!==t):[...f,t]);
+  const [actionType,setActionType]=useState("All actions");
+  const [actionTypeDraft,setActionTypeDraft]=useState("All actions");
+  const [actionTypeOpen,setActionTypeOpen]=useState(false);
+  const actionTypeRef=useDismiss(actionTypeOpen,()=>setActionTypeOpen(false));
+  const [userFilter,setUserFilter]=useState("All users");
+  const [userDraft,setUserDraft]=useState("All users");
+  const [userOpen,setUserOpen]=useState(false);
+  const userRef=useDismiss(userOpen,()=>setUserOpen(false));
+  const [categoryFilter,setCategoryFilter]=useState("All categories");
+  const [categoryDraft,setCategoryDraft]=useState("All categories");
+  const [categoryOpen,setCategoryOpen]=useState(false);
+  const categoryRef=useDismiss(categoryOpen,()=>setCategoryOpen(false));
+  const [dateRange,setDateRange]=useState("");
+  const [dateRangeDraft,setDateRangeDraft]=useState("");
   const markRead=(id:number)=>setEntries(es=>es.map(e=>e.id===id?{...e,read:true}:e));
-  const allTypes=Array.from(new Set(entries.flatMap(e=>e.actions.map(a=>a.label))));
-  const visible=entries.filter(e=>(typeFilters.length===0||e.actions.some(a=>typeFilters.includes(a.label)))&&`${e.actor} ${e.itemTitle} ${e.actions.map(a=>a.label).join(" ")}`.toLowerCase().includes(query.toLowerCase()));
+  const allActionTypes=["All actions",...Array.from(new Set(entries.flatMap(e=>e.actions.map(a=>a.label))))];
+  const allUsers=["All users",...Array.from(new Set(entries.map(e=>e.actor)))];
+  const allCategories=["All categories",...Array.from(new Set(entries.map(e=>e.category)))];
+  const activeFilterCount=(actionType!=="All actions"?1:0)+(userFilter!=="All users"?1:0)+(categoryFilter!=="All categories"?1:0)+(dateRange?1:0);
+  const openFilters=()=>{setActionTypeDraft(actionType);setUserDraft(userFilter);setCategoryDraft(categoryFilter);setDateRangeDraft(dateRange);setFilterOpen(true)};
+  const applyFilters=()=>{setActionType(actionTypeDraft);setUserFilter(userDraft);setCategoryFilter(categoryDraft);setDateRange(dateRangeDraft);setFilterOpen(false)};
+  const clearFilters=()=>{setActionTypeDraft("All actions");setUserDraft("All users");setCategoryDraft("All categories");setDateRangeDraft("");setActionType("All actions");setUserFilter("All users");setCategoryFilter("All categories");setDateRange("")};
+  const visible=entries.filter(e=>
+    (actionType==="All actions"||e.actions.some(a=>a.label===actionType))
+    &&(userFilter==="All users"||e.actor===userFilter)
+    &&(categoryFilter==="All categories"||e.category===categoryFilter)
+    &&`${e.actor} ${e.itemTitle} ${e.actions.map(a=>a.label).join(" ")}`.toLowerCase().includes(query.toLowerCase()));
   const unread=entries.filter(e=>!e.read).length;
   const groups:{dateLabel:string;items:TimelineEntry[]}[]=[];
   visible.forEach(e=>{const g=groups[groups.length-1];if(g&&g.dateLabel===e.dateLabel)g.items.push(e);else groups.push({dateLabel:e.dateLabel,items:[e]})});
@@ -889,11 +925,13 @@ function EngagementTimeline({client,close,onGoTo}:{client:ClientRecord;close:()=
     <div className="drawer-head"><h2>Engagement Timeline</h2><div className="timeline-head-actions"><span className="timeline-unread"><strong>{unread}</strong> Unread of {entries.length}</span><button className="icon-btn" onClick={close}><X/></button></div></div>
     <div className="timeline-toolbar">
       <div className="topbar-popover" ref={filterRef}>
-        <button className="secondary-btn" onClick={()=>setFilterOpen(v=>!v)}><Filter size={14}/>Filters<ChevronRight size={14}/></button>
-        {filterOpen&&<div className="dropdown-menu">
-          <div className="dropdown-head"><strong>Filter by action</strong><span>Show only matching activity</span></div>
-          {allTypes.map(t=><label className="dropdown-check" key={t}><input type="checkbox" checked={typeFilters.includes(t)} onChange={()=>toggleTypeFilter(t)}/><span>{t}</span></label>)}
-          {typeFilters.length>0&&<button className="dropdown-item" onClick={()=>setTypeFilters([])}><RotateCcw size={14}/><span>Clear filters</span></button>}
+        <button className={`secondary-btn ${activeFilterCount>0?"active":""}`} onClick={()=>filterOpen?setFilterOpen(false):openFilters()}><Filter size={14}/>Filters{activeFilterCount>0&&<b className="count-inline">{activeFilterCount}</b>}<ChevronDown size={14}/></button>
+        {filterOpen&&<div className="dropdown-menu timeline-filter-menu">
+          <TimelineFilterSelect label="Action Type" options={allActionTypes} value={actionTypeDraft} onChange={setActionTypeDraft} open={actionTypeOpen} setOpen={setActionTypeOpen} outerRef={actionTypeRef}/>
+          <TimelineFilterSelect label="User" options={allUsers} value={userDraft} onChange={setUserDraft} open={userOpen} setOpen={setUserOpen} outerRef={userRef}/>
+          <TimelineFilterSelect label="Category" options={allCategories} value={categoryDraft} onChange={setCategoryDraft} open={categoryOpen} setOpen={setCategoryOpen} outerRef={categoryRef}/>
+          <div className="timeline-filter-field"><label>Date Range</label><div className="timeline-daterange-input"><CalendarDays size={14}/><input value={dateRangeDraft} onChange={e=>setDateRangeDraft(e.target.value)} placeholder="Select date range"/></div></div>
+          <div className="timeline-filter-actions"><button className="secondary-btn" onClick={clearFilters}>Clear</button><button className="primary-btn" onClick={applyFilters}>Apply</button></div>
         </div>}
       </div>
       <div className="search no-margin"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search"/></div>
@@ -1055,23 +1093,22 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
         </div>
         <div className="documents-workspace">
           <aside className="documents-folder-tree">
-            {/* title on every label: a tree column can't fit long filenames at any sane width, so
-                the full name stays reachable on hover instead of being lost to the ellipsis. */}
+            {/* Category is as deep as the tree goes within a stage — matching AssureAudit's own
+                Documents section, where a folder is a request category, not a per-file drill-down.
+                Categories roll up under the same audit stages the sidebar uses, so a document
+                folder reads as part of the one audit, not a separately-invented filing system. */}
             <p className="folder-tree-heading">Folders</p>
             <button className={`folder-tree-item ${!selectedFolder?"active":""}`} onClick={()=>{setSelectedFolder(null);setSelectedId(null)}}><FolderOpen size={15}/><span>All documents</span><b>{documents.length}</b></button>
-            {Object.entries(grouped).map(([cat,docs])=>{
-              const isOpen=!collapsedGroups[cat];
-              return <div className="folder-tree-group" key={cat}>
-                {/* only the actual selection carries the pill — when a file inside this folder is
-                    open, the folder itself stays unhighlighted so there's one clear selected row */}
-                <div className={`folder-tree-item ${selectedFolder===cat&&!selectedId?"active":""}`}>
-                  <button className="folder-tree-caret" onClick={()=>toggleGroup(cat)} aria-label={`${isOpen?"Collapse":"Expand"} ${cat}`}><ChevronDown size={13} className={isOpen?"":"collapsed"}/></button>
-                  <button className="folder-tree-label" title={cat} onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>
-                </div>
-                {isOpen&&docs.map(doc=><button key={doc.id} title={doc.name} className={`folder-tree-file ${selectedId===doc.id?"active":""}`} onClick={()=>{setSelectedId(doc.id);setSelectedFolder(cat)}}><FileText size={13}/><span>{doc.name}</span></button>)}
+            {AUDIT_STAGE_ORDER.map(stage=>{
+              const cats=Object.entries(grouped).filter(([cat])=>stageForCategory(cat)===stage);
+              const emptyCats=folders.filter(name=>!grouped[name]&&stageForCategory(name)===stage);
+              if(cats.length===0&&emptyCats.length===0)return null;
+              return <div className="folder-tree-stage" key={stage}>
+                <p className="folder-tree-stage-label">{stage}</p>
+                {cats.map(([cat,docs])=><button key={cat} title={cat} className={`folder-tree-item sub ${selectedFolder===cat?"active":""}`} onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>)}
+                {emptyCats.map(name=><button key={name} title={name} className={`folder-tree-item sub empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
               </div>;
             })}
-            {folders.filter(name=>!grouped[name]).map(name=><button key={name} title={name} className={`folder-tree-item empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
           </aside>
           {/* File list and detail sit side by side, three columns total with the tree — the same
               layout as both AssureAudit's own Documents section and AssurePro's, where opening a
@@ -1084,7 +1121,7 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
                 {!collapsedGroups[cat]&&docs.map(doc=><div className="doc-row-v2" key={doc.id}>
                   <input type="checkbox" checked={checked.includes(doc.id)} onChange={()=>toggleCheck(doc.id)}/>
                   <button className="doc-row-clickzone" onClick={()=>setSelectedId(doc.id)}>
-                    <i className={`tone-dot ${doc.tone}`}/>
+                    <i className={`tone-dot ${doc.tone}`} title={TONE_LABEL[doc.tone]}/>
                     <span className="doc-id">{doc.id}</span>
                     <span className="doc-row-title"><strong>{doc.name}</strong><small>{doc.type}</small></span>
                     <span className={`status-pill ${doc.tone}`}>{doc.due}</span>

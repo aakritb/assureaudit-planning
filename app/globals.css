@@ -381,6 +381,16 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .timeline-drawer{width:540px}
 .timeline-head-actions{display:flex;align-items:center;gap:16px}
 .timeline-unread{font-size:12.5px;color:var(--muted)}
+.timeline-filter-menu{width:280px;padding:14px;display:flex;flex-direction:column;gap:14px}
+.timeline-filter-field{position:relative;display:flex;flex-direction:column;gap:6px}
+.timeline-filter-field label{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.timeline-filter-select{display:flex;align-items:center;justify-content:space-between;border:1px solid #dedbe9;border-radius:9px;background:#fff;padding:9px 12px;font-size:13px;width:100%;text-align:left}
+.timeline-filter-select svg.collapsed{transform:rotate(-90deg)}
+.timeline-filter-options{position:absolute;top:100%;left:0;right:0;margin-top:4px;max-height:220px;overflow:auto;z-index:5}
+.timeline-daterange-input{display:flex;align-items:center;gap:8px;border:1px solid #dedbe9;border-radius:9px;padding:9px 12px;color:var(--muted)}
+.timeline-daterange-input input{border:0;padding:0;width:100%}
+.timeline-daterange-input input:focus{box-shadow:none}
+.timeline-filter-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:4px;border-top:1px solid var(--line)}
 .timeline-unread strong{color:var(--violet-dark);font-weight:700}
 .timeline-toolbar{display:flex;align-items:center;gap:10px;padding:14px 22px;border-bottom:1px solid var(--line)}
 .timeline-toolbar .search{flex:1}
@@ -448,6 +458,9 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
    leaves filenames readable, with the full text on hover for the few that still overflow. */
 .documents-folder-tree{width:288px;flex:none;border-right:1px solid var(--line);padding:10px;align-self:stretch;overflow:auto;background:#fcfcfe}
 .folder-tree-heading{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:4px 10px 8px}
+.folder-tree-stage{margin-top:6px}
+.folder-tree-stage-label{font-size:10.5px;font-weight:700;color:var(--muted-2);padding:6px 10px 2px}
+.folder-tree-item.sub{padding-left:22px;font-size:12px}
 .folder-tree-group{display:flex;flex-direction:column}
 .folder-tree-item{display:flex;align-items:center;gap:7px;width:100%;border:0;background:transparent;border-radius:8px;padding:8px 10px;text-align:left;font-size:12.5px;color:var(--muted-2);cursor:pointer}
 .folder-tree-item.active,.folder-tree-item.active .folder-tree-label{background:var(--violet-soft);color:var(--violet-dark);font-weight:650}
