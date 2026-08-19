@@ -50,7 +50,7 @@ test("keeps materiality guidance contextual and calculates triviality from overa
   assert.match(page, /‘Clearly trivial’ is not another expression for ‘not material.’/);
 });
 
-test("uses a staged client workspace with ingest before workpapers", async () => {
+test("uses a staged client workspace with ingest before planning", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
   assert.match(page, /Home as HomeIcon/);
@@ -58,7 +58,7 @@ test("uses a staged client workspace with ingest before workpapers", async () =>
   assert.doesNotMatch(page, /<Home\/>/);
   assert.doesNotMatch(page, /className="planning-stepper"/);
   assert.match(page, /<span>Data ingest<\/span>/);
-  assert.match(page, /<span>Workpapers<\/span>/);
+  assert.match(page, /<span>Planning<\/span>/);
   assert.match(page, /const INGEST_STEPS=/);
   assert.match(page, /label:"Accounting system"/);
   assert.match(page, /label:"Transform & validate"/);
