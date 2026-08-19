@@ -476,14 +476,13 @@ const WORK_TASKS:WorkTask[]=[
   {id:13,title:"Confirm plan administrator representations",clientSlug:"horizon",type:"Collect",assignee:"Leo Chen",priority:"Low",status:"Todo",waitingOn:"Client response",due:"Aug 19",billable:true,description:"Awaiting signed representation letter from Jordan Taylor.",stage:"Completion"},
   {id:14,title:"Archive engagement file",clientSlug:"cedar",type:"Admin",assignee:"Meera Kapoor",priority:"Low",status:"Todo",waitingOn:"Not blocked",due:"Not set",billable:false,description:"Engagement is complete; finalize retention and archive per firm policy.",stage:"Completion"},
 ];
-const WORKFLOW_STAGES=["Intake","Ingest","Review","Delivered"] as const;
+const WORKFLOW_STAGES=["Planning","Fieldwork","Completion"] as const;
 type WorkflowStage=typeof WORKFLOW_STAGES[number];
-const WORKFLOW_STAGE_TONE:Record<WorkflowStage,string>={Intake:"danger",Ingest:"progress",Review:"warning",Delivered:"approved"};
+const WORKFLOW_STAGE_TONE:Record<WorkflowStage,string>={Planning:"progress",Fieldwork:"warning",Completion:"approved"};
 function clientToWorkflowStage(stage:string):WorkflowStage{
-  if(stage==="Setup required")return "Intake";
-  if(stage==="Data ingest")return "Ingest";
-  if(stage==="Workpapers"||stage==="Review")return "Review";
-  return "Delivered";
+  if(stage==="Setup required"||stage==="Data ingest")return "Planning";
+  if(stage==="Workpapers")return "Fieldwork";
+  return "Completion";
 }
 const WORKFLOW_ROLE_LETTERS=["P","R","S","A"] as const;
 function buildTeamSlots(slug:string,assignedCount:number):{initials:string;named:boolean}[]{
@@ -522,17 +521,16 @@ function WorkflowEngagements({view,navigate,update}:{view:"Board"|"List";navigat
   const [dragId,setDragId]=useState<string|null>(null);
   const [collapsedCols,setCollapsedCols]=useState<Record<string,boolean>>({});
   const [query,setQuery]=useState("");
-  const [typeFilter,setTypeFilter]=useState("All engagements");
-  const [typeOpen,setTypeOpen]=useState(false);
-  const typeRef=useDismiss(typeOpen,()=>setTypeOpen(false));
+  const [stageFilter,setStageFilter]=useState("All engagements");
+  const [stageFilterOpen,setStageFilterOpen]=useState(false);
+  const stageFilterRef=useDismiss(stageFilterOpen,()=>setStageFilterOpen(false));
   const [displayOpen,setDisplayOpen]=useState(false);
   const displayRef=useDismiss(displayOpen,()=>setDisplayOpen(false));
   const [showAvatars,setShowAvatars]=useState(true);
   const [showCategory,setShowCategory]=useState(true);
 
-  const types=Array.from(new Set(cards.map(c=>c.type)));
-  const visible=cards.filter(c=>(typeFilter==="All engagements"||c.type===typeFilter)&&c.name.toLowerCase().includes(query.toLowerCase()));
-  const intakeValue=visible.filter(c=>c.stage==="Intake").reduce((s,c)=>s+c.value,0);
+  const visible=cards.filter(c=>(stageFilter==="All engagements"||c.stage===stageFilter)&&c.name.toLowerCase().includes(query.toLowerCase()));
+  const planningValue=visible.filter(c=>c.stage==="Planning").reduce((s,c)=>s+c.value,0);
   const newEngagement=()=>update({},"New engagements are created in AssurePro — you'll be redirected there to continue.");
 
   const moveCard=(id:string,to:WorkflowStage)=>{
@@ -545,14 +543,14 @@ function WorkflowEngagements({view,navigate,update}:{view:"Board"|"List";navigat
 
   return <>
     <div className="workflow-toolbar">
-      <div className="topbar-popover" ref={typeRef}>
-        <button className="secondary-btn" onClick={()=>setTypeOpen(v=>!v)}>{typeFilter} <b className="count-inline">{typeFilter==="All engagements"?cards.length:cards.filter(c=>c.type===typeFilter).length}</b><ChevronDown size={14}/></button>
-        {typeOpen&&<div className="dropdown-menu">
-          <button className={`dropdown-item ${typeFilter==="All engagements"?"active":""}`} onClick={()=>{setTypeFilter("All engagements");setTypeOpen(false)}}>All engagements <b className="count-inline">{cards.length}</b></button>
-          {types.map(t=><button key={t} className={`dropdown-item ${typeFilter===t?"active":""}`} onClick={()=>{setTypeFilter(t);setTypeOpen(false)}}>{t} <b className="count-inline">{cards.filter(c=>c.type===t).length}</b></button>)}
+      <div className="topbar-popover" ref={stageFilterRef}>
+        <button className="secondary-btn" onClick={()=>setStageFilterOpen(v=>!v)}>{stageFilter} <b className="count-inline">{stageFilter==="All engagements"?cards.length:cards.filter(c=>c.stage===stageFilter).length}</b><ChevronDown size={14}/></button>
+        {stageFilterOpen&&<div className="dropdown-menu">
+          <button className={`dropdown-item ${stageFilter==="All engagements"?"active":""}`} onClick={()=>{setStageFilter("All engagements");setStageFilterOpen(false)}}>All engagements <b className="count-inline">{cards.length}</b></button>
+          {WORKFLOW_STAGES.map(s=><button key={s} className={`dropdown-item ${stageFilter===s?"active":""}`} onClick={()=>{setStageFilter(s);setStageFilterOpen(false)}}>{s} <b className="count-inline">{cards.filter(c=>c.stage===s).length}</b></button>)}
         </div>}
       </div>
-      <span className="workflow-pipeline-badge">Pipeline <b>{money(intakeValue)}</b></span>
+      <span className="workflow-pipeline-badge">Pipeline <b>{money(planningValue)}</b></span>
       <div className="search no-margin workflow-search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search engagements…"/></div>
       <button className="primary-btn" onClick={newEngagement}><Plus size={15}/>New Engagement</button>
       <div className="topbar-popover" ref={displayRef}>
@@ -569,7 +567,7 @@ function WorkflowEngagements({view,navigate,update}:{view:"Board"|"List";navigat
         const rows=visible.filter(c=>c.stage===stage);
         const isCollapsed=collapsedCols[stage];
         return <div key={stage} className={`kanban-column workflow-column ${isCollapsed?"collapsed":""}`} onDragOver={e=>e.preventDefault()} onDrop={()=>dragId&&moveCard(dragId,stage)}>
-          <div className="kanban-column-head"><span><i className={`tone-dot ${WORKFLOW_STAGE_TONE[stage]}`}/>{stage}</span><span className="workflow-col-actions">{stage==="Intake"&&intakeValue>0&&<b className="workflow-col-value">{money(intakeValue)}</b>}<b>{rows.length}</b><button className="icon-btn" title={isCollapsed?"Expand column":"Collapse column"} onClick={()=>setCollapsedCols(c=>({...c,[stage]:!c[stage]}))}><ChevronLeft size={13}/></button><button className="icon-btn" title="New engagement" onClick={newEngagement}><Plus size={13}/></button></span></div>
+          <div className="kanban-column-head"><span><i className={`tone-dot ${WORKFLOW_STAGE_TONE[stage]}`}/>{stage}</span><span className="workflow-col-actions">{stage==="Planning"&&planningValue>0&&<b className="workflow-col-value">{money(planningValue)}</b>}<b>{rows.length}</b><button className="icon-btn" title={isCollapsed?"Expand column":"Collapse column"} onClick={()=>setCollapsedCols(c=>({...c,[stage]:!c[stage]}))}><ChevronLeft size={13}/></button><button className="icon-btn" title="New engagement" onClick={newEngagement}><Plus size={13}/></button></span></div>
           {!isCollapsed&&<>
             {rows.map(card=><button key={card.id} className="kanban-card workflow-card" draggable onDragStart={()=>setDragId(card.id)} onClick={()=>card.clientSlug&&navigate(`/clients/${card.clientSlug}`)}>
               {card.flagged&&<span className="workflow-card-flag"><AlertTriangle size={11}/></span>}
@@ -731,17 +729,16 @@ function CreateTaskModal({close,onCreate,restrictAssigneeToSelf,defaultAssignee,
     </div>
     <Field label="Notes"><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional notes…"/></Field>
     {restrictAssigneeToSelf&&<p className="restriction-note"><LockKeyhole size={12}/>Preparers can only create tasks assigned to themselves — ask a Manager or Partner to assign work to others.</p>}
-    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!title.trim()} onClick={()=>onCreate({title,type,clientSlug,assignee,priority,due:due.trim()||"No date",waitingOn,billable:true,description:notes,stage:client?"Intake":"Admin"})}>Create task</button></div>
+    <div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="primary-btn" disabled={!title.trim()} onClick={()=>onCreate({title,type,clientSlug,assignee,priority,due:due.trim()||"No date",waitingOn,billable:true,description:notes,stage:client?"Planning":"Admin"})}>Create task</button></div>
   </div></div>;
 }
 
 function Dashboard({ navigate, state }: { navigate: (p: string) => void; state: DemoState }) {
   const stageCount=(s:WorkflowStage)=>CLIENTS.filter(c=>clientToWorkflowStage(c.stage)===s).length;
   const pipeline=[
-    {name:"Intake",value:stageCount("Intake"),color:"#E0D9FF"},
-    {name:"Ingest",value:stageCount("Ingest"),color:"#6B46FF"},
-    {name:"Review",value:stageCount("Review"),color:"#A38FFF"},
-    {name:"Delivered",value:stageCount("Delivered"),color:"#C1B3FF"},
+    {name:"Planning",value:stageCount("Planning"),color:"#6B46FF"},
+    {name:"Fieldwork",value:stageCount("Fieldwork"),color:"#A38FFF"},
+    {name:"Completion",value:stageCount("Completion"),color:"#C1B3FF"},
   ].filter(s=>s.value>0);
   const due=[{name:"Overdue",value:2},{name:"0–7 days",value:5},{name:"8–14 days",value:3},{name:"15+ days",value:1}];
   return <div className="page firm-dashboard">
@@ -960,21 +957,31 @@ function EngagementTimeline({client,close,onGoTo}:{client:ClientRecord;close:()=
 function DocumentsCenter({initialSlug,navigate,update}:{initialSlug?:string;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
   const [selectedSlug,setSelectedSlug]=useState(initialSlug||CLIENTS[0].slug);
   const [clientQuery,setClientQuery]=useState("");
+  const [clientsCollapsed,setClientsCollapsed]=useState(false);
   const client=CLIENTS.find(c=>c.slug===selectedSlug)||CLIENTS[0];
   const filteredClients=CLIENTS.filter(c=>`${c.name} ${c.industry}`.toLowerCase().includes(clientQuery.toLowerCase()));
+  const awaiting=filteredClients.filter(c=>c.openItems>0);
+  const restClients=filteredClients.filter(c=>c.openItems===0);
+  const clientRow=(c:ClientRecord)=><button key={c.slug} className={c.slug===selectedSlug?"active":""} onClick={()=>setSelectedSlug(c.slug)}>
+    <i>{c.initials}</i>
+    <span><strong>{c.name}</strong><small>{docsForClient(c).length} documents{c.openItems>0?` · ${c.openItems} pending`:""}</small></span>
+    {c.openItems>0&&<b className="pending-dot"/>}
+  </button>;
   return <div className="page documents-center-page">
     <div className="page-heading"><div><p className="eyebrow">Firm portfolio</p><h1>Documents</h1><p>One document center for every client — select a client to view its library.</p></div></div>
     <div className="documents-center-layout">
-      <aside className="documents-center-clients">
+      <aside className={`documents-center-clients ${clientsCollapsed?"collapsed":""}`}>
+        <div className="documents-center-clients-head"><span>Clients <b className="count-inline">{CLIENTS.length}</b></span><button className="icon-btn" title={clientsCollapsed?"Expand clients":"Collapse clients"} onClick={()=>setClientsCollapsed(v=>!v)}><ChevronLeft size={14} className={clientsCollapsed?"rotated":""}/></button></div>
+        {!clientsCollapsed&&<>
         <div className="search"><Search/><input value={clientQuery} onChange={e=>setClientQuery(e.target.value)} placeholder="Search clients…"/></div>
         <div className="documents-center-client-list">
-          {filteredClients.map(c=><button key={c.slug} className={c.slug===selectedSlug?"active":""} onClick={()=>setSelectedSlug(c.slug)}>
-            <i>{c.initials}</i>
-            <span><strong>{c.name}</strong><small>{docsForClient(c).length} documents{c.openItems>0?` · ${c.openItems} pending`:""}</small></span>
-            {c.openItems>0&&<b className="pending-dot"/>}
-          </button>)}
+          {awaiting.length>0&&<p className="documents-client-group-label"><i className="pending-dot"/>Awaiting documents <b>{awaiting.length}</b></p>}
+          {awaiting.map(clientRow)}
+          {restClients.length>0&&<p className="documents-client-group-label">All clients</p>}
+          {restClients.map(clientRow)}
           {filteredClients.length===0&&<div className="dropdown-empty">No clients match.</div>}
         </div>
+        </>}
       </aside>
       <ClientDocumentsMain key={client.slug} client={client} navigate={navigate} update={update}/>
     </div>
@@ -1007,6 +1014,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const [onlyFlagged,setOnlyFlagged]=useState(false);
   const [onlyClientUploads,setOnlyClientUploads]=useState(false);
   const [packCreated,setPackCreated]=useState(false);
+  const [fileKind,setFileKind]=useState<"All"|"Requested"|"Internal">("All");
+  const [assureProOpen,setAssureProOpen]=useState(false);
+  const assureProRef=useDismiss(assureProOpen,()=>setAssureProOpen(false));
   const goToTimelineTarget=(entry:TimelineEntry)=>{
     if(!entry.target)return;
     if(entry.target.tab==="Files"){setTab("Files");setSelectedId(entry.target.id)}
@@ -1021,6 +1031,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const grouped:Record<string,DocRecord[]>={};
   visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
   const displayedDocs=selectedFolder?visible.filter(d=>d.category===selectedFolder):visible;
+  const requestedCount=displayedDocs.filter(d=>d.status==="Requested").length;
+  const internalCount=displayedDocs.filter(d=>!d.clientUpload&&d.status!=="Requested").length;
+  const kindFilteredDocs=fileKind==="All"?displayedDocs:fileKind==="Requested"?displayedDocs.filter(d=>d.status==="Requested"):displayedDocs.filter(d=>!d.clientUpload&&d.status!=="Requested");
   const toggleTone=(tone:string)=>setToneFilters(f=>f.includes(tone)?f.filter(t=>t!==tone):[...f,tone]);
   const toggleGroup=(cat:string)=>setCollapsedGroups(g=>({...g,[cat]:!g[cat]}));
   const updateDoc=(id:number,patch:Partial<DocRecord>)=>setDocuments(docs=>docs.map(d=>d.id===id?{...d,...patch}:d));
@@ -1044,9 +1057,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
     update({},`Created ${DEFAULT_REQUEST_PACK.length} categories and ${added.length} requests.`);
   };
   const catOrder=Array.from(new Set(visibleAll.map(d=>d.category)));
-  const pageCount=Math.max(1,Math.ceil(displayedDocs.length/pageSize));
+  const pageCount=Math.max(1,Math.ceil(kindFilteredDocs.length/pageSize));
   const safePage=Math.min(page,pageCount);
-  const pagedDocs=displayedDocs.slice((safePage-1)*pageSize,safePage*pageSize);
+  const pagedDocs=kindFilteredDocs.slice((safePage-1)*pageSize,safePage*pageSize);
   const pagedGrouped:Record<string,DocRecord[]>={};
   pagedDocs.forEach(doc=>{(pagedGrouped[doc.category]=pagedGrouped[doc.category]||[]).push(doc)});
   const allChecked=pagedDocs.length>0&&pagedDocs.every(d=>checked.includes(d.id));
@@ -1057,8 +1070,14 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
     {!embedded&&<div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>}
     <div className="chip-row-label"><span>Linked workpapers</span><InfoTip title="Linked workpapers" text="Numbered cross-references (201–205) to the specific Data Ingest and Workpapers step that produced or relies on this client's documents. Click a chip to jump straight to that step." standard="Cross-reference · Planning workflow"/></div>
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
+      <p className="documents-breadcrumb">Documents <ChevronRight size={11}/> {selectedFolder||"All documents"}</p>
       <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{displayedDocs.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
       {tab==="Files"?<>
+        <div className="documents-kind-tabs">
+          <button className={fileKind==="All"?"active":""} onClick={()=>{setFileKind("All");setPage(1)}}>All <b>{displayedDocs.length}</b></button>
+          <button className={fileKind==="Requested"?"active":""} onClick={()=>{setFileKind("Requested");setPage(1)}}>Requested <b>{requestedCount}</b></button>
+          <button className={fileKind==="Internal"?"active":""} onClick={()=>{setFileKind("Internal");setPage(1)}}>Internal <b>{internalCount}</b></button>
+        </div>
         {/* Category summary chips: each category's request IDs as bubbles, collapsible from the
             toolbar caret — AssureAudit's own pattern, restyled to AssurePro's chip language. */}
         {chipsOpen&&catOrder.length>0&&<div className="doc-category-chips">
@@ -1087,8 +1106,16 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
           <button className="icon-btn notification" title="Engagement Timeline" onClick={()=>setTimelineOpen(true)}><History size={16}/><i>1</i></button>
           {!packCreated&&<button className="secondary-btn" onClick={createDefaultRequests}><Plus size={15}/>Create Default Requests</button>}
           <button className="icon-btn" title="Export documents.csv" onClick={()=>update({},`Documents for ${client.name} exported as documents.csv (simulated)`)}><Download size={16}/></button>
-          <button className="secondary-btn" onClick={()=>setCategoryOpen(true)}><Plus size={15}/>Create Category</button>
-          <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Plus size={15}/>Create Request</button>
+          <div className="topbar-popover" ref={assureProRef}>
+            <button className="secondary-btn" onClick={()=>setAssureProOpen(v=>!v)}><BriefcaseBusiness size={14}/>Assure Pro<ChevronDown size={14}/></button>
+            {assureProOpen&&<div className="dropdown-menu">
+              <div className="dropdown-head"><strong>Source</strong><span>Where this folder's files are managed</span></div>
+              <button className="dropdown-item" onClick={()=>{setAssureProOpen(false);update({},`Opening ${selectedFolder||client.name}'s documents in AssurePro`)}}><BriefcaseBusiness size={14}/><span>AssurePro</span></button>
+            </div>}
+          </div>
+          <button className="secondary-btn" onClick={()=>setRequestOpen(true)}><Plus size={15}/>Request</button>
+          <button className="secondary-btn" onClick={()=>update({},"Import brings files in from AssurePro or a connected source (simulated).")}><Download size={15}/>Import</button>
+          <button className="primary-btn" onClick={()=>update({},"File upload happens here — wire to your OS file picker in production.")}><UploadCloud size={15}/>Upload</button>
         </div>
         <div className="documents-workspace">
           <aside className="documents-folder-tree">
@@ -1096,16 +1123,18 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
                 Documents section, where a folder is a request category, not a per-file drill-down.
                 Categories roll up under the same audit stages the sidebar uses, so a document
                 folder reads as part of the one audit, not a separately-invented filing system. */}
-            <p className="folder-tree-heading">Folders</p>
-            <button className={`folder-tree-item ${!selectedFolder?"active":""}`} onClick={()=>{setSelectedFolder(null);setSelectedId(null)}}><FolderOpen size={15}/><span>All documents</span><b>{documents.length}</b></button>
+            <div className="folder-tree-head"><p className="folder-tree-heading">Folders</p><button className="icon-btn" title="Create Category" onClick={()=>setCategoryOpen(true)}><Plus size={14}/></button></div>
+            <button className={`folder-tree-item ${!selectedFolder&&!onlyClientUploads?"active":""}`} onClick={()=>{setSelectedFolder(null);setOnlyClientUploads(false);setSelectedId(null)}}><FolderOpen size={15}/><span>All documents</span><b>{documents.length}</b></button>
+            <button className={`folder-tree-item ${onlyClientUploads&&!selectedFolder?"active":""}`} onClick={()=>{setSelectedFolder(null);setOnlyClientUploads(true);setSelectedId(null)}}><UploadCloud size={15}/><span>Client Uploads</span><b>{documents.filter(d=>d.clientUpload).length}</b></button>
+            <button className="folder-tree-item" onClick={()=>update({},"Opens this client's Messaging thread (simulated).")}><MessageSquare size={15}/><span>Messaging</span></button>
             {AUDIT_STAGE_ORDER.map(stage=>{
               const cats=Object.entries(grouped).filter(([cat])=>stageForCategory(cat)===stage);
               const emptyCats=folders.filter(name=>!grouped[name]&&stageForCategory(name)===stage);
               if(cats.length===0&&emptyCats.length===0)return null;
               return <div className="folder-tree-stage" key={stage}>
                 <p className="folder-tree-stage-label">{stage}</p>
-                {cats.map(([cat,docs])=><button key={cat} title={cat} className={`folder-tree-item sub ${selectedFolder===cat?"active":""}`} onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>)}
-                {emptyCats.map(name=><button key={name} title={name} className={`folder-tree-item sub empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
+                {cats.map(([cat,docs])=><button key={cat} title={cat} className={`folder-tree-item sub ${selectedFolder===cat?"active":""}`} onClick={()=>{setSelectedFolder(cat);setOnlyClientUploads(false);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>)}
+                {emptyCats.map(name=><button key={name} title={name} className={`folder-tree-item sub empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setOnlyClientUploads(false);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
               </div>;
             })}
           </aside>
@@ -1129,14 +1158,14 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
                   </button>
                 </div>)}
               </section>)}
-              {displayedDocs.length===0&&selectedFolder&&!grouped[selectedFolder]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document and use "Move" to file it here.</p>}
-              {displayedDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>{packCreated||documents.length>0?"Clear the filters or search to see the full client library.":'Use "Create Default Requests" to seed the standard request pack, or "Create Request" for a one-off.'}</p></div>}
+              {kindFilteredDocs.length===0&&selectedFolder&&!grouped[selectedFolder]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document and use "Move" to file it here.</p>}
+              {kindFilteredDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>{packCreated||documents.length>0?"Clear the filters or search to see the full client library.":'Use "Create Default Requests" to seed the standard request pack, or "Request" for a one-off.'}</p></div>}
               {displayedDocs.length>0&&<div className="doc-pagination">
                 <div className="topbar-popover" ref={sizeRef}>
                   <span>Showing</span>
                   <button className="secondary-btn" onClick={()=>setSizeOpen(v=>!v)}>{pageSize}<ChevronDown size={13}/></button>
                   {sizeOpen&&<div className="dropdown-menu">{DOC_PAGE_SIZES.map(s=><button key={s} className="dropdown-item" onClick={()=>{setPageSize(s);setPage(1);setSizeOpen(false)}}>{s}</button>)}</div>}
-                  <span>of {displayedDocs.length} documents</span>
+                  <span>of {kindFilteredDocs.length} documents</span>
                 </div>
                 <div className="doc-pagination-pages">
                   <button className="icon-btn" disabled={safePage===1} onClick={()=>setPage(1)}><ChevronLeft size={14}/></button>
@@ -1277,14 +1306,14 @@ const CLIENT_TAGS:Record<string,string[]>={
   horizon:["EBP specialist required"],
   cedar:["Long-term client","Low risk"],
 };
-const ENGAGEMENT_STAGE_TONE:Record<string,string>={Intake:"danger","Document Collection":"progress","Categorization & Reconciliation":"warning",Review:"warning",Complete:"approved"};
+const ENGAGEMENT_STAGE_TONE:Record<string,string>={Planning:"progress",Fieldwork:"warning",Completion:"approved",Complete:"approved"};
 function engagementStageTone(stage:string){return ENGAGEMENT_STAGE_TONE[stage]||"neutral"}
 type ClientEngagementRow={id:string;title:string;period:string;stage:string;due:string;assignee:string};
 function engagementsForClient(client:ClientRecord):ClientEngagementRow[]{
   const team=CLIENT_TEAMS[client.slug];
   const senior=team.firm[team.firm.length-1]?.name||client.owner;
   const wf=clientToWorkflowStage(client.stage);
-  const currentStage=wf==="Intake"?"Intake":wf==="Ingest"?"Document Collection":wf==="Review"?"Review":"Complete";
+  const currentStage=wf;
   const yearMatch=client.period.match(/(\d{4})/);
   const year=yearMatch?parseInt(yearMatch[1]):2025;
   const priorPeriod=client.period.replace(String(year),String(year-1));
@@ -2164,6 +2193,8 @@ function GlobalGuide({path,open,setOpen}:{path:string;open:boolean;setOpen:(v:bo
   ]}:path==="/documents"||(clientPath&&path.endsWith("/documents"))?{title:"Documents",steps:[
     ["Switch clients from one place","One document center serves every client — use the list on the left to move between libraries without leaving the page."],
     ["Files vs. Requests","Files groups documents by category with status and comment counts. Requests tracks what's still outstanding from the client — the pending count on the tab always matches what's in the list."],
+    ["All, Requested, Internal","Inside Files, split the current folder by what's been requested from the client versus what the firm prepared internally — each count updates as you select a different folder."],
+    ["Request, Import, Upload, or hand off to AssurePro","Request asks the client for a new document, Import brings files in from a connected source, and Upload adds one from this device. The AssurePro dropdown opens the same folder in AssurePro."],
     ["Trace back to the source workpaper","The numbered chips (201–205) link each document category to the Data Ingest or Workpapers step that produced it — click one to jump straight there."],
   ]}:clientPath?{title:"Client overview",steps:[
     ["Review the client first","This page combines engagement details, attention items, documents and the approval hierarchy for one client."],
