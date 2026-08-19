@@ -986,7 +986,7 @@ function DocumentsCenter({initialSlug,navigate,update}:{initialSlug?:string;navi
   </div>;
 }
 
-function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void}) {
+function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRecord;navigate:(p:string)=>void;update:(p:Partial<DemoState>,m?:string)=>void;embedded?:boolean}) {
   const [query,setQuery]=useState("");
   const [toneFilters,setToneFilters]=useState<string[]>([]);
   const [collapsedGroups,setCollapsedGroups]=useState<Record<string,boolean>>({});
@@ -1022,7 +1022,7 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const selectedRequest=requests.find(r=>r.id===selectedRequestId)||null;
   return <>
     <section className="documents-main documents-center-main">
-    <div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>
+    {!embedded&&<div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>}
     <div className="chip-row-label"><span>Linked workpapers</span><InfoTip title="Linked workpapers" text="Numbered cross-references (201–205) to the specific Data Ingest and Workpapers step that produced or relies on this client's documents. Click a chip to jump straight to that step." standard="Cross-reference · Planning workflow"/></div>
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
       <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{documents.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
@@ -1263,11 +1263,11 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
         :<><h1>{displayName}</h1><button className="icon-btn" title="Rename" onClick={()=>setEditingName(true)}><Pencil size={14}/></button><span className="chip neutral">Business</span><span className="status-pill approved">Active</span></>}
       </div>
       <div className="client-head-actions">
-        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/engagement/${client.slug}/planning`)}}><ClipboardCheck size={14}/><span>Workflow</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/clients/${client.slug}/documents`)}}><FolderOpen size={14}/><span>Documents</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);setTab("Billing")}}><FileSpreadsheet size={14}/><span>Billing</span></button></div>}</div>
+        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/engagement/${client.slug}/planning`)}}><ClipboardCheck size={14}/><span>Workflow</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);setTab("Documents")}}><FolderOpen size={14}/><span>Documents</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);setTab("Billing")}}><FileSpreadsheet size={14}/><span>Billing</span></button></div>}</div>
         <div className="topbar-popover" ref={moreRef}><button className="icon-btn" onClick={()=>setMoreOpen(v=>!v)}><MoreHorizontal/></button>{moreOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose email (simulated)")}}><Send size={14}/><span>Email</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose SMS (simulated)")}}><MessageSquare size={14}/><span>SMS</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Note added (simulated)")}}><FileText size={14}/><span>Note</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},`${displayName} archived (simulated)`)}}><FolderOpen size={14}/><span>Archive</span></button><button className="dropdown-item danger" onClick={()=>{setMoreOpen(false);update({},"Delete not available in this prototype")}}><Trash2 size={14}/><span>Delete</span></button></div>}</div>
       </div>
     </div>
-    <nav className="client-tabs">{CLIENT_DETAIL_TABS.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>t==="Documents"?navigate(`/clients/${client.slug}/documents`):setTab(t)}>{t}</button>)}</nav>
+    <nav className="client-tabs">{CLIENT_DETAIL_TABS.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</nav>
     {tab==="Overview"&&<>
     {attentionCount>0&&<section className="client-attention"><div><AlertCircle/><strong>Needs attention</strong><span>{attentionCount}</span></div>
       {overdueInvoices.length>0&&<button onClick={()=>setTab("Billing")}><strong>{overdueInvoices.length} invoice{overdueInvoices.length===1?"":"s"} overdue</strong><span>{money(overdueAmount)}</span><ArrowRight/></button>}
@@ -1282,13 +1282,14 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
       <aside className="client-stat-cards">
         <div className="stat-card"><span className="stat-card-icon"><DollarSign size={14}/></span><small>Outstanding</small><strong className={overdueAmount>0?"danger-text":""}>{money(overdueAmount)}</strong><span>{overdueInvoices.length>0?`${overdueInvoices.length} invoices overdue`:"No invoices overdue"}</span></div>
         <div className="stat-card"><span className="stat-card-icon"><CalendarDays size={14}/></span><small>Next deadline</small><strong>{client.due==="Not set"||client.due==="Complete"?"–":client.due}</strong><span>{client.due==="Not set"||client.due==="Complete"?"No upcoming deadlines":"Upcoming"}</span></div>
-        <div className="stat-card-row"><div className="stat-card compact"><strong>{engagements.length}</strong><span>Engagements</span></div><div className="stat-card compact"><strong>{client.documents}</strong><span>Documents</span></div></div>
+        <div className="stat-card-row"><button className="stat-card compact" onClick={()=>setTab("Engagements")}><strong>{engagements.length}</strong><span>Engagements</span></button><button className="stat-card compact" onClick={()=>setTab("Documents")}><strong>{client.documents}</strong><span>Documents</span></button></div>
         <div className="stat-card"><small>Client Pending Actions</small><p className="panel-empty-text">No pending actions.</p></div>
         <div className="stat-card"><div className="stat-card-head"><small>Recent communications</small><button className="text-link" onClick={()=>setTab("Communications")}>View all</button></div><p className="panel-empty-text">{CLIENT_TEAMS[client.slug].firm[0]?.name} sent a message 2d ago.</p></div>
       </aside>
     </div>
     </>}
     {tab==="Info"&&<ClientInfoTab client={client}/>}
+    {tab==="Documents"&&<ClientDocumentsMain client={client} navigate={navigate} update={update} embedded/>}
     {tab==="Engagements"&&<section className="section-card client-engagements-card" style={{maxWidth:900}}><div className="section-title"><div><h2>Engagements</h2><p>Every engagement open for {displayName}.</p></div></div>
       <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span></div>
       {engagements.map(e=><div className="engagements-table-row" key={e.id}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span></div>)}
