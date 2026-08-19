@@ -332,7 +332,7 @@ export default function Home() {
           <FieldworkShell path={path} navigate={navigate} state={state} update={update}/>
         ) : planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
-        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} /> : path === "/documents" ? <DocumentsCenter navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <DocumentsCenter initialSlug={clientSlug} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
+        ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} /> : path === "/documents" ? <DocumentsCenter navigate={navigate} update={update} /> : path === "/metrics" ? <MetricsDashboard navigate={navigate} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <DocumentsCenter initialSlug={clientSlug} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
       </main>
       {demoOpen && <DemoControls state={state} update={update} close={() => setDemoOpen(false)}/>} 
       {toast && <div className="toast sync-toast" role="status"><span className="toast-success"><Check/></span><div><strong>{/AssurePro|QuickBooks|sync|connector|connection/i.test(toast)?"Connected platform updated":"Action completed"}</strong><span>{toast}</span></div><button aria-label="Dismiss notification" onClick={()=>setToast("")}><X/></button></div>}
@@ -358,6 +358,7 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       <button className={`nav-item ${path === "/clients" || path === "/engagements" ? "active" : ""}`} onClick={() => navigate("/clients")}><Users/><span>Clients</span></button>
       <button className={`nav-item ${path === "/documents" ? "active" : ""}`} onClick={() => navigate("/documents")}><FolderOpen/><span>Documents</span></button>
       <button className={`nav-item ${path === "/my-work" ? "active" : ""}`} onClick={() => navigate("/my-work")}><ClipboardCheck/><span>My work</span><span className="nav-count">{myWorkBadgeCount(state)}</span></button>
+      <button className={`nav-item ${path === "/metrics" ? "active" : ""}`} onClick={() => navigate("/metrics")}><Gauge/><span>Metrics</span></button>
       {!clientContext&&<><p className="nav-label branch-label">Client workspace</p><div className="client-workspace-nav workspace-preview"><button className="select-client-nav" onClick={()=>navigate("/clients")}><Search/><span>Select a client</span><ChevronRight/></button><button disabled><HomeIcon/><span>Overview</span><LockKeyhole className="branch-lock"/></button><button disabled><Database/><span>Data ingest</span><LockKeyhole className="branch-lock"/></button><button disabled><ClipboardCheck/><span>Workpapers</span><LockKeyhole className="branch-lock"/></button><button disabled><Search/><span>Fieldwork</span><LockKeyhole className="branch-lock"/></button><button disabled><FileCheck2/><span>Report</span><LockKeyhole className="branch-lock"/></button></div></>}
       {clientContext&&<><p className="nav-label branch-label">Client workspace</p><button className="sidebar-client-chip" onClick={()=>navigate(`/clients/${clientSlug}`)} title={`${client.name} — back to overview`}><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry}</small></span></button><div className="client-workspace-nav"><button className={path===`/clients/${clientSlug}`||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. Planning's own workpaper board and insight rail already link to every sub-view (setup, entity-controls, risks, responses, publish), so this is a single entry rather than a partial duplicate list. */}<button className={inPlanning?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i className={inPlanning?"progress":""}/><span>Planning</span><b>{planningProgressPct(state)}%</b></button><button className={inFieldwork?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/fieldwork`)}><i className={inFieldwork?"progress":state.fieldworkSynced?"approved":""}/><span>Fieldwork</span>{state.fieldworkSynced&&<b>Synced</b>}</button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><i/><span>Report</span><LockKeyhole className="branch-lock"/></button></div>}</>}</div></>}
       <p className="nav-label practice">Firm</p><button className="nav-item" onClick={()=>update({},"Firm audit log opened (simulated)")}><History/><span>Firm audit log</span></button><button className="nav-item" disabled title="Template Library — coming soon. A firm-wide library of pre-defined engagement letter and service templates, ready to preview and add to any engagement."><FileText/><span>Template Library</span><LockKeyhole className="branch-lock"/></button>
@@ -899,6 +900,65 @@ function EngagementTimeline({client,close,onGoTo}:{client:ClientRecord;close:()=
       </Fragment>)}
       {visible.length===0&&<div className="work-empty"><Search/><h3>No matching activity</h3><p>Try a different search or clear filters.</p></div>}
     </div>
+  </div>;
+}
+
+type MetricKPI={id:string;label:string;value:number;target:number;max:number;unit:string;better:"higher"|"lower";delta:number;format:(n:number)=>string};
+const FIRM_METRICS:MetricKPI[]=[
+  {id:"utilization",label:"Utilization",value:74,target:70,max:100,unit:"pts",better:"higher",delta:3,format:n=>`${n}%`},
+  {id:"realization",label:"Realization",value:88,target:92,max:100,unit:"pts",better:"higher",delta:-2,format:n=>`${n}%`},
+  {id:"dtb",label:"Days to bill",value:34,target:30,max:60,unit:"d",better:"lower",delta:-4,format:n=>`${n}d`},
+  {id:"margin",label:"Engagement margin",value:38,target:35,max:60,unit:"pts",better:"higher",delta:1,format:n=>`${n}%`},
+];
+const PEER_GROUPS=["Under $2M","$2M–$10M","$10M+"] as const;
+type PeerGroup=typeof PEER_GROUPS[number];
+const PEER_PERCENTILE:Record<PeerGroup,Record<string,number>>={
+  "Under $2M":{utilization:88,realization:70,dtb:40,margin:82},
+  "$2M–$10M":{utilization:74,realization:58,dtb:55,margin:66},
+  "$10M+":{utilization:52,realization:44,dtb:65,margin:48},
+};
+function quartileLabel(percentile:number){return percentile>=75?"Top quartile":percentile>=50?"2nd quartile":percentile>=25?"3rd quartile":"Bottom quartile"}
+function KpiGauge({metric}:{metric:MetricKPI}){
+  const pct=Math.max(0,Math.min(1,metric.value/metric.max));
+  const r=52,cx=65,cy=62,c=Math.PI*r;
+  const onTrack=metric.better==="higher"?metric.value>=metric.target:metric.value<=metric.target;
+  const arcColor=onTrack?"#1a8a4c":"#c17d1a";
+  const deltaGood=metric.better==="higher"?metric.delta>=0:metric.delta<=0;
+  return <div className="kpi-gauge-card">
+    <svg viewBox="0 0 130 70" className="kpi-gauge">
+      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`} fill="none" stroke="var(--line)" strokeWidth="11" strokeLinecap="round"/>
+      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`} fill="none" stroke={arcColor} strokeWidth="11" strokeLinecap="round" strokeDasharray={`${c*pct} ${c}`}/>
+    </svg>
+    <div className="kpi-gauge-value">{metric.format(metric.value)}</div>
+    <div className="kpi-gauge-label">{metric.label}</div>
+    <div className="kpi-gauge-meta"><span>Target {metric.format(metric.target)}</span><span className={deltaGood?"kpi-delta-up":"kpi-delta-down"}>{metric.delta>=0?"+":""}{metric.delta}{metric.unit==="pts"?" pts":metric.unit} vs last quarter</span></div>
+  </div>;
+}
+function QuartileBar({percentile}:{percentile:number}){
+  return <div className="quartile-bar"><i/><i/><i/><i/><b style={{left:`${percentile}%`}}/></div>;
+}
+function MetricsDashboard({navigate}:{navigate:(p:string)=>void}){
+  const [peerGroup,setPeerGroup]=useState<PeerGroup>("$2M–$10M");
+  const [peerOpen,setPeerOpen]=useState(false);
+  const peerRef=useDismiss(peerOpen,()=>setPeerOpen(false));
+  return <div className="page metrics-page">
+    <div className="page-heading"><div><p className="eyebrow">Firm performance</p><h1>Metrics</h1><p>Track firm KPIs and see how you compare against similar firms.</p></div>
+      <div className="topbar-popover" ref={peerRef}>
+        <button className="secondary-btn" onClick={()=>setPeerOpen(v=>!v)}><Users size={14}/>Peer group: {peerGroup}<ChevronDown size={14}/></button>
+        {peerOpen&&<div className="dropdown-menu">{PEER_GROUPS.map(g=><button key={g} className={`dropdown-item ${g===peerGroup?"active":""}`} onClick={()=>{setPeerGroup(g);setPeerOpen(false)}}>{g} revenue</button>)}</div>}
+      </div>
+    </div>
+    <section className="metrics-kpi-row">{FIRM_METRICS.map(m=><KpiGauge key={m.id} metric={m}/>)}</section>
+    <section className="section-card">
+      <div className="section-title"><div><h2>Peer-quartile benchmarking</h2><p>How your firm's KPIs compare to {peerGroup} revenue firms.</p></div></div>
+      <div className="quartile-list">
+        {FIRM_METRICS.map(m=>{const percentile=PEER_PERCENTILE[peerGroup][m.id];return <div className="quartile-row" key={m.id}>
+          <div className="quartile-row-label"><strong>{m.label}</strong><span>{m.format(m.value)}</span></div>
+          <QuartileBar percentile={percentile}/>
+          <div className="quartile-row-meta"><span>{quartileLabel(percentile)}</span><span>{percentile}th percentile</span></div>
+        </div>})}
+      </div>
+    </section>
   </div>;
 }
 
