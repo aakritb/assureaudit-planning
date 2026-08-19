@@ -460,7 +460,10 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .chip.neutral{background:#f0eef4;color:#57516c}
 .chip button{border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0}
 .danger-text{color:var(--red)}
-.client-overview-grid-v2{display:grid;grid-template-columns:minmax(0,1.6fr) 300px;gap:14px;align-items:start;margin-bottom:16px;max-width:1180px}
+/* One shared content width for the whole client detail page, so the header, the tab bar and
+   every tab body line up on the same left and right edges instead of each capping itself. */
+.client-overview-page{max-width:1300px}
+.client-overview-grid-v2{display:grid;grid-template-columns:minmax(0,1.6fr) 300px;gap:14px;align-items:start;margin-bottom:16px}
 .client-engagements-card{padding:0}
 .client-engagements-card>.section-title{padding:17px 17px 13px}
 .engagements-table{border-top:1px solid var(--line);border-radius:0}
@@ -504,3 +507,10 @@ button.engagements-table-row:hover{background:#faf9ff}
 .credential-fields .icon-btn{width:22px;height:22px}
 .credential-meta{display:block;color:var(--muted);font-size:10.5px;margin-top:10px}
 @media(max-width:900px){.client-overview-grid-v2{grid-template-columns:1fr}.engagements-table-head{display:none}.engagements-table-row{grid-template-columns:1fr;gap:4px}}
+/* The client page's Requests list sits directly under the documents tab bar, so it continues from
+   it seamlessly the way the Files workspace does, rather than floating as a separate rounded card.
+   It also carries a lock column the firm-wide/portal request lists don't have — without reserving
+   that column, a locked row's 5th child wrapped onto an implicit second grid row. */
+.documents-requests-list{border-top:0;border-radius:0 0 13px 13px}
+.documents-requests-list>button{grid-template-columns:38px 1fr 16px auto 18px}
+@media(max-width:640px){.documents-requests-list>button{grid-template-columns:35px 1fr 16px}.documents-requests-list>button>.status-pill{grid-column:2}.documents-requests-list>button>svg:last-child{grid-column:3;grid-row:1}}

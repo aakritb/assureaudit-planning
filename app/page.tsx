@@ -1005,7 +1005,7 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
             </div>}
           </div>
         </div>
-      </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list">{requests.map(r=><button key={r.id} onClick={()=>setSelectedRequestId(r.id)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div>{r.locked&&<LockKeyhole size={14} className="request-lock-icon"/>}<span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
+      </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list documents-requests-list">{requests.map(r=><button key={r.id} onClick={()=>setSelectedRequestId(r.id)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div>{/* the lock slot always renders so locked and unlocked rows share one grid */}{r.locked?<LockKeyhole size={14} className="request-lock-icon"/>:<span/>}<span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
     </section>
     {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name} onCreate={addRequest}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
@@ -1206,7 +1206,9 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
         :<><h1>{displayName}</h1><button className="icon-btn" title="Rename" onClick={()=>setEditingName(true)}><Pencil size={14}/></button><span className="chip neutral">Business</span><span className="status-pill approved">Active</span></>}
       </div>
       <div className="client-head-actions">
-        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/engagement/${client.slug}/planning`)}}><ClipboardCheck size={14}/><span>Workflow</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);setTab("Documents")}}><FolderOpen size={14}/><span>Documents</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);setTab("Billing")}}><FileSpreadsheet size={14}/><span>Billing</span></button></div>}</div>
+        {/* "Open in" is the cross-product jump within the Assure One suite — Documents and Billing
+            are tabs on this very page now, so listing them here would just be a redundant tab switch. */}
+        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><div className="dropdown-head"><strong>Open this client in</strong><span>Jump across the Assure One suite</span></div><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);update({},`Opening ${displayName} in AssurePro — practice management, billing and engagement letters live there.`)}}><BriefcaseBusiness size={14}/><span>AssurePro</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/engagement/${client.slug}/planning`)}}><ClipboardCheck size={14}/><span>Audit workpapers</span></button></div>}</div>
         <div className="topbar-popover" ref={moreRef}><button className="icon-btn" onClick={()=>setMoreOpen(v=>!v)}><MoreHorizontal/></button>{moreOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose email (simulated)")}}><Send size={14}/><span>Email</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose SMS (simulated)")}}><MessageSquare size={14}/><span>SMS</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Note added (simulated)")}}><FileText size={14}/><span>Note</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},`${displayName} archived (simulated)`)}}><FolderOpen size={14}/><span>Archive</span></button><button className="dropdown-item danger" onClick={()=>{setMoreOpen(false);update({},"Delete not available in this prototype")}}><Trash2 size={14}/><span>Delete</span></button></div>}</div>
       </div>
     </div>
@@ -1233,7 +1235,7 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
     </>}
     {tab==="Info"&&<ClientInfoTab client={client}/>}
     {tab==="Documents"&&<ClientDocumentsMain client={client} navigate={navigate} update={update} embedded/>}
-    {tab==="Engagements"&&<section className="section-card client-engagements-card" style={{maxWidth:900}}><div className="section-title"><div><h2>Engagements</h2><p>Every engagement open for {displayName}.</p></div></div>
+    {tab==="Engagements"&&<section className="section-card client-engagements-card"><div className="section-title"><div><h2>Engagements</h2><p>Every engagement open for {displayName}.</p></div></div>
       <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span><span/></div>
       {engagements.map(e=><button className="engagements-table-row" key={e.id} onClick={()=>navigate(`/engagement/${client.slug}/planning`)}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span><ChevronRight/></button>)}
       </div>
@@ -1276,13 +1278,11 @@ function ClientBillingTab({client,invoices,update}:{client:ClientRecord;invoices
   </section>;
 }
 function ClientEngagementLetterTab({client,update}:{client:ClientRecord;update:(p:Partial<DemoState>,m?:string)=>void}){
-  const [packages,setPackages]=useState(()=>signingPackagesForClient(client));
-  const addPackage=()=>{
-    const id=Math.max(0,...packages.map(p=>p.id))+1;
-    setPackages(p=>[{id,name:"New signing package",status:"Draft",sent:"–",completed:"–",signBy:"–",validTill:"–"},...p]);
-    update({},"New signing package created as a draft");
-  };
-  return <section className="section-card"><div className="section-title"><div><h2>Signing packages</h2><p>Engagement letters, intake requests, and other documents sent for signature.</p></div><button className="primary-btn" onClick={addPackage}><Plus size={15}/>New package</button></div>
+  const packages=signingPackagesForClient(client);
+  // Engagement letters are authored and sent for signature in AssurePro — AssureAudit only reads
+  // the resulting signed letter — so this hands off rather than faking a local draft row.
+  const newPackage=()=>update({},"Engagement letters are created in AssurePro — you'll be redirected there to build and send this package.");
+  return <section className="section-card"><div className="section-title"><div><h2>Signing packages</h2><p>Engagement letters, intake requests, and other documents sent for signature. Created in AssurePro, read-only here.</p></div><button className="primary-btn" onClick={newPackage}><Plus size={15}/>New package</button></div>
     <div className="engagements-table"><div className="engagements-table-head" style={{gridTemplateColumns:"1.6fr 1fr 1fr 1fr 1fr 1fr"}}><span>Name</span><span>Status</span><span>Sent</span><span>Completed</span><span>Sign by</span><span>Valid till</span></div>
     {packages.map(p=><div className="engagements-table-row" key={p.id} style={{gridTemplateColumns:"1.6fr 1fr 1fr 1fr 1fr 1fr"}}><span>{p.name}</span><span><span className={`status-pill ${p.status==="Completed"?"approved":p.status==="Cancelled"?"danger":p.status==="Sent"?"warning":"neutral"}`}>{p.status}</span></span><span>{p.sent}</span><span>{p.completed}</span><span>{p.signBy}</span><span>{p.validTill}</span></div>)}
     </div>
@@ -1321,7 +1321,7 @@ function ClientCommunications({client}:{client:ClientRecord}){
     {author:"AssurePro",date:"Aug 12, 2026",text:"Engagement letter countersigned and filed automatically from AssurePro."},
     {author:"Meera Kapoor",date:"Aug 9, 2026",text:"Kicked off planning discussion with the engagement team; risk areas confirmed."},
   ];
-  return <section className="client-facts-card" style={{maxWidth:640}}><div className="section-title"><div><p className="eyebrow">Client workspace</p><h2>Communications</h2><p>Recent notes and correspondence synced from AssurePro and the audit team.</p></div></div>
+  return <section className="client-facts-card"><div className="section-title"><div><p className="eyebrow">Client workspace</p><h2>Communications</h2><p>Recent notes and correspondence synced from AssurePro and the audit team.</p></div></div>
     <div className="drawer-comment-list">{items.map((c,i)=><div className="drawer-comment" key={i}><strong>{c.author}</strong><small style={{display:"block",color:"var(--muted)",fontSize:9,marginBottom:4}}>{c.date}</small><p style={{margin:0}}>{c.text}</p></div>)}</div>
   </section>;
 }
