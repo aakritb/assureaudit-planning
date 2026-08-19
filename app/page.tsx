@@ -815,12 +815,12 @@ const WORKPAPER_REFS=[
   {id:205,title:"Materiality workpaper",route:"materiality"},
 ];
 
-type ClientRequest={id:number;title:string;type:string;status:"To do"|"Submitted"|"Done";due:string};
+type ClientRequest={id:number;title:string;type:string;status:"To do"|"Submitted"|"Done";due:string;locked:boolean};
 function requestsForClient(client:ClientRecord):ClientRequest[]{
   const requests:ClientRequest[]=[
-    {id:1,title:"Signed engagement letter (current year)",type:"File upload",status:"Done",due:"Complete"},
+    {id:1,title:"Signed engagement letter (current year)",type:"File upload",status:"Done",due:"Complete",locked:true},
   ];
-  if(client.openItems>0)requests.push({id:2,title:"Clarify Board minutes — Q4 governance note",type:"Clarification",status:"To do",due:"Due in 2d"});
+  if(client.openItems>0)requests.push({id:2,title:"Clarify Board minutes — Q4 governance note",type:"Clarification",status:"To do",due:"Due in 2d",locked:false});
   return requests;
 }
 
@@ -930,6 +930,7 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const [query,setQuery]=useState("");
   const [toneFilters,setToneFilters]=useState<string[]>([]);
   const [collapsedGroups,setCollapsedGroups]=useState<Record<string,boolean>>({});
+  const [selectedFolder,setSelectedFolder]=useState<string|null>(null);
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [requestOpen,setRequestOpen]=useState(false);
   const [categoryOpen,setCategoryOpen]=useState(false);
@@ -947,6 +948,7 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const visible=documents.filter(doc=>(toneFilters.length===0||toneFilters.includes(doc.tone))&&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
   const grouped:Record<string,DocRecord[]>={};
   visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
+  const displayedDocs=selectedFolder?visible.filter(d=>d.category===selectedFolder):visible;
   const toggleTone=(tone:string)=>setToneFilters(f=>f.includes(tone)?f.filter(t=>t!==tone):[...f,tone]);
   const toggleGroup=(cat:string)=>setCollapsedGroups(g=>({...g,[cat]:!g[cat]}));
   const updateDoc=(id:number,patch:Partial<DocRecord>)=>setDocuments(docs=>docs.map(d=>d.id===id?{...d,...patch}:d));
@@ -954,7 +956,10 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
   const addCategory=(name:string)=>{setFolders(f=>[...f,name]);setCategoryOpen(false);update({},`"${name}" category created for ${client.name}`)};
   const selectedDoc=documents.find(d=>d.id===selectedId)||null;
   const requestsPending=requests.filter(r=>r.status!=="Done").length;
-  const addRequest=(title:string,due:string)=>setRequests(r=>[{id:Math.max(0,...r.map(x=>x.id))+1,title,type:"File upload",status:"To do",due},...r]);
+  const addRequest=(title:string,due:string)=>setRequests(r=>[{id:Math.max(0,...r.map(x=>x.id))+1,title,type:"File upload",status:"To do",due,locked:false},...r]);
+  const updateRequest=(id:number,patch:Partial<ClientRequest>)=>setRequests(rs=>rs.map(r=>r.id===id?{...r,...patch}:r));
+  const [selectedRequestId,setSelectedRequestId]=useState<number|null>(null);
+  const selectedRequest=requests.find(r=>r.id===selectedRequestId)||null;
   return <>
     <section className="documents-main documents-center-main">
     <div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>
@@ -970,31 +975,74 @@ function ClientDocumentsMain({client,navigate,update}:{client:ClientRecord;navig
           <button className="secondary-btn" onClick={()=>setCategoryOpen(true)}><Plus size={15}/>Create Category</button>
           <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button>
         </div>
-        <div className="documents-grouped-list">
-          {Object.entries(grouped).map(([cat,docs])=><section className="doc-group" key={cat}>
-            <button className="doc-group-head" onClick={()=>toggleGroup(cat)}><ChevronDown className={collapsedGroups[cat]?"collapsed":""}/><strong>{cat}</strong><b className="count">{docs.length}</b></button>
-            {!collapsedGroups[cat]&&docs.map(doc=><button className="doc-row-v2" key={doc.id} onClick={()=>setSelectedId(doc.id)}>
-              <i className={`tone-dot ${doc.tone}`}/>
-              <span className="doc-id">{doc.id}</span>
-              <span className="doc-row-title"><strong>{doc.name}</strong><small>{doc.type}</small></span>
-              <span className={`status-pill ${doc.tone}`}>{doc.due}</span>
-              <span className="doc-row-meta"><MessageSquare size={13}/>{doc.comments.length}</span>
-              <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
-            </button>)}
-          </section>)}
-          {folders.map(name=>!grouped[name]&&<section className="doc-group" key={name}><button className="doc-group-head" onClick={()=>toggleGroup(name)}><ChevronDown className={collapsedGroups[name]?"collapsed":""}/><strong>{name}</strong><b className="count">0</b></button>{!collapsedGroups[name]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document below and use "Move" to file it here.</p>}</section>)}
-          {visible.length===0&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the filters or search to see the full client library.</p></div>}
+        <div className="documents-workspace">
+          <aside className="documents-folder-tree">
+            <button className={`folder-tree-item ${!selectedFolder?"active":""}`} onClick={()=>{setSelectedFolder(null);setSelectedId(null)}}><FolderOpen size={15}/><span>All documents</span><b>{documents.length}</b></button>
+            {Object.entries(grouped).map(([cat,docs])=>{
+              const isOpen=!collapsedGroups[cat];
+              return <div className="folder-tree-group" key={cat}>
+                <div className={`folder-tree-item ${selectedFolder===cat?"active":""}`}>
+                  <button className="folder-tree-caret" onClick={()=>toggleGroup(cat)}><ChevronDown size={13} className={isOpen?"":"collapsed"}/></button>
+                  <button className="folder-tree-label" onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>
+                </div>
+                {isOpen&&docs.map(doc=><button key={doc.id} className={`folder-tree-file ${selectedId===doc.id?"active":""}`} onClick={()=>{setSelectedId(doc.id);setSelectedFolder(cat)}}><FileText size={13}/><span>{doc.name}</span></button>)}
+              </div>;
+            })}
+            {folders.filter(name=>!grouped[name]).map(name=><button key={name} className={`folder-tree-item empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
+          </aside>
+          <div className="documents-main-panel">
+            {selectedDoc?<DocumentDetailPanel inline doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/>:<div className="documents-grouped-list">
+              {displayedDocs.map(doc=><button className="doc-row-v2" key={doc.id} onClick={()=>setSelectedId(doc.id)}>
+                <i className={`tone-dot ${doc.tone}`}/>
+                <span className="doc-id">{doc.id}</span>
+                <span className="doc-row-title"><strong>{doc.name}</strong><small>{doc.type}</small></span>
+                <span className={`status-pill ${doc.tone}`}>{doc.due}</span>
+                <span className="doc-row-meta"><MessageSquare size={13}/>{doc.comments.length}</span>
+                <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
+              </button>)}
+              {displayedDocs.length===0&&selectedFolder&&!grouped[selectedFolder]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document and use "Move" to file it here.</p>}
+              {displayedDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the filters or search to see the full client library.</p></div>}
+            </div>}
+          </div>
         </div>
-      </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list">{requests.map(r=><button key={r.id} onClick={()=>update({},`${r.title} — ${r.status}`)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div><span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
+      </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list">{requests.map(r=><button key={r.id} onClick={()=>setSelectedRequestId(r.id)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div>{r.locked&&<LockKeyhole size={14} className="request-lock-icon"/>}<span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
     </section>
-    {selectedDoc&&<DocumentDetailPanel doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/>}
     {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name} onCreate={addRequest}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
     {timelineOpen&&<EngagementTimeline client={client} close={()=>setTimelineOpen(false)} onGoTo={goToTimelineTarget}/>}
+    {selectedRequest&&<RequestDetailDrawer request={selectedRequest} close={()=>setSelectedRequestId(null)} update={update} onUpdate={patch=>updateRequest(selectedRequest.id,patch)}/>}
   </>;
 }
+function RequestDetailDrawer({request,close,update,onUpdate}:{request:ClientRequest;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<ClientRequest>)=>void}){
+  const [statusOpen,setStatusOpen]=useState(false);
+  const statusRef=useDismiss(statusOpen,()=>setStatusOpen(false));
+  const REQUEST_STATUSES=["To do","Submitted","Done"] as const;
+  const setStatus=(status:typeof REQUEST_STATUSES[number])=>{
+    onUpdate({status,locked:status==="Done"?true:request.locked});
+    setStatusOpen(false);
+    update({},`"${request.title}" marked ${status}`);
+  };
+  const toggleLock=()=>{
+    onUpdate({locked:!request.locked});
+    update({},`"${request.title}" ${request.locked?"unlocked":"locked"}${request.locked?" — the client can edit it again":" — the client can no longer edit it"}`);
+  };
+  return <div className="detail-drawer">
+    <div className="drawer-head"><div><span className={`status-pill ${request.status==="Done"?"approved":request.status==="Submitted"?"warning":"neutral"}`}>{request.status}</span><h2>{request.title}</h2><p>{request.type}</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+    <div className="drawer-body">
+      {request.locked&&<div className="request-locked-banner"><LockKeyhole size={15}/><span>This request is locked — the client can't make further changes until you unlock it.</span></div>}
+      <div className="panel-meta-row"><div><small>Type</small><strong>{request.type}</strong></div><div><small>Due</small><strong>{request.due}</strong></div></div>
+      <p className="drawer-label">Status</p>
+      <div className="topbar-popover" ref={statusRef}>
+        <button className="secondary-btn" disabled={request.locked} onClick={()=>setStatusOpen(v=>!v)}>{request.status} <ChevronDown size={14}/></button>
+        {statusOpen&&<div className="dropdown-menu">{REQUEST_STATUSES.map(s=><button key={s} className="dropdown-item" onClick={()=>setStatus(s)}>{s}</button>)}</div>}
+      </div>
+      {request.locked&&<p className="restriction-note"><LockKeyhole size={12}/>Unlock this request to change its status.</p>}
+      <button className={`secondary-btn full ${request.locked?"":"danger-outline"}`} style={{marginTop:14}} onClick={toggleLock}><LockKeyhole size={15}/>{request.locked?"Unlock request":"Lock request"}</button>
+    </div>
+  </div>;
+}
 
-function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,categories}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[];categories:string[]}){
+function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,categories,inline}:{doc:DocRecord;close:()=>void;update:(p:Partial<DemoState>,m?:string)=>void;onUpdate:(patch:Partial<DocRecord>)=>void;onDelete:()=>void;clientDocs:DocRecord[];categories:string[];inline?:boolean}){
   const [tab,setTab]=useState<"Request Info"|"Client Docs"|"Comments"|"Activity">("Request Info");
   const [statusMenuOpen,setStatusMenuOpen]=useState(false);
   const statusMenuRef=useDismiss(statusMenuOpen,()=>setStatusMenuOpen(false));
@@ -1008,8 +1056,19 @@ function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,cate
   const addComment=()=>{if(!commentDraft.trim())return;onUpdate({comments:[...doc.comments,{author:"Oscar Owner",text:commentDraft.trim()}]});setCommentDraft("")};
   const assignTo=(name:string)=>{onUpdate({assignee:name});setAssignOpen(false);update({},`${doc.name} assigned to ${name}`)};
   const uploadDoc=()=>{onUpdate({attachments:doc.attachments+1});update({},`File uploaded to ${doc.name}`)};
+  const [revisionOpen,setRevisionOpen]=useState(false);
+  const [revisionNote,setRevisionNote]=useState("");
+  const isPendingReview=doc.clientUpload&&doc.tone!=="approved";
+  const approve=()=>{onUpdate({tone:"approved",due:"Complete"});update({},`${doc.name} approved`)};
+  const requestRevision=()=>{
+    if(!revisionNote.trim())return;
+    onUpdate({tone:"danger",due:"Revision requested",comments:[...doc.comments,{author:"Oscar Owner",text:`Revision requested: ${revisionNote.trim()}`}]});
+    update({},`Revision requested for ${doc.name}`);
+    setRevisionNote("");
+    setRevisionOpen(false);
+  };
   const tabs=["Request Info","Client Docs","Comments","Activity"] as const;
-  return <div className="detail-drawer document-detail-panel">
+  return <div className={inline?"document-preview-panel":"detail-drawer document-detail-panel"}>
     <div className="drawer-head"><div><span className={`status-pill ${doc.tone}`}>{doc.due}</span><h2>{doc.name}</h2><p>{doc.category} · #{doc.id}</p></div>
       <div className="drawer-head-actions">
         <button className="icon-btn" title="Rename" onClick={()=>update({},"Rename not available in this prototype")}><Pencil size={16}/></button>
@@ -1017,6 +1076,12 @@ function DocumentDetailPanel({doc,close,update,onUpdate,onDelete,clientDocs,cate
         <button className="icon-btn" onClick={close}><X/></button>
       </div>
     </div>
+    <div className="doc-preview-surface"><FileText size={36}/><strong>{doc.name}</strong><span>Preview not available in this prototype — showing file summary below</span></div>
+    {isPendingReview&&<div className="doc-approval-actions">
+      <button className="primary-btn" onClick={approve}><Check size={15}/>Approve</button>
+      <button className="secondary-btn danger-outline" onClick={()=>setRevisionOpen(v=>!v)}><AlertTriangle size={15}/>Request revision</button>
+    </div>}
+    {revisionOpen&&<div className="revision-note-box"><textarea value={revisionNote} onChange={e=>setRevisionNote(e.target.value)} placeholder="Explain what needs to change…"/><button className="primary-btn" disabled={!revisionNote.trim()} onClick={requestRevision}>Send revision request</button></div>}
     <div className="panel-status-row"><div className="topbar-popover" ref={statusMenuRef}><button className="secondary-btn" onClick={()=>setStatusMenuOpen(v=>!v)}>Change Status <ChevronDown size={14}/></button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{STATUS_OPTIONS.map(o=><button key={o.due} className="dropdown-item" onClick={()=>setStatus(o.tone,o.due)}><i className={`tone-dot ${o.tone}`}/><span>{o.due}</span></button>)}</div>}</div></div>
     <div className="drawer-tabs">{tabs.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
     <div className="drawer-body">
