@@ -977,18 +977,21 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
         </div>
         <div className="documents-workspace">
           <aside className="documents-folder-tree">
+            {/* title on every label: a tree column can't fit long filenames at any sane width, so
+                the full name stays reachable on hover instead of being lost to the ellipsis. */}
+            <p className="folder-tree-heading">Folders</p>
             <button className={`folder-tree-item ${!selectedFolder?"active":""}`} onClick={()=>{setSelectedFolder(null);setSelectedId(null)}}><FolderOpen size={15}/><span>All documents</span><b>{documents.length}</b></button>
             {Object.entries(grouped).map(([cat,docs])=>{
               const isOpen=!collapsedGroups[cat];
               return <div className="folder-tree-group" key={cat}>
                 <div className={`folder-tree-item ${selectedFolder===cat?"active":""}`}>
-                  <button className="folder-tree-caret" onClick={()=>toggleGroup(cat)}><ChevronDown size={13} className={isOpen?"":"collapsed"}/></button>
-                  <button className="folder-tree-label" onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>
+                  <button className="folder-tree-caret" onClick={()=>toggleGroup(cat)} aria-label={`${isOpen?"Collapse":"Expand"} ${cat}`}><ChevronDown size={13} className={isOpen?"":"collapsed"}/></button>
+                  <button className="folder-tree-label" title={cat} onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>
                 </div>
-                {isOpen&&docs.map(doc=><button key={doc.id} className={`folder-tree-file ${selectedId===doc.id?"active":""}`} onClick={()=>{setSelectedId(doc.id);setSelectedFolder(cat)}}><FileText size={13}/><span>{doc.name}</span></button>)}
+                {isOpen&&docs.map(doc=><button key={doc.id} title={doc.name} className={`folder-tree-file ${selectedId===doc.id?"active":""}`} onClick={()=>{setSelectedId(doc.id);setSelectedFolder(cat)}}><FileText size={13}/><span>{doc.name}</span></button>)}
               </div>;
             })}
-            {folders.filter(name=>!grouped[name]).map(name=><button key={name} className={`folder-tree-item empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
+            {folders.filter(name=>!grouped[name]).map(name=><button key={name} title={name} className={`folder-tree-item empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
           </aside>
           <div className="documents-main-panel">
             {selectedDoc?<DocumentDetailPanel inline doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/>:<div className="documents-grouped-list">
