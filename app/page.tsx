@@ -362,7 +362,9 @@ function Sidebar({ path, navigate, state, update, mobileNav, setMobileNav }: { p
       {clientContext&&<><p className="nav-label branch-label">Client workspace</p><button className="sidebar-client-chip" onClick={()=>navigate(`/clients/${clientSlug}`)} title={`${client.name} — back to overview`}><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry}</small></span></button><div className="client-workspace-nav"><button className={path===`/clients/${clientSlug}`||path===`/engagement/${clientSlug}`?"active":""} onClick={()=>navigate(`/clients/${clientSlug}`)}><HomeIcon/><span>Overview</span></button>{!client.ready?<button className="setup-blocked-nav" disabled><AlertTriangle/><span>Finish setup in AssurePro</span><LockKeyhole className="branch-lock"/></button>:<><button className={`branch-parent ${inIngest?"active":""}`} onClick={()=>{setIngestOpen(!ingestOpen);if(!inIngest)navigate(`/engagement/${clientSlug}/ingest/details`)}}><Database/><span>Data ingest</span><b>{client.progress}%</b><ChevronDown className={ingestOpen?"rotated":""}/></button>{ingestOpen&&<div className="branch-children ingest-branch">{ingestSteps.map((label,i)=><button key={label} className={active===label.toLowerCase().replace(" ","-")?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/ingest/${label.toLowerCase().replace(" ","-")}`)}><i className={i<4?"approved":i===4?"warning":""}/><span>{label}</span></button>)}</div>}<button className={`branch-parent ${inPlanning?"active":""}`} onClick={()=>{setPlanningOpen(!planningOpen);if(!inPlanning)navigate(`/engagement/${clientSlug}/planning`)}}><ClipboardCheck/><span>Workpapers</span><b>{planningProgressPct(state)}%</b><ChevronDown className={planningOpen?"rotated":""}/></button>{planningOpen&&<div className="branch-children">{/* Materiality is intentionally not listed here — it lives only in Data Ingest; landing on /planning/materiality (e.g. a stale link) shows a banner pointing there instead of a dead sidebar entry. Planning's own workpaper board and insight rail already link to every sub-view (setup, entity-controls, risks, responses, publish), so this is a single entry rather than a partial duplicate list. */}<button className={inPlanning?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/planning`)}><i className={inPlanning?"progress":""}/><span>Planning</span><b>{planningProgressPct(state)}%</b></button><button className={inFieldwork?"active":""} onClick={()=>navigate(`/engagement/${clientSlug}/fieldwork`)}><i className={inFieldwork?"progress":state.fieldworkSynced?"approved":""}/><span>Fieldwork</span>{state.fieldworkSynced&&<b>Synced</b>}</button><button onClick={()=>update({},"Reporting unlocks after Fieldwork")}><i/><span>Report</span><LockKeyhole className="branch-lock"/></button></div>}</>}</div></>}
       <p className="nav-label practice">Firm</p><button className="nav-item" onClick={()=>update({},"Firm audit log opened (simulated)")}><History/><span>Firm audit log</span></button><button className="nav-item" disabled title="Template Library — coming soon. A firm-wide library of pre-defined engagement letter and service templates, ready to preview and add to any engagement."><FileText/><span>Template Library</span><LockKeyhole className="branch-lock"/></button>
     </nav>
-    <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>{state.role}</span></div></div>
+    {/* Matches AssurePro's sidebar identity chip, which shows role + firm ("Owner · Patel &…").
+        The top-right avatar is the profile menu — the reference carries both, so both stay. */}
+    <div className="profile"><div className="avatar">OO</div><div><strong>Oscar Owner</strong><span>{state.role} · Patel &amp; Associates CPA</span></div></div>
   </aside>;
 }
 
@@ -804,6 +806,22 @@ function docsForClient(client:ClientRecord):DocRecord[]{
   ];
 }
 
+// The request pack AssureAudit's "Create Default Requests" seeds — the standard categories a
+// financial-statement audit collects. Mirrors the real product, which reports back how many
+// categories and requests it created and then hides the button once the pack exists.
+const DEFAULT_REQUEST_PACK:{category:string;items:string[]}[]=[
+  {category:"Cash & Equivalents",items:["Bank statements — all accounts","Bank reconciliations","Outstanding check listing"]},
+  {category:"Accounts Receivable",items:["AR aging detail","Subsequent receipts testing","Allowance for doubtful accounts"]},
+  {category:"Inventory",items:["Year-end inventory listing","Obsolete inventory policy","Inventory valuation policy","Physical count observation memo"]},
+  {category:"Fixed Assets",items:["Fixed asset rollforward","Additions support","Disposals support","Depreciation schedule","Repair & maintenance detail"]},
+  {category:"Accounts Payable & Accruals",items:["AP aging detail","Subsequent disbursements","Accrued liabilities schedule"]},
+  {category:"Long Term Debt",items:["Loan agreements","Debt covenant compliance"]},
+  {category:"Equity Workpapers",items:["Equity rollforward","Board minutes — equity actions","Member register"]},
+  {category:"Revenue and Expense Workpapers",items:["Revenue recognition policy","Top-20 revenue transactions","Cutoff testing support","Expense analytics","Payroll register","Related-party transactions","Grant agreements","Contribution schedules"]},
+  {category:"Financial Reporting",items:["Draft financial statements","Trial balance — final","Journal entry listing","Note disclosure support","Prior-year comparatives"]},
+  {category:"Miscellaneous",items:["Management representation letter"]},
+];
+const DOC_PAGE_SIZES=[10,20,50];
 const DOC_TONES=["neutral","warning","danger","approved"] as const;
 const TONE_LABEL:Record<string,string>={neutral:"No status",warning:"Due soon",danger:"Overdue",approved:"Complete"};
 const STATUS_OPTIONS=[{tone:"neutral",due:"Not started"},{tone:"warning",due:"Due in 3d"},{tone:"danger",due:"Overdue"},{tone:"approved",due:"Complete"}];
@@ -939,13 +957,30 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const [documents,setDocuments]=useState<DocRecord[]>(()=>docsForClient(client));
   const [requests,setRequests]=useState<ClientRequest[]>(()=>requestsForClient(client));
   const [timelineOpen,setTimelineOpen]=useState(false);
+  // AssureAudit's own Documents section: category chips, bulk selection, paging, a Filters
+  // popover and the default-request pack. Kept as features, restyled to AssurePro's language.
+  const [checked,setChecked]=useState<number[]>([]);
+  const [chipsOpen,setChipsOpen]=useState(true);
+  const [pageSize,setPageSize]=useState(20);
+  const [page,setPage]=useState(1);
+  const [sizeOpen,setSizeOpen]=useState(false);
+  const sizeRef=useDismiss(sizeOpen,()=>setSizeOpen(false));
+  const [filtersOpen,setFiltersOpen]=useState(false);
+  const filtersRef=useDismiss(filtersOpen,()=>setFiltersOpen(false));
+  const [onlyFlagged,setOnlyFlagged]=useState(false);
+  const [onlyClientUploads,setOnlyClientUploads]=useState(false);
+  const [packCreated,setPackCreated]=useState(false);
   const goToTimelineTarget=(entry:TimelineEntry)=>{
     if(!entry.target)return;
     if(entry.target.tab==="Files"){setTab("Files");setSelectedId(entry.target.id)}
     else{setTab("Requests");update({},`Opened request: ${entry.itemTitle}`)}
     setTimelineOpen(false);
   };
-  const visible=documents.filter(doc=>(toneFilters.length===0||toneFilters.includes(doc.tone))&&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
+  const visible=documents.filter(doc=>(toneFilters.length===0||toneFilters.includes(doc.tone))
+    &&(!onlyFlagged||doc.tone==="danger"||doc.tone==="warning")
+    &&(!onlyClientUploads||doc.clientUpload)
+    &&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
+  const visibleAll=visible;
   const grouped:Record<string,DocRecord[]>={};
   visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
   const displayedDocs=selectedFolder?visible.filter(d=>d.category===selectedFolder):visible;
@@ -960,6 +995,26 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const updateRequest=(id:number,patch:Partial<ClientRequest>)=>setRequests(rs=>rs.map(r=>r.id===id?{...r,...patch}:r));
   const [selectedRequestId,setSelectedRequestId]=useState<number|null>(null);
   const selectedRequest=requests.find(r=>r.id===selectedRequestId)||null;
+  const activeFilterCount=(onlyFlagged?1:0)+(onlyClientUploads?1:0)+toneFilters.length;
+  const createDefaultRequests=()=>{
+    let nextId=Math.max(0,...documents.map(d=>d.id))+1;
+    const added:DocRecord[]=[];
+    DEFAULT_REQUEST_PACK.forEach(({category,items})=>items.forEach(name=>{
+      added.push({id:nextId++,name,category,type:"Document request",status:"Requested",date:"Today",tone:"neutral",due:"Not started",assignee:client.owner,attachments:0,clientUpload:false,description:`Requested from ${client.name} as part of the default ${client.auditType} pack.`,comments:[]});
+    }));
+    setDocuments(d=>[...d,...added]);
+    setPackCreated(true);
+    update({},`Created ${DEFAULT_REQUEST_PACK.length} categories and ${added.length} requests.`);
+  };
+  const catOrder=Array.from(new Set(visibleAll.map(d=>d.category)));
+  const pageCount=Math.max(1,Math.ceil(displayedDocs.length/pageSize));
+  const safePage=Math.min(page,pageCount);
+  const pagedDocs=displayedDocs.slice((safePage-1)*pageSize,safePage*pageSize);
+  const pagedGrouped:Record<string,DocRecord[]>={};
+  pagedDocs.forEach(doc=>{(pagedGrouped[doc.category]=pagedGrouped[doc.category]||[]).push(doc)});
+  const allChecked=pagedDocs.length>0&&pagedDocs.every(d=>checked.includes(d.id));
+  const toggleCheck=(id:number)=>setChecked(c=>c.includes(id)?c.filter(x=>x!==id):[...c,id]);
+  const toggleAll=()=>setChecked(allChecked?[]:pagedDocs.map(d=>d.id));
   return <>
     <section className="documents-main documents-center-main">
     {!embedded&&<div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>}
@@ -967,13 +1022,36 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
       <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{documents.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
       {tab==="Files"?<>
+        {/* Category summary chips: each category's request IDs as bubbles, collapsible from the
+            toolbar caret — AssureAudit's own pattern, restyled to AssurePro's chip language. */}
+        {chipsOpen&&catOrder.length>0&&<div className="doc-category-chips">
+          {catOrder.map(cat=>{
+            const docs=grouped[cat]||[];
+            return <button key={cat} className={`doc-category-chip ${selectedFolder===cat?"active":""}`} onClick={()=>{setSelectedFolder(selectedFolder===cat?null:cat);setSelectedId(null);setPage(1)}} title={`${cat} — ${docs.length} item${docs.length===1?"":"s"}`}>
+              <span className="doc-chip-bubbles">{docs.slice(0,8).map(d=><i key={d.id}>{d.id}</i>)}{docs.length>8&&<em>+{docs.length-8}</em>}</span>
+              <span className="doc-chip-label">{cat}</span>
+            </button>;
+          })}
+        </div>}
         <div className="documents-toolbar-row">
-          <div className="search no-margin"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search documents or type"/></div>
-          <div className="tone-filter-row">{DOC_TONES.map(t=><button key={t} title={TONE_LABEL[t]} aria-label={`Filter: ${TONE_LABEL[t]}`} className={`tone-dot ${t} ${toneFilters.includes(t)?"active":""}`} onClick={()=>toggleTone(t)}/>)}</div>
-          <button className="icon-btn" title="Engagement Timeline" onClick={()=>setTimelineOpen(true)}><History size={16}/></button>
-          <button className="secondary-btn" onClick={()=>update({},`Documents for ${client.name} exported as documents.csv (simulated)`)}><Download size={15}/>Export</button>
+          <button className="icon-btn" title={chipsOpen?"Hide categories":"Show categories"} aria-expanded={chipsOpen} onClick={()=>setChipsOpen(v=>!v)}><ChevronDown size={15} className={chipsOpen?"":"collapsed"}/></button>
+          <div className="search no-margin"><Search/><input value={query} onChange={e=>{setQuery(e.target.value);setPage(1)}} placeholder="Search documents or type"/></div>
+          <span className="toolbar-label">Status:</span>
+          <div className="tone-filter-row">{DOC_TONES.map(t=><button key={t} title={TONE_LABEL[t]} aria-label={`Filter: ${TONE_LABEL[t]}`} className={`tone-dot ${t} ${toneFilters.includes(t)?"active":""}`} onClick={()=>{toggleTone(t);setPage(1)}}/>)}</div>
+          <div className="topbar-popover" ref={filtersRef}>
+            <button className={`secondary-btn ${activeFilterCount>0?"active":""}`} onClick={()=>setFiltersOpen(v=>!v)}><Filter size={14}/>Filters{activeFilterCount>0&&<b className="count-inline">{activeFilterCount}</b>}</button>
+            {filtersOpen&&<div className="dropdown-menu">
+              <div className="dropdown-head"><strong>Filter documents</strong><span>Narrow the list below</span></div>
+              <label className="dropdown-check"><input type="checkbox" checked={onlyFlagged} onChange={()=>{setOnlyFlagged(v=>!v);setPage(1)}}/><span>Needs attention only</span></label>
+              <label className="dropdown-check"><input type="checkbox" checked={onlyClientUploads} onChange={()=>{setOnlyClientUploads(v=>!v);setPage(1)}}/><span>Client uploads only</span></label>
+              {activeFilterCount>0&&<button className="dropdown-item" onClick={()=>{setOnlyFlagged(false);setOnlyClientUploads(false);setToneFilters([]);setPage(1)}}><RotateCcw size={14}/><span>Clear all filters</span></button>}
+            </div>}
+          </div>
+          <button className="icon-btn notification" title="Engagement Timeline" onClick={()=>setTimelineOpen(true)}><History size={16}/><i>1</i></button>
+          {!packCreated&&<button className="secondary-btn" onClick={createDefaultRequests}><Plus size={15}/>Create Default Requests</button>}
+          <button className="icon-btn" title="Export documents.csv" onClick={()=>update({},`Documents for ${client.name} exported as documents.csv (simulated)`)}><Download size={16}/></button>
           <button className="secondary-btn" onClick={()=>setCategoryOpen(true)}><Plus size={15}/>Create Category</button>
-          <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Send size={15}/>Request</button>
+          <button className="primary-btn" onClick={()=>setRequestOpen(true)}><Plus size={15}/>Create Request</button>
         </div>
         <div className="documents-workspace">
           <aside className="documents-folder-tree">
@@ -984,7 +1062,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
             {Object.entries(grouped).map(([cat,docs])=>{
               const isOpen=!collapsedGroups[cat];
               return <div className="folder-tree-group" key={cat}>
-                <div className={`folder-tree-item ${selectedFolder===cat?"active":""}`}>
+                {/* only the actual selection carries the pill — when a file inside this folder is
+                    open, the folder itself stays unhighlighted so there's one clear selected row */}
+                <div className={`folder-tree-item ${selectedFolder===cat&&!selectedId?"active":""}`}>
                   <button className="folder-tree-caret" onClick={()=>toggleGroup(cat)} aria-label={`${isOpen?"Collapse":"Expand"} ${cat}`}><ChevronDown size={13} className={isOpen?"":"collapsed"}/></button>
                   <button className="folder-tree-label" title={cat} onClick={()=>{setSelectedFolder(cat);setSelectedId(null)}}><FolderOpen size={14}/><span>{cat}</span><b>{docs.length}</b></button>
                 </div>
@@ -993,20 +1073,47 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
             })}
             {folders.filter(name=>!grouped[name]).map(name=><button key={name} title={name} className={`folder-tree-item empty ${selectedFolder===name?"active":""}`} onClick={()=>{setSelectedFolder(name);setSelectedId(null)}}><FolderOpen size={14}/><span>{name}</span><b>0</b></button>)}
           </aside>
+          {/* File list and detail sit side by side, three columns total with the tree — the same
+              layout as both AssureAudit's own Documents section and AssurePro's, where opening a
+              file never hides the list you picked it from. */}
           <div className="documents-main-panel">
-            {selectedDoc?<DocumentDetailPanel inline doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/>:<div className="documents-grouped-list">
-              {displayedDocs.map(doc=><button className="doc-row-v2" key={doc.id} onClick={()=>setSelectedId(doc.id)}>
-                <i className={`tone-dot ${doc.tone}`}/>
-                <span className="doc-id">{doc.id}</span>
-                <span className="doc-row-title"><strong>{doc.name}</strong><small>{doc.type}</small></span>
-                <span className={`status-pill ${doc.tone}`}>{doc.due}</span>
-                <span className="doc-row-meta"><MessageSquare size={13}/>{doc.comments.length}</span>
-                <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
-              </button>)}
+            <div className="documents-grouped-list">
+              {pagedDocs.length>0&&<label className="doc-select-all"><input type="checkbox" checked={allChecked} onChange={toggleAll}/><span>Select All{checked.length>0&&` (${checked.length} selected)`}</span></label>}
+              {Object.entries(pagedGrouped).map(([cat,docs])=><section className="doc-group" key={cat}>
+                <button className="doc-group-head" onClick={()=>toggleGroup(cat)}><ChevronDown className={collapsedGroups[cat]?"collapsed":""}/><strong>{cat}</strong><b className="count">{docs.length}</b></button>
+                {!collapsedGroups[cat]&&docs.map(doc=><div className="doc-row-v2" key={doc.id}>
+                  <input type="checkbox" checked={checked.includes(doc.id)} onChange={()=>toggleCheck(doc.id)}/>
+                  <button className="doc-row-clickzone" onClick={()=>setSelectedId(doc.id)}>
+                    <i className={`tone-dot ${doc.tone}`}/>
+                    <span className="doc-id">{doc.id}</span>
+                    <span className="doc-row-title"><strong>{doc.name}</strong><small>{doc.type}</small></span>
+                    <span className={`status-pill ${doc.tone}`}>{doc.due}</span>
+                    <span className="doc-row-meta"><MessageSquare size={13}/>{doc.comments.length}</span>
+                    <span className="doc-row-meta"><Paperclip size={13}/>{doc.attachments}</span>
+                  </button>
+                </div>)}
+              </section>)}
               {displayedDocs.length===0&&selectedFolder&&!grouped[selectedFolder]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document and use "Move" to file it here.</p>}
-              {displayedDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>Clear the filters or search to see the full client library.</p></div>}
-            </div>}
+              {displayedDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>{packCreated||documents.length>0?"Clear the filters or search to see the full client library.":'Use "Create Default Requests" to seed the standard request pack, or "Create Request" for a one-off.'}</p></div>}
+              {displayedDocs.length>0&&<div className="doc-pagination">
+                <div className="topbar-popover" ref={sizeRef}>
+                  <span>Showing</span>
+                  <button className="secondary-btn" onClick={()=>setSizeOpen(v=>!v)}>{pageSize}<ChevronDown size={13}/></button>
+                  {sizeOpen&&<div className="dropdown-menu">{DOC_PAGE_SIZES.map(s=><button key={s} className="dropdown-item" onClick={()=>{setPageSize(s);setPage(1);setSizeOpen(false)}}>{s}</button>)}</div>}
+                  <span>of {displayedDocs.length} documents</span>
+                </div>
+                <div className="doc-pagination-pages">
+                  <button className="icon-btn" disabled={safePage===1} onClick={()=>setPage(1)}><ChevronLeft size={14}/></button>
+                  <button className="icon-btn" disabled={safePage===1} onClick={()=>setPage(p=>p-1)}><ChevronLeft size={14}/></button>
+                  <span className="doc-pagination-current">{safePage}</span>
+                  <span>of {pageCount} pages</span>
+                  <button className="icon-btn" disabled={safePage===pageCount} onClick={()=>setPage(p=>p+1)}><ChevronRight size={14}/></button>
+                  <button className="icon-btn" disabled={safePage===pageCount} onClick={()=>setPage(pageCount)}><ChevronRight size={14}/></button>
+                </div>
+              </div>}
+            </div>
           </div>
+          {selectedDoc&&<div className="documents-detail-col"><DocumentDetailPanel inline doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/></div>}
         </div>
       </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list documents-requests-list">{requests.map(r=><button key={r.id} onClick={()=>setSelectedRequestId(r.id)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div>{/* the lock slot always renders so locked and unlocked rows share one grid */}{r.locked?<LockKeyhole size={14} className="request-lock-icon"/>:<span/>}<span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
     </section>
@@ -1211,7 +1318,7 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
       <div className="client-head-actions">
         {/* "Open in" is the cross-product jump within the Assure One suite — Documents and Billing
             are tabs on this very page now, so listing them here would just be a redundant tab switch. */}
-        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><div className="dropdown-head"><strong>Open this client in</strong><span>Jump across the Assure One suite</span></div><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);update({},`Opening ${displayName} in AssurePro — practice management, billing and engagement letters live there.`)}}><BriefcaseBusiness size={14}/><span>AssurePro</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/engagement/${client.slug}/planning`)}}><ClipboardCheck size={14}/><span>Audit workpapers</span></button></div>}</div>
+        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><div className="dropdown-head"><strong>Open this client in</strong><span>Jump across the Assure One suite</span></div><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);update({},`Opening ${displayName} in AssurePro — practice management, billing and engagement letters live there.`)}}><BriefcaseBusiness size={14}/><span>AssurePro</span></button></div>}</div>
         <div className="topbar-popover" ref={moreRef}><button className="icon-btn" onClick={()=>setMoreOpen(v=>!v)}><MoreHorizontal/></button>{moreOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose email (simulated)")}}><Send size={14}/><span>Email</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose SMS (simulated)")}}><MessageSquare size={14}/><span>SMS</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Note added (simulated)")}}><FileText size={14}/><span>Note</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},`${displayName} archived (simulated)`)}}><FolderOpen size={14}/><span>Archive</span></button><button className="dropdown-item danger" onClick={()=>{setMoreOpen(false);update({},"Delete not available in this prototype")}}><Trash2 size={14}/><span>Delete</span></button></div>}</div>
       </div>
     </div>

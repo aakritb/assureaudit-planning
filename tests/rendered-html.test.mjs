@@ -211,7 +211,7 @@ test("searches across the platform and keeps the signed-in identity role based",
   assert.match(page, /Materiality & handoff/);
   assert.match(page, /General Ledger Detail\.csv/);
   assert.match(page, /event\.metaKey\|\|event\.ctrlKey/);
-  assert.match(page, /<span>\{state\.role\}<\/span>/);
+  assert.match(page, /<span>\{state\.role\}/);
   assert.doesNotMatch(page, /Baldeep Singh Chhabra · Partner/);
   assert.doesNotMatch(page, /className="global-search" onClick=\{\(\)=>navigate\("\/clients"\)\}/);
   assert.match(css, /\.global-search-menu/);
