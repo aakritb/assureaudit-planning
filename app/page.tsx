@@ -5,7 +5,7 @@ import {
   Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell,
   BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2,
   ChevronDown, ChevronLeft, ChevronRight, Circle, ClipboardCheck, Clock3,
-  Cloud, Database, Download, FileCheck2, FileSpreadsheet, FileText, Filter,
+  Cloud, Database, DollarSign, Download, FileCheck2, FileSpreadsheet, FileText, Filter,
   FolderOpen, Gauge, History, Home as HomeIcon, Info, LayoutDashboard, Link2, ListChecks,
   LockKeyhole, Menu, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
@@ -1183,32 +1183,193 @@ function CreateRequestModalSimple({close,update,clientName,onCreate}:{close:()=>
 }
 
 
+const CLIENT_TAGS:Record<string,string[]>={
+  bbawc:["Audit risk","Board relationship"],
+  harbor:["Long-term client"],
+  greenfield:["Audit risk","New client"],
+  metro:["Needs setup"],
+  horizon:["EBP specialist required"],
+  cedar:["Long-term client","Low risk"],
+};
+const ENGAGEMENT_STAGE_TONE:Record<string,string>={Intake:"danger","Document Collection":"progress","Categorization & Reconciliation":"warning",Review:"warning",Complete:"approved"};
+function engagementStageTone(stage:string){return ENGAGEMENT_STAGE_TONE[stage]||"neutral"}
+type ClientEngagementRow={id:string;title:string;period:string;stage:string;due:string;assignee:string};
+function engagementsForClient(client:ClientRecord):ClientEngagementRow[]{
+  const team=CLIENT_TEAMS[client.slug];
+  const lead=team.firm[0]?.name||"Oscar Owner";
+  const senior=team.firm[team.firm.length-1]?.name||lead;
+  const wf=clientToWorkflowStage(client.stage);
+  const primaryStage=wf==="Intake"?"Intake":wf==="Ingest"?"Document Collection":wf==="Review"?"Review":"Complete";
+  return [
+    {id:`${client.slug}-1`,title:`${client.name} — ${client.auditType}`,period:client.period,stage:primaryStage,due:client.due,assignee:client.owner},
+    {id:`${client.slug}-2`,title:`${client.name} — Form 990 Tax Return`,period:client.period,stage:client.progress>40?"Categorization & Reconciliation":"Intake",due:"May 31, 2026",assignee:senior},
+    {id:`${client.slug}-3`,title:`${client.name} — Monthly Bookkeeping`,period:"–",stage:"Document Collection",due:"No date",assignee:lead},
+  ];
+}
+type ClientInvoice={id:number;number:string;amount:number;status:"Paid"|"Overdue"|"Draft";dueDate:string};
+function invoicesForClient(client:ClientRecord):ClientInvoice[]{
+  const overdueCount=client.openItems>0?Math.min(3,client.openItems):0;
+  const invoices:ClientInvoice[]=[
+    {id:1,number:"INV-1042",amount:1200,status:"Paid",dueDate:"Jun 1, 2026"},
+    {id:2,number:"INV-1058",amount:950,status:"Paid",dueDate:"Jul 1, 2026"},
+  ];
+  for(let i=0;i<overdueCount;i++)invoices.push({id:3+i,number:`INV-10${65+i}`,amount:300+i*150,status:"Overdue",dueDate:"Aug 5, 2026"});
+  return invoices;
+}
+type SigningPackage={id:number;name:string;status:"Draft"|"Sent"|"Completed"|"Cancelled";sent:string;completed:string;signBy:string;validTill:string};
+function signingPackagesForClient(client:ClientRecord):SigningPackage[]{
+  return [
+    {id:1,name:`${client.auditType} Engagement Letter`,status:"Completed",sent:"Aug 4, 2025",completed:"Aug 4, 2025",signBy:"–",validTill:"–"},
+    {id:2,name:"Form 990 Engagement Letter",status:"Draft",sent:"–",completed:"–",signBy:"–",validTill:"–"},
+    {id:3,name:"Management Representation Letter",status:client.progress>=80?"Sent":"Draft",sent:client.progress>=80?"Aug 10, 2026":"–",completed:"–",signBy:"Aug 20, 2026",validTill:"Sep 1, 2026"},
+  ];
+}
+type ClientCredential={id:number;name:string;category:string;username:string;lastRevealed:string};
+function credentialsForClient(client:ClientRecord):ClientCredential[]{
+  return [{id:1,name:"QuickBooks Online",category:"Accounting system",username:`${client.slug}.admin@qbo.com`,lastRevealed:"17d ago"}];
+}
+type ClientEmailLog={id:number;sentAt:string;type:string;to:string;subject:string;status:"Sent"|"Failed"|"Not sent"};
+function emailsForClient(client:ClientRecord):ClientEmailLog[]{
+  const contact=CLIENT_TEAMS[client.slug].client[0];
+  const to=contact?`${contact.name.toLowerCase().replace(/ /g,".")}@${client.slug}.org`:"contact@client.org";
+  return [
+    {id:1,sentAt:"Aug 18, 2026, 2:45 PM",type:"Document request",to,subject:`${client.name} requested documents`,status:"Sent"},
+    {id:2,sentAt:"Aug 12, 2026, 10:05 AM",type:"Client message",to,subject:"Your auditor is waiting for your reply",status:"Sent"},
+    {id:3,sentAt:"Aug 4, 2026, 9:00 AM",type:"Engagement letter",to,subject:"Please sign your engagement letter",status:client.ready?"Sent":"Not sent"},
+  ];
+}
+const CLIENT_DETAIL_TABS=["Overview","Info","Documents","Communications","Engagements","Billing","Engagement Letter","Credentials","Emails"] as const;
 function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navigate:(p:string)=>void;state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void}) {
-  const docs=docsForClient(client);
-  const [tab,setTab]=useState<"Overview"|"Engagements"|"Audit information"|"Team"|"Communications">("Overview");
+  const [tab,setTab]=useState<typeof CLIENT_DETAIL_TABS[number]>("Overview");
+  const [editingName,setEditingName]=useState(false);
+  const [nameDraft,setNameDraft]=useState(client.name);
+  const [displayName,setDisplayName]=useState(client.name);
+  const [openInOpen,setOpenInOpen]=useState(false);
+  const openInRef=useDismiss(openInOpen,()=>setOpenInOpen(false));
+  const [moreOpen,setMoreOpen]=useState(false);
+  const moreRef=useDismiss(moreOpen,()=>setMoreOpen(false));
+  const saveName=()=>{if(!nameDraft.trim())return;setDisplayName(nameDraft.trim());setEditingName(false);update({},"Client name updated")};
   if(!client.ready)return <div className="page client-overview-page"><div className="client-profile-head"><button className="back-client" onClick={()=>navigate("/clients")}><ArrowLeft/></button><i>{client.initials}</i><div><p className="eyebrow">Client audit workspace</p><h1>{client.name}</h1><span>{client.industry} · {client.subIndustry}</span></div></div><section className="setup-required"><AlertTriangle/><div><p className="eyebrow">Setup required</p><h2>Complete engagement details in AssurePro first</h2><p>Audit data is intentionally hidden until the signed engagement letter provides the period, audit type, reporting framework and responsible team.</p><ul><li>Signed engagement letter</li><li>Audit period and reporting deadline</li><li>Industry and sub-industry</li><li>Engagement partner and manager</li></ul><button className="primary-btn" onClick={()=>navigate("/clients")}>Return to clients</button></div></section><EngagementTeam client={client}/></div>;
+  const engagements=engagementsForClient(client);
+  const invoices=invoicesForClient(client);
+  const overdueInvoices=invoices.filter(i=>i.status==="Overdue");
+  const overdueAmount=overdueInvoices.reduce((s,i)=>s+i.amount,0);
+  const overdueTasks=client.openItems*3;
+  const attentionCount=(overdueInvoices.length>0?1:0)+(overdueTasks>0?1:0);
   return <div className="page client-overview-page">
-    <div className="client-profile-head"><button className="back-client" onClick={()=>navigate("/clients")}><ArrowLeft/></button><i>{client.initials}</i><div><p className="eyebrow">Client audit workspace</p><h1>{client.name}</h1><span>{client.industry} · {client.subIndustry} · US GAAP</span></div><div className="client-head-meta"><span><small>Active engagements</small><strong>1</strong></span><span><small>Documents</small><strong>{client.documents}</strong></span><span><small>Open items</small><strong>{client.openItems}</strong></span></div></div>
-    <nav className="client-tabs"><button className={tab==="Overview"?"active":""} onClick={()=>setTab("Overview")}>Overview</button><button onClick={()=>navigate(`/clients/${client.slug}/documents`)}>Documents</button><button className={tab==="Engagements"?"active":""} onClick={()=>setTab("Engagements")}>Engagements</button><button className={tab==="Audit information"?"active":""} onClick={()=>setTab("Audit information")}>Audit information</button><button className={tab==="Team"?"active":""} onClick={()=>setTab("Team")}>Team</button><button className={tab==="Communications"?"active":""} onClick={()=>setTab("Communications")}>Communications</button></nav>
+    <div className="client-profile-head client-profile-head-v2"><button className="back-client" onClick={()=>navigate("/clients")}><ArrowLeft/></button><i>{client.initials}</i>
+      <div className="client-head-name-row">
+        {editingName?<div className="client-name-edit"><input value={nameDraft} onChange={e=>setNameDraft(e.target.value)} autoFocus/><button className="primary-btn" onClick={saveName}>Save</button><button className="secondary-btn" onClick={()=>{setNameDraft(displayName);setEditingName(false)}}>Cancel</button></div>
+        :<><h1>{displayName}</h1><button className="icon-btn" title="Rename" onClick={()=>setEditingName(true)}><Pencil size={14}/></button><span className="chip neutral">Business</span><span className="status-pill approved">Active</span></>}
+      </div>
+      <div className="client-head-actions">
+        <div className="topbar-popover" ref={openInRef}><button className="secondary-btn" onClick={()=>setOpenInOpen(v=>!v)}>Open in <ChevronDown size={14}/></button>{openInOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/engagement/${client.slug}/planning`)}}><ClipboardCheck size={14}/><span>Workflow</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);navigate(`/clients/${client.slug}/documents`)}}><FolderOpen size={14}/><span>Documents</span></button><button className="dropdown-item" onClick={()=>{setOpenInOpen(false);setTab("Billing")}}><FileSpreadsheet size={14}/><span>Billing</span></button></div>}</div>
+        <div className="topbar-popover" ref={moreRef}><button className="icon-btn" onClick={()=>setMoreOpen(v=>!v)}><MoreHorizontal/></button>{moreOpen&&<div className="dropdown-menu"><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose email (simulated)")}}><Send size={14}/><span>Email</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Compose SMS (simulated)")}}><MessageSquare size={14}/><span>SMS</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},"Note added (simulated)")}}><FileText size={14}/><span>Note</span></button><button className="dropdown-item" onClick={()=>{setMoreOpen(false);update({},`${displayName} archived (simulated)`)}}><FolderOpen size={14}/><span>Archive</span></button><button className="dropdown-item danger" onClick={()=>{setMoreOpen(false);update({},"Delete not available in this prototype")}}><Trash2 size={14}/><span>Delete</span></button></div>}</div>
+      </div>
+    </div>
+    <nav className="client-tabs">{CLIENT_DETAIL_TABS.map(t=><button key={t} className={tab===t?"active":""} onClick={()=>t==="Documents"?navigate(`/clients/${client.slug}/documents`):setTab(t)}>{t}</button>)}</nav>
     {tab==="Overview"&&<>
-    {client.openItems>0&&<section className="client-attention"><div><AlertCircle/><strong>Needs attention</strong><span>{client.openItems}</span></div><button onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}><strong>Resolve {client.openItems} data-ingest items</strong><span>Validation and account-mapping exceptions</span><ArrowRight/></button></section>}
-    <div className="client-overview-grid"><section className="client-engagement-card"><div className="section-title"><div><p className="eyebrow">Current engagement</p><h2>{client.auditType} · {state.fiscalYear}</h2><p>Period ended {client.period}</p></div><span className="status-pill progress">In progress</span></div><div className="engagement-stage-strip">{[{n:"1",t:"Data ingest",p:client.progress},{n:"2",t:"Workpapers",p:0},{n:"3",t:"Fieldwork",p:0},{n:"4",t:"Report",p:0},{n:"5",t:"Completion",p:0}].map((x,i)=><button key={x.t} className={i===0?"active":"locked"} disabled={i>0} onClick={()=>navigate(`/engagement/${client.slug}/ingest/details`)}><i>{i>0?<LockKeyhole/>:x.n}</i><span><strong>{x.t}</strong><small>{i===0?`${x.p}% complete`:"Locked"}</small></span><em><b style={{width:`${x.p}%`}}/></em></button>)}</div><div className="engagement-next-action"><div><Database/><span><small>Continue where the team stopped</small><strong>Review transformed ledger data</strong><p>3 validation checks require auditor judgment before account mapping.</p></span></div><button className="primary-btn" onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}>Continue ingest <ArrowRight/></button></div></section>
-      <aside className="client-facts-card"><div className="section-title"><div><h2>Engagement details</h2><p>Synced from AssurePro.</p></div><span className="source-badge"><Check/>Synced</span></div><dl><div><dt>Audit type</dt><dd>{client.auditType}</dd></div><div><dt>Period end</dt><dd>{client.period}</dd></div><div><dt>Reporting deadline</dt><dd>April 30, 2026</dd></div><div><dt>Engagement partner</dt><dd>Oscar Owner</dd></div><div><dt>Engagement manager</dt><dd>Meera Kapoor</dd></div><div><dt>Accounting system</dt><dd>QuickBooks Online</dd></div></dl></aside></div>
-    <EngagementTeam client={client}/>
-    <section className="client-documents" id="documents"><div className="section-title"><div><p className="eyebrow">Documents</p><h2>Recent client and engagement files</h2><p>Files collected in AssurePro and source data used by the audit.</p></div><button className="secondary-btn" onClick={()=>navigate(`/clients/${client.slug}/documents`)}>View all {client.documents} <ArrowRight/></button></div>{docs.map(d=><button className="doc-row-v2" key={d.id} onClick={()=>navigate(`/clients/${client.slug}/documents`)}>
-      <i className={`tone-dot ${d.tone}`}/>
-      <span className="doc-id">{d.id}</span>
-      <span className="doc-row-title"><strong>{d.name}</strong><small>{d.type}</small></span>
-      <span className={`status-pill ${d.tone}`}>{d.due}</span>
-      <span className="doc-row-meta"><MessageSquare size={13}/>{d.comments.length}</span>
-      <span className="doc-row-meta"><Paperclip size={13}/>{d.attachments}</span>
-    </button>)}</section>
+    {attentionCount>0&&<section className="client-attention"><div><AlertCircle/><strong>Needs attention</strong><span>{attentionCount}</span></div>
+      {overdueInvoices.length>0&&<button onClick={()=>setTab("Billing")}><strong>{overdueInvoices.length} invoice{overdueInvoices.length===1?"":"s"} overdue</strong><span>{money(overdueAmount)}</span><ArrowRight/></button>}
+      {overdueTasks>0&&<button onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}><strong>{overdueTasks} tasks past due</strong><span>earliest {client.due}</span><ArrowRight/></button>}
+    </section>}
+    <div className="client-overview-grid-v2">
+      <section className="section-card client-engagements-card"><div className="section-title"><div><h2>Engagements</h2></div><button className="text-link" onClick={()=>setTab("Engagements")}>View all {engagements.length} <ArrowRight size={13}/></button></div>
+        <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span></div>
+        {engagements.map(e=><div className="engagements-table-row" key={e.id}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span></div>)}
+        </div>
+      </section>
+      <aside className="client-stat-cards">
+        <div className="stat-card"><span className="stat-card-icon"><DollarSign size={14}/></span><small>Outstanding</small><strong className={overdueAmount>0?"danger-text":""}>{money(overdueAmount)}</strong><span>{overdueInvoices.length>0?`${overdueInvoices.length} invoices overdue`:"No invoices overdue"}</span></div>
+        <div className="stat-card"><span className="stat-card-icon"><CalendarDays size={14}/></span><small>Next deadline</small><strong>{client.due==="Not set"||client.due==="Complete"?"–":client.due}</strong><span>{client.due==="Not set"||client.due==="Complete"?"No upcoming deadlines":"Upcoming"}</span></div>
+        <div className="stat-card-row"><div className="stat-card compact"><strong>{engagements.length}</strong><span>Engagements</span></div><div className="stat-card compact"><strong>{client.documents}</strong><span>Documents</span></div></div>
+        <div className="stat-card"><small>Client Pending Actions</small><p className="panel-empty-text">No pending actions.</p></div>
+        <div className="stat-card"><div className="stat-card-head"><small>Recent communications</small><button className="text-link" onClick={()=>setTab("Communications")}>View all</button></div><p className="panel-empty-text">{CLIENT_TEAMS[client.slug].firm[0]?.name} sent a message 2d ago.</p></div>
+      </aside>
+    </div>
     </>}
-    {tab==="Engagements"&&<section className="client-engagement-card" style={{maxWidth:680}}><div className="section-title"><div><p className="eyebrow">Current engagement</p><h2>{client.auditType} · {state.fiscalYear}</h2><p>Period ended {client.period}</p></div><span className="status-pill progress">In progress</span></div><div className="engagement-stage-strip">{[{n:"1",t:"Data ingest",p:client.progress},{n:"2",t:"Workpapers",p:0},{n:"3",t:"Fieldwork",p:0},{n:"4",t:"Report",p:0},{n:"5",t:"Completion",p:0}].map((x,i)=><button key={x.t} className={i===0?"active":"locked"} disabled={i>0} onClick={()=>navigate(`/engagement/${client.slug}/ingest/details`)}><i>{i>0?<LockKeyhole/>:x.n}</i><span><strong>{x.t}</strong><small>{i===0?`${x.p}% complete`:"Locked"}</small></span><em><b style={{width:`${x.p}%`}}/></em></button>)}</div><div className="engagement-next-action"><div><Database/><span><small>Continue where the team stopped</small><strong>Review transformed ledger data</strong><p>3 validation checks require auditor judgment before account mapping.</p></span></div><button className="primary-btn" onClick={()=>navigate(`/engagement/${client.slug}/ingest/validate`)}>Continue ingest <ArrowRight/></button></div></section>}
-    {tab==="Audit information"&&<aside className="client-facts-card" style={{maxWidth:420}}><div className="section-title"><div><h2>Audit information</h2><p>Synced from AssurePro.</p></div><span className="source-badge"><Check/>Synced</span></div><dl><div><dt>Audit type</dt><dd>{client.auditType}</dd></div><div><dt>Period end</dt><dd>{client.period}</dd></div><div><dt>Reporting deadline</dt><dd>April 30, 2026</dd></div><div><dt>Engagement partner</dt><dd>Oscar Owner</dd></div><div><dt>Engagement manager</dt><dd>Meera Kapoor</dd></div><div><dt>Accounting system</dt><dd>QuickBooks Online</dd></div></dl></aside>}
-    {tab==="Team"&&<EngagementTeam client={client}/>}
+    {tab==="Info"&&<ClientInfoTab client={client}/>}
+    {tab==="Engagements"&&<section className="section-card client-engagements-card" style={{maxWidth:900}}><div className="section-title"><div><h2>Engagements</h2><p>Every engagement open for {displayName}.</p></div></div>
+      <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span></div>
+      {engagements.map(e=><div className="engagements-table-row" key={e.id}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span></div>)}
+      </div>
+    </section>}
     {tab==="Communications"&&<ClientCommunications client={client}/>}
+    {tab==="Billing"&&<ClientBillingTab client={client} invoices={invoices} update={update}/>}
+    {tab==="Engagement Letter"&&<ClientEngagementLetterTab client={client} update={update}/>}
+    {tab==="Credentials"&&<ClientCredentialsTab client={client} update={update}/>}
+    {tab==="Emails"&&<ClientEmailsTab client={client}/>}
   </div>;
+}
+function ClientInfoTab({client}:{client:ClientRecord}){
+  const team=CLIENT_TEAMS[client.slug];
+  const tags=CLIENT_TAGS[client.slug]||[];
+  const [tagList,setTagList]=useState(tags);
+  return <div className="client-overview-grid-v2">
+    <section className="section-card"><div className="section-title"><div><h2>Contact Information</h2></div></div>
+      <dl className="info-dl"><div><dt>Name</dt><dd>{client.name}</dd></div><div><dt>Email</dt><dd>info@{client.slug}.org</dd></div><div><dt>Phone</dt><dd className="info-add">Add phone</dd></div><div><dt>Address</dt><dd className="info-add">Add address</dd></div></dl>
+    </section>
+    <section className="section-card"><div className="section-title"><div><h2>Entity Details</h2></div></div>
+      <dl className="info-dl"><div><dt>Entity Type</dt><dd>Business</dd></div><div><dt>Industry</dt><dd>{client.industry}</dd></div><div><dt>Sub-industry</dt><dd>{client.subIndustry}</dd></div><div><dt>Period end</dt><dd>{client.period}</dd></div><div><dt>Accounting system</dt><dd>QuickBooks Online</dd></div></dl>
+    </section>
+    <section className="section-card"><div className="section-title"><div><h2>Portal Access</h2></div></div>
+      <div className="portal-access-list">{team.client.map((m,i)=><div className="portal-access-row" key={m.initials}><i className="person-avatar violet">{m.initials}</i><div><strong>{m.name}</strong><span>{m.role}</span></div><span className={`status-pill ${i===0?"approved":"warning"}`}>{i===0?"Activated":"Pending"}</span></div>)}</div>
+    </section>
+    <section className="section-card"><div className="section-title"><div><h2>Tags</h2></div></div>
+      <div className="client-tag-row">{tagList.map(t=><span className="chip neutral" key={t}>{t}<button onClick={()=>setTagList(l=>l.filter(x=>x!==t))}><X size={11}/></button></span>)}{tagList.length===0&&<p className="panel-empty-text">No tags yet.</p>}</div>
+    </section>
+  </div>;
+}
+function ClientBillingTab({client,invoices,update}:{client:ClientRecord;invoices:ClientInvoice[];update:(p:Partial<DemoState>,m?:string)=>void}){
+  const [sub,setSub]=useState<"Invoices"|"Software"|"Time Entries">("Invoices");
+  return <section className="section-card">
+    <div className="subtabs">{(["Invoices","Software","Time Entries"] as const).map(s=><button key={s} className={sub===s?"active":""} onClick={()=>setSub(s)}>{s}</button>)}</div>
+    {sub==="Invoices"&&<div className="engagements-table"><div className="engagements-table-head" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}><span>Number</span><span>Amount</span><span>Status</span><span>Due Date</span></div>
+      {invoices.map(inv=><div className="engagements-table-row" key={inv.id} style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}><span>{inv.number}</span><span>{money(inv.amount)}</span><span><span className={`status-pill ${inv.status==="Paid"?"approved":inv.status==="Overdue"?"danger":"neutral"}`}>{inv.status}</span></span><span>{inv.dueDate}</span></div>)}
+    </div>}
+    {sub==="Software"&&<p className="panel-empty-text">Software subscriptions aren't tracked in this prototype.</p>}
+    {sub==="Time Entries"&&<p className="panel-empty-text">Time entries aren't tracked in this prototype.</p>}
+  </section>;
+}
+function ClientEngagementLetterTab({client,update}:{client:ClientRecord;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const [packages,setPackages]=useState(()=>signingPackagesForClient(client));
+  const addPackage=()=>{
+    const id=Math.max(0,...packages.map(p=>p.id))+1;
+    setPackages(p=>[{id,name:"New signing package",status:"Draft",sent:"–",completed:"–",signBy:"–",validTill:"–"},...p]);
+    update({},"New signing package created as a draft");
+  };
+  return <section className="section-card"><div className="section-title"><div><h2>Signing packages</h2><p>Engagement letters, intake requests, and other documents sent for signature.</p></div><button className="primary-btn" onClick={addPackage}><Plus size={15}/>New package</button></div>
+    <div className="engagements-table"><div className="engagements-table-head" style={{gridTemplateColumns:"1.6fr 1fr 1fr 1fr 1fr 1fr"}}><span>Name</span><span>Status</span><span>Sent</span><span>Completed</span><span>Sign by</span><span>Valid till</span></div>
+    {packages.map(p=><div className="engagements-table-row" key={p.id} style={{gridTemplateColumns:"1.6fr 1fr 1fr 1fr 1fr 1fr"}}><span>{p.name}</span><span><span className={`status-pill ${p.status==="Completed"?"approved":p.status==="Cancelled"?"danger":p.status==="Sent"?"warning":"neutral"}`}>{p.status}</span></span><span>{p.sent}</span><span>{p.completed}</span><span>{p.signBy}</span><span>{p.validTill}</span></div>)}
+    </div>
+  </section>;
+}
+function ClientCredentialsTab({client,update}:{client:ClientRecord;update:(p:Partial<DemoState>,m?:string)=>void}){
+  const credentials=credentialsForClient(client);
+  const [revealed,setRevealed]=useState<Record<number,boolean>>({});
+  return <section className="section-card"><div className="section-title"><div><h2>{credentials.length} credential{credentials.length===1?"":"s"}</h2></div><button className="primary-btn" onClick={()=>update({},"Add credential not available in this prototype")}><Plus size={15}/>Add credential</button></div>
+    <div className="credential-banner"><LockKeyhole size={14}/><span>Encrypted at rest with AES-256 · Only engagement owners can reveal secrets. Every reveal is logged.</span></div>
+    {credentials.map(c=><div className="credential-card" key={c.id}>
+      <div className="credential-card-head"><span className="credential-icon"><Building2 size={16}/></span><div><strong>{c.name}</strong><small>{c.category}</small></div></div>
+      <div className="credential-fields">
+        <div><small>USERNAME</small><span>{c.username}</span></div>
+        <div><small>PASSWORD</small><span>{revealed[c.id]?"demo-password-123":"••••••••••"}<button className="icon-btn" onClick={()=>setRevealed(r=>({...r,[c.id]:!r[c.id]}))}>{revealed[c.id]?<X size={14}/>:<Search size={14}/>}</button></span></div>
+      </div>
+      <small className="credential-meta">Last revealed {c.lastRevealed}</small>
+    </div>)}
+  </section>;
+}
+function ClientEmailsTab({client}:{client:ClientRecord}){
+  const emails=emailsForClient(client);
+  const [filter,setFilter]=useState<"All"|"Sent"|"Failed"|"Not sent">("All");
+  const visible=emails.filter(e=>filter==="All"||e.status===filter);
+  return <section className="section-card">
+    <div className="my-work-filters">{(["All","Sent","Failed","Not sent"] as const).map(f=><button key={f} className={filter===f?"active":""} onClick={()=>setFilter(f)}>{f}</button>)}</div>
+    <div className="engagements-table" style={{marginTop:12}}><div className="engagements-table-head" style={{gridTemplateColumns:"1.2fr 1fr 1.4fr 1.6fr .8fr"}}><span>Sent</span><span>Type</span><span>To</span><span>Subject</span><span>Status</span></div>
+    {visible.map(e=><div className="engagements-table-row" key={e.id} style={{gridTemplateColumns:"1.2fr 1fr 1.4fr 1.6fr .8fr"}}><span>{e.sentAt}</span><span>{e.type}</span><span>{e.to}</span><span>{e.subject}</span><span><span className={`status-pill ${e.status==="Sent"?"approved":e.status==="Failed"?"danger":"neutral"}`}>{e.status}</span></span></div>)}
+    {visible.length===0&&<p className="panel-empty-text">No emails match this filter.</p>}
+    </div>
+  </section>;
 }
 function ClientCommunications({client}:{client:ClientRecord}){
   const items=[

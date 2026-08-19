@@ -475,3 +475,52 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .quartile-row-meta span:first-child{color:var(--violet-dark);font-weight:650;font-size:12px}
 @media(max-width:1100px){.metrics-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.metrics-kpi-row{grid-template-columns:1fr}.quartile-row{grid-template-columns:1fr;gap:8px}.quartile-row-meta{align-items:flex-start}}
+.client-profile-head-v2{grid-template-columns:34px 46px 1fr auto}
+.client-head-name-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.client-head-name-row h1{font-size:19px;margin:0}
+.client-name-edit{display:flex;align-items:center;gap:8px}
+.client-name-edit input{width:240px}
+.client-head-actions{display:flex;align-items:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#f0eef4;color:#57516c;font-size:11px;font-weight:650;padding:4px 9px;border-radius:999px}
+.chip.neutral{background:#f0eef4;color:#57516c}
+.chip button{border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0}
+.danger-text{color:var(--red)}
+.client-overview-grid-v2{display:grid;grid-template-columns:minmax(0,1.6fr) 300px;gap:14px;align-items:start;margin-bottom:16px}
+.client-engagements-card{padding:17px}
+.engagements-table{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.engagements-table-head,.engagements-table-row{display:grid;grid-template-columns:1.6fr .8fr 1.2fr 1fr 1.2fr;gap:10px;align-items:center;padding:10px 14px}
+.engagements-table-head{background:#faf9fc;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.engagements-table-row{border-top:1px solid var(--line);font-size:12.5px}
+.engagement-assignee{display:flex;align-items:center;gap:6px;font-size:12px}
+.client-stat-cards{display:flex;flex-direction:column;gap:12px}
+.stat-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat-card-icon{color:var(--violet);display:inline-flex;margin-bottom:4px}
+.stat-card small{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.stat-card strong{display:block;font-size:19px;font-weight:700}
+.stat-card>span:last-child{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.stat-card-row{display:flex;gap:12px}
+.stat-card.compact{flex:1;text-align:center}
+.stat-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.info-dl{display:flex;flex-direction:column;gap:0}
+.info-dl>div{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.info-dl>div:first-child{border-top:0}
+.info-dl dt{font-size:11px;color:var(--muted)}
+.info-dl dd{font-size:12.5px;font-weight:600;text-align:right}
+.info-dl dd.info-add{color:var(--violet);font-weight:600;cursor:pointer}
+.portal-access-list{display:flex;flex-direction:column;gap:10px}
+.portal-access-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.portal-access-row:first-child{border-top:0}
+.portal-access-row>div{flex:1;display:flex;flex-direction:column}
+.portal-access-row>div span{font-size:11px;color:var(--muted)}
+.client-tag-row{display:flex;flex-wrap:wrap;gap:8px}
+.credential-banner{display:flex;align-items:center;gap:8px;background:#f6f4fc;color:var(--muted-2);border-radius:9px;padding:10px 12px;font-size:12px;margin-bottom:14px}
+.credential-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px}
+.credential-card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.credential-icon{width:32px;height:32px;border-radius:9px;background:var(--violet-soft);color:var(--violet-dark);display:grid;place-items:center;flex:none}
+.credential-card-head small{display:block;color:var(--muted);font-size:11px}
+.credential-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.credential-fields small{display:block;color:var(--muted);font-size:9.5px;letter-spacing:.05em;margin-bottom:4px}
+.credential-fields span{display:flex;align-items:center;gap:8px;font-size:13px}
+.credential-fields .icon-btn{width:22px;height:22px}
+.credential-meta{display:block;color:var(--muted);font-size:10.5px;margin-top:10px}
+@media(max-width:900px){.client-overview-grid-v2{grid-template-columns:1fr}.engagements-table-head{display:none}.engagements-table-row{grid-template-columns:1fr;gap:4px}}

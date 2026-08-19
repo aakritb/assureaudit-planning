@@ -13,7 +13,7 @@ test("separates the firm portfolio dashboard from each client overview", async (
   assert.match(page, /function ClientOverview\(/);
   assert.match(page, /Open a client to see its overview, documents and engagement workflow/);
   assert.match(page, /Riverside Youth & Family Services, Inc\./);
-  assert.match(page, /Recent client and engagement files/);
+  assert.match(page, /Outstanding<\/small>/);
   assert.match(page, /Finish setup in AssurePro/);
   assert.match(page, /Audit data is intentionally hidden/);
   assert.doesNotMatch(page, /Your site is taking shape|react-loading-skeleton|codex-preview/i);
