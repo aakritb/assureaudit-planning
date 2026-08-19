@@ -479,6 +479,7 @@ const WORK_TASKS:WorkTask[]=[
 const WORKFLOW_STAGES=["Planning","Fieldwork","Completion"] as const;
 type WorkflowStage=typeof WORKFLOW_STAGES[number];
 const WORKFLOW_STAGE_TONE:Record<WorkflowStage,string>={Planning:"progress",Fieldwork:"warning",Completion:"approved"};
+const STAGE_SUBSTEPS:Record<WorkflowStage,string[]>={Planning:["Risk Assessment","Materiality","Planning","Data"],Fieldwork:["Audit Procedures","Testing","Evidence","Review"],Completion:["Final Review","Adjustments","Sign-off","Archive"]};
 function clientToWorkflowStage(stage:string):WorkflowStage{
   if(stage==="Setup required"||stage==="Data ingest")return "Planning";
   if(stage==="Workpapers")return "Fieldwork";
@@ -568,6 +569,7 @@ function WorkflowEngagements({view,navigate,update}:{view:"Board"|"List";navigat
         const isCollapsed=collapsedCols[stage];
         return <div key={stage} className={`kanban-column workflow-column ${isCollapsed?"collapsed":""}`} onDragOver={e=>e.preventDefault()} onDrop={()=>dragId&&moveCard(dragId,stage)}>
           <div className="kanban-column-head"><span><i className={`tone-dot ${WORKFLOW_STAGE_TONE[stage]}`}/>{stage}</span><span className="workflow-col-actions">{stage==="Planning"&&planningValue>0&&<b className="workflow-col-value">{money(planningValue)}</b>}<b>{rows.length}</b><button className="icon-btn" title={isCollapsed?"Expand column":"Collapse column"} onClick={()=>setCollapsedCols(c=>({...c,[stage]:!c[stage]}))}><ChevronLeft size={13}/></button><button className="icon-btn" title="New engagement" onClick={newEngagement}><Plus size={13}/></button></span></div>
+          {!isCollapsed&&<p className="kanban-column-substeps">{STAGE_SUBSTEPS[stage].map((s,i)=><Fragment key={s}>{i>0&&<span className="substep-sep">·</span>}<span>{s}</span></Fragment>)}</p>}
           {!isCollapsed&&<>
             {rows.map(card=><button key={card.id} className="kanban-card workflow-card" draggable onDragStart={()=>setDragId(card.id)} onClick={()=>card.clientSlug&&navigate(`/clients/${card.clientSlug}`)}>
               {card.flagged&&<span className="workflow-card-flag"><AlertTriangle size={11}/></span>}
