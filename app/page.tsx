@@ -1067,13 +1067,13 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const allChecked=pagedDocs.length>0&&pagedDocs.every(d=>checked.includes(d.id));
   const toggleCheck=(id:number)=>setChecked(c=>c.includes(id)?c.filter(x=>x!==id):[...c,id]);
   const toggleAll=()=>setChecked(allChecked?[]:pagedDocs.map(d=>d.id));
+  const filesRequestsTabs=<div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{displayedDocs.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>;
   return <>
     <section className="documents-main documents-center-main">
     {!embedded&&<div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>}
     <div className="chip-row-label"><span>Linked workpapers</span><InfoTip title="Linked workpapers" text="Numbered cross-references (201–205) to the specific Data Ingest and Workpapers step that produced or relies on this client's documents. Click a chip to jump straight to that step." standard="Cross-reference · Planning workflow"/></div>
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
       <p className="documents-breadcrumb">Documents <ChevronRight size={11}/> {selectedFolder||"All documents"}</p>
-      <div className="documents-tabs"><button className={tab==="Files"?"active":""} onClick={()=>setTab("Files")}>Files <b>{displayedDocs.length}</b></button><button className={tab==="Requests"?"active":""} onClick={()=>setTab("Requests")}>Requests {requestsPending>0&&<b className="warn">{requestsPending} pending</b>}</button></div>
       {tab==="Files"?<>
         <div className="documents-kind-tabs">
           <button className={fileKind==="All"?"active":""} onClick={()=>{setFileKind("All");setPage(1)}}>All <b>{displayedDocs.length}</b></button>
@@ -1119,6 +1119,7 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
           <button className="secondary-btn" onClick={()=>update({},"Import brings files in from AssurePro or a connected source (simulated).")}><Download size={15}/>Import</button>
           <button className="primary-btn" onClick={()=>update({},"File upload happens here — wire to your OS file picker in production.")}><UploadCloud size={15}/>Upload</button>
         </div>
+        {filesRequestsTabs}
         <div className="documents-workspace">
           <aside className="documents-folder-tree">
             {/* Category is as deep as the tree goes within a stage — matching AssureAudit's own
@@ -1182,7 +1183,10 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
           </div>
           {selectedDoc&&<div className="documents-detail-col"><DocumentDetailPanel inline doc={selectedDoc} close={()=>setSelectedId(null)} update={update} onUpdate={patch=>updateDoc(selectedDoc.id,patch)} onDelete={()=>removeDoc(selectedDoc.id)} clientDocs={documents.filter(d=>d.category===selectedDoc.category&&d.clientUpload&&d.id!==selectedDoc.id)} categories={Array.from(new Set([...documents.map(d=>d.category),...folders]))}/></div>}
         </div>
-      </>:requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list documents-requests-list">{requests.map(r=><button key={r.id} onClick={()=>setSelectedRequestId(r.id)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div>{/* the lock slot always renders so locked and unlocked rows share one grid */}{r.locked?<LockKeyhole size={14} className="request-lock-icon"/>:<span/>}<span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
+      </>:<>
+        {filesRequestsTabs}
+        {requests.length===0?<div className="work-empty"><Send/><h3>No open requests</h3><p>Use Request to ask {client.owner==="Unassigned"?"the client":client.owner} for a new document.</p></div>:<div className="request-list documents-requests-list">{requests.map(r=><button key={r.id} onClick={()=>setSelectedRequestId(r.id)}><div className={`request-icon ${r.status==="Done"?"done":""}`}>{r.status==="Done"?<Check/>:<FileText/>}</div><div><strong>{r.title}</strong><span>{r.type} · {r.due==="Complete"?"No action required":`Due ${r.due}`}</span></div>{/* the lock slot always renders so locked and unlocked rows share one grid */}{r.locked?<LockKeyhole size={14} className="request-lock-icon"/>:<span/>}<span className={`status-pill ${r.status==="Done"?"approved":r.status==="Submitted"?"warning":"neutral"}`}>{r.status}</span><ChevronRight/></button>)}</div>}
+      </>}
     </section>
     {requestOpen&&<CreateRequestModalSimple close={()=>setRequestOpen(false)} update={update} clientName={client.name} onCreate={addRequest}/>}
     {categoryOpen&&<CreateCategoryModal close={()=>setCategoryOpen(false)} onCreate={addCategory}/>}
