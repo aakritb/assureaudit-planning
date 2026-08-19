@@ -485,12 +485,17 @@ input:focus,select:focus,textarea:focus,button:focus-visible{box-shadow:0 0 0 3p
 .chip.neutral{background:#f0eef4;color:#57516c}
 .chip button{border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0}
 .danger-text{color:var(--red)}
-.client-overview-grid-v2{display:grid;grid-template-columns:minmax(0,1.6fr) 300px;gap:14px;align-items:start;margin-bottom:16px}
-.client-engagements-card{padding:17px}
-.engagements-table{border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.engagements-table-head,.engagements-table-row{display:grid;grid-template-columns:1.6fr .8fr 1.2fr 1fr 1.2fr;gap:10px;align-items:center;padding:10px 14px}
-.engagements-table-head{background:#faf9fc;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.engagements-table-row{border-top:1px solid var(--line);font-size:12.5px}
+.client-overview-grid-v2{display:grid;grid-template-columns:minmax(0,1.6fr) 300px;gap:14px;align-items:start;margin-bottom:16px;max-width:1180px}
+.client-engagements-card{padding:0}
+.client-engagements-card>.section-title{padding:17px 17px 13px}
+.engagements-table{border-top:1px solid var(--line);border-radius:0}
+.engagements-table-head,.engagements-table-row{display:grid;grid-template-columns:1.6fr .8fr 1.2fr 1fr 1.2fr 18px;gap:10px;align-items:center;padding:10px 14px}
+.engagements-table-head{background:#faf9fc;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.engagements-table-row{border-top:1px solid var(--line);border-left:0;border-right:0;border-bottom:0;width:100%;background:#fff;text-align:left;font-size:12px;color:var(--ink)}
+.engagements-table-row:first-of-type{border-top:0}
+button.engagements-table-row{cursor:pointer}
+button.engagements-table-row:hover{background:#faf9ff}
+.engagements-table-row svg{color:var(--muted);width:15px}
 .engagement-assignee{display:flex;align-items:center;gap:6px;font-size:12px}
 .client-stat-cards{display:flex;flex-direction:column;gap:12px}
 .stat-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}

@@ -1196,14 +1196,15 @@ function engagementStageTone(stage:string){return ENGAGEMENT_STAGE_TONE[stage]||
 type ClientEngagementRow={id:string;title:string;period:string;stage:string;due:string;assignee:string};
 function engagementsForClient(client:ClientRecord):ClientEngagementRow[]{
   const team=CLIENT_TEAMS[client.slug];
-  const lead=team.firm[0]?.name||"Oscar Owner";
-  const senior=team.firm[team.firm.length-1]?.name||lead;
+  const senior=team.firm[team.firm.length-1]?.name||client.owner;
   const wf=clientToWorkflowStage(client.stage);
-  const primaryStage=wf==="Intake"?"Intake":wf==="Ingest"?"Document Collection":wf==="Review"?"Review":"Complete";
+  const currentStage=wf==="Intake"?"Intake":wf==="Ingest"?"Document Collection":wf==="Review"?"Review":"Complete";
+  const yearMatch=client.period.match(/(\d{4})/);
+  const year=yearMatch?parseInt(yearMatch[1]):2025;
+  const priorPeriod=client.period.replace(String(year),String(year-1));
   return [
-    {id:`${client.slug}-1`,title:`${client.name} — ${client.auditType}`,period:client.period,stage:primaryStage,due:client.due,assignee:client.owner},
-    {id:`${client.slug}-2`,title:`${client.name} — Form 990 Tax Return`,period:client.period,stage:client.progress>40?"Categorization & Reconciliation":"Intake",due:"May 31, 2026",assignee:senior},
-    {id:`${client.slug}-3`,title:`${client.name} — Monthly Bookkeeping`,period:"–",stage:"Document Collection",due:"No date",assignee:lead},
+    {id:`${client.slug}-cur`,title:`${client.auditType} — FY ${year}`,period:client.period,stage:currentStage,due:client.due,assignee:client.owner},
+    {id:`${client.slug}-prior`,title:`${client.auditType} — FY ${year-1}`,period:priorPeriod,stage:"Complete",due:"Complete",assignee:senior},
   ];
 }
 type ClientInvoice={id:number;number:string;amount:number;status:"Paid"|"Overdue"|"Draft";dueDate:string};
@@ -1218,9 +1219,11 @@ function invoicesForClient(client:ClientRecord):ClientInvoice[]{
 }
 type SigningPackage={id:number;name:string;status:"Draft"|"Sent"|"Completed"|"Cancelled";sent:string;completed:string;signBy:string;validTill:string};
 function signingPackagesForClient(client:ClientRecord):SigningPackage[]{
+  const yearMatch=client.period.match(/(\d{4})/);
+  const year=yearMatch?parseInt(yearMatch[1]):2025;
   return [
-    {id:1,name:`${client.auditType} Engagement Letter`,status:"Completed",sent:"Aug 4, 2025",completed:"Aug 4, 2025",signBy:"–",validTill:"–"},
-    {id:2,name:"Form 990 Engagement Letter",status:"Draft",sent:"–",completed:"–",signBy:"–",validTill:"–"},
+    {id:1,name:`${client.auditType} Engagement Letter — FY ${year}`,status:"Completed",sent:"Aug 4, 2025",completed:"Aug 4, 2025",signBy:"–",validTill:"–"},
+    {id:2,name:`${client.auditType} Engagement Letter — FY ${year-1}`,status:"Completed",sent:"Aug 2, 2024",completed:"Aug 6, 2024",signBy:"–",validTill:"–"},
     {id:3,name:"Management Representation Letter",status:client.progress>=80?"Sent":"Draft",sent:client.progress>=80?"Aug 10, 2026":"–",completed:"–",signBy:"Aug 20, 2026",validTill:"Sep 1, 2026"},
   ];
 }
@@ -1275,8 +1278,8 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
     </section>}
     <div className="client-overview-grid-v2">
       <section className="section-card client-engagements-card"><div className="section-title"><div><h2>Engagements</h2></div><button className="text-link" onClick={()=>setTab("Engagements")}>View all {engagements.length} <ArrowRight size={13}/></button></div>
-        <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span></div>
-        {engagements.map(e=><div className="engagements-table-row" key={e.id}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span></div>)}
+        <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span><span/></div>
+        {engagements.map(e=><button className="engagements-table-row" key={e.id} onClick={()=>navigate(`/engagement/${client.slug}/planning`)}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span><ChevronRight/></button>)}
         </div>
       </section>
       <aside className="client-stat-cards">
@@ -1291,8 +1294,8 @@ function ClientOverview({client,navigate,state,update}:{client:ClientRecord;navi
     {tab==="Info"&&<ClientInfoTab client={client}/>}
     {tab==="Documents"&&<ClientDocumentsMain client={client} navigate={navigate} update={update} embedded/>}
     {tab==="Engagements"&&<section className="section-card client-engagements-card" style={{maxWidth:900}}><div className="section-title"><div><h2>Engagements</h2><p>Every engagement open for {displayName}.</p></div></div>
-      <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span></div>
-      {engagements.map(e=><div className="engagements-table-row" key={e.id}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span></div>)}
+      <div className="engagements-table"><div className="engagements-table-head"><span>Type</span><span>Period</span><span>Stage</span><span>Due Date</span><span>Assignee</span><span/></div>
+      {engagements.map(e=><button className="engagements-table-row" key={e.id} onClick={()=>navigate(`/engagement/${client.slug}/planning`)}><span>{e.title}</span><span>{e.period||"–"}</span><span><span className={`status-pill ${engagementStageTone(e.stage)}`}>{e.stage}</span></span><span>{e.due}</span><span className="engagement-assignee">{e.assignee!=="Unassigned"&&<i className="person-avatar violet">{e.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>}{e.assignee}</span><ChevronRight/></button>)}
       </div>
     </section>}
     {tab==="Communications"&&<ClientCommunications client={client}/>}
