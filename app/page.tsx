@@ -5,7 +5,7 @@ import {
   Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell,
   BookOpen, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCircle2,
   ChevronDown, ChevronLeft, ChevronRight, Circle, ClipboardCheck, Clock3,
-  Cloud, Database, DollarSign, Download, FileCheck2, FileSpreadsheet, FileText, Filter,
+  Cloud, Copy, Database, DollarSign, Download, FileCheck2, FileSpreadsheet, FileText, Filter,
   FolderOpen, Gauge, History, Home as HomeIcon, Info, LayoutDashboard, Link2, ListChecks,
   LockKeyhole, Menu, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus,
   RefreshCw, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
@@ -22,6 +22,22 @@ type StepState = "Complete" | "In Progress" | "Needs Attention" | "Not Started" 
 type RiskItem = { id: number; title: string; fsa: string; assertion: string; likelihood: string; magnitude: string; level: string; significant: boolean; fraud: boolean; balance: string; driver: string; response: string };
 type ProcedureItem = { title: string; risk: string; type: string; assignee: string; due: string; status: string };
 type ReconRow = { account: string; tb: string; gl: string; variance: string; status: string; owner: string };
+type Workpaper = {
+  id: string; name: string; fsa: string;
+  type: "Manual Workbook" | "AI Workbook" | "Template Workbook";
+  status: "Draft" | "In Progress" | "Ready for Review" | "Returned" | "Completed";
+  owner: string; reviewer: string; dueDate: string; lastModified: string;
+  planningVersion: number;
+  linkedRisk: string; linkedAssertion: string; linkedProcedure: string;
+  templateKey: string; createdFrom: "template" | "scratch" | "ai-agent";
+  archived: boolean;
+};
+type WorkpaperTemplate = {
+  key: string; name: string; description: string; kind: "scratch" | "ai-agent" | "predefined";
+  fsa?: string; linkedRisks?: string[]; linkedAssertions?: string[]; plannedProcedures?: string[];
+  requiredDocuments?: { name: string; matchFields: string[]; usedToMatch: string }[];
+  expectedOutputColumns?: string[]; exceptionCriteria?: string; estimatedSampleSize?: string;
+};
 
 type DemoState = {
   role: Role;
@@ -62,7 +78,29 @@ type DemoState = {
   reconciliationRows: ReconRow[];
   fieldworkSynced: boolean;
   fieldworkPeriod: string;
+  workpapers: Workpaper[];
+  planningVersion: number;
 };
+
+// Each seeded workpaper references a REAL Planning risk/assertion/procedure (see RISKS/SEEDED_PROCEDURES
+// below) so Fieldwork reads as a continuation of Planning, not a parallel invented dataset.
+const SEEDED_WORKPAPERS: Workpaper[] = [
+  { id: "wp-revenue-cutoff", name: "Revenue Cutoff Testing", fsa: "Revenue", type: "Template Workbook", status: "Ready for Review", owner: "Jasmine Alvarez", reviewer: "Oscar Owner", dueDate: "Mar 20", lastModified: "Mar 14", planningVersion: 1, linkedRisk: "Revenue cutoff", linkedAssertion: "Cutoff", linkedProcedure: "Test contribution cutoff around year end", templateKey: "revenue", createdFrom: "template", archived: false },
+  { id: "wp-fixed-asset-additions", name: "Fixed Asset Additions", fsa: "Property & equipment", type: "Manual Workbook", status: "Draft", owner: "Jasmine Alvarez", reviewer: "Meera Kapoor", dueDate: "Mar 24", lastModified: "Mar 10", planningVersion: 1, linkedRisk: "Fixed asset additions", linkedAssertion: "Classification", linkedProcedure: "Vouch current-year additions to invoices per the capital expenditure policy", templateKey: "fixed-assets", createdFrom: "template", archived: false },
+  { id: "wp-expense-testing", name: "Expense Testing", fsa: "Expenses", type: "Manual Workbook", status: "In Progress", owner: "Meera Kapoor", reviewer: "Oscar Owner", dueDate: "Mar 21", lastModified: "Mar 16", planningVersion: 1, linkedRisk: "Payroll allocation", linkedAssertion: "Classification", linkedProcedure: "Test expense classification against the business process walkthrough", templateKey: "expenses", createdFrom: "template", archived: false },
+  { id: "wp-cash-confirmation", name: "Cash Confirmation", fsa: "Cash", type: "Template Workbook", status: "Completed", owner: "Jasmine Alvarez", reviewer: "Meera Kapoor", dueDate: "Mar 12", lastModified: "Mar 12", planningVersion: 1, linkedRisk: "Cash existence", linkedAssertion: "Existence", linkedProcedure: "Confirm cash and investment balances directly with financial institutions", templateKey: "cash", createdFrom: "template", archived: false },
+  { id: "wp-journal-entry-testing", name: "Journal Entry Testing", fsa: "Journal entries", type: "AI Workbook", status: "In Progress", owner: "Meera Kapoor", reviewer: "Oscar Owner", dueDate: "Mar 22", lastModified: "Mar 17", planningVersion: 1, linkedRisk: "Management override of controls", linkedAssertion: "Occurrence", linkedProcedure: "Test journal entries using fraud-risk criteria", templateKey: "journal-entries", createdFrom: "ai-agent", archived: false },
+];
+
+const WORKPAPER_TEMPLATES: WorkpaperTemplate[] = [
+  { key: "scratch", name: "Start from scratch", description: "Open a blank workpaper and add procedures, sample data and evidence requirements yourself.", kind: "scratch" },
+  { key: "ai-agent", name: "Start with AI Agent", description: "Describe the testing objective in plain language — the agent drafts the sample, matching rules and output columns for you to approve.", kind: "ai-agent" },
+  { key: "revenue", name: "Revenue", description: "Pre-built procedures for revenue recognition, cutoff testing and completeness checks.", kind: "predefined", fsa: "Revenue", linkedRisks: ["Revenue cutoff"], linkedAssertions: ["Cutoff"], plannedProcedures: ["Test contribution cutoff around year end", "Inspect restricted grant terms and performance conditions"], requiredDocuments: [{ name: "Revenue transaction listing", matchFields: ["Transaction date", "Donor/grantor", "Amount"], usedToMatch: "General ledger detail" }, { name: "Grant agreements", matchFields: ["Grantor", "Performance conditions", "Award amount"], usedToMatch: "Contribution schedule" }], expectedOutputColumns: ["Transaction date", "Donor/Grantor", "Amount", "Recognition period", "Exception"], exceptionCriteria: "Revenue recorded outside the correct fiscal period without documented deferral.", estimatedSampleSize: "25 of 412 transactions" },
+  { key: "fixed-assets", name: "Fixed Assets", description: "Structured testing for additions, disposals, depreciation and asset verification.", kind: "predefined", fsa: "Property & equipment", linkedRisks: ["Fixed asset additions"], linkedAssertions: ["Classification"], plannedProcedures: ["Vouch current-year additions to invoices per the capital expenditure policy"], requiredDocuments: [{ name: "Additions listing", matchFields: ["Asset description", "Purchase date", "Amount"], usedToMatch: "General ledger detail" }, { name: "Vendor invoices", matchFields: ["Vendor", "Invoice date", "Amount"], usedToMatch: "Additions listing" }], expectedOutputColumns: ["Asset description", "Purchase date", "Amount", "Capitalized/expensed", "Exception"], exceptionCriteria: "Addition capitalized without supporting invoice, or expensed item that meets the capitalization threshold.", estimatedSampleSize: "20 of 64 additions" },
+  { key: "expenses", name: "Expenses", description: "Ready-made framework for expense testing, accrual review and cutoff analysis.", kind: "predefined", fsa: "Expenses", linkedRisks: ["Payroll allocation"], linkedAssertions: ["Classification"], plannedProcedures: ["Test expense classification against the business process walkthrough"], requiredDocuments: [{ name: "Expense/payroll register", matchFields: ["Employee/vendor", "Pay period", "Amount"], usedToMatch: "General ledger detail" }, { name: "Program allocation schedule", matchFields: ["Program", "Allocation %", "Amount"], usedToMatch: "Expense register" }], expectedOutputColumns: ["Employee/vendor", "Pay period", "Amount", "Program allocation", "Exception"], exceptionCriteria: "Expense allocated to a program without supporting time or allocation records.", estimatedSampleSize: "15 of 260 pay periods" },
+  { key: "cash", name: "Cash", description: "Confirmation and reconciliation procedures for cash and investment balances.", kind: "predefined", fsa: "Cash", linkedRisks: ["Cash existence"], linkedAssertions: ["Existence"], plannedProcedures: ["Confirm cash and investment balances directly with financial institutions"], requiredDocuments: [{ name: "Bank confirmation requests", matchFields: ["Institution", "Account number", "Balance"], usedToMatch: "Trial balance cash accounts" }, { name: "Bank statements", matchFields: ["Institution", "Statement date", "Balance"], usedToMatch: "Confirmation replies" }], expectedOutputColumns: ["Institution", "Account", "TB balance", "Confirmed balance", "Exception"], exceptionCriteria: "Confirmed balance does not agree to the trial balance without a reconciling item.", estimatedSampleSize: "3 of 3 institutions" },
+  { key: "journal-entries", name: "Journal Entries", description: "Procedures to identify and test journal entries using fraud-risk criteria.", kind: "predefined", fsa: "Journal entries", linkedRisks: ["Management override of controls"], linkedAssertions: ["Occurrence"], plannedProcedures: ["Test journal entries using fraud-risk criteria"], requiredDocuments: [{ name: "Journal entry detail export", matchFields: ["Entry date", "Preparer", "Amount", "Account"], usedToMatch: "General ledger detail" }], expectedOutputColumns: ["Entry date", "Preparer", "Account", "Amount", "Risk flag", "Exception"], exceptionCriteria: "Entry posted by a non-standard user, on a weekend, or at/near a round-dollar amount without support.", estimatedSampleSize: "18 of 1,204 entries" },
+];
 
 const defaultState: DemoState = {
   role: "Auditor / Preparer", fiscalYear: "FY 2025", connector: "Connected", controlTotals: "Pass", mapped: 96,
@@ -80,6 +118,7 @@ const defaultState: DemoState = {
     { account: "Net assets released", tb: "($210,000)", gl: "($206,200)", variance: "($3,800)", status: "Accepted", owner: "J. Alvarez" },
   ],
   fieldworkSynced: false, fieldworkPeriod: "",
+  workpapers: SEEDED_WORKPAPERS, planningVersion: 1,
 };
 
 const engagement = {
@@ -328,7 +367,7 @@ export default function Home() {
         {ingest ? (
           <IngestWorkspace path={path} navigate={navigate} state={state} update={update}/>
         ) : fieldwork ? (
-          <FieldworkShell path={path} navigate={navigate} state={state} update={update}/>
+          state.locked ? <FieldworkRouter path={path} navigate={navigate} state={state} update={update}/> : <FieldworkLocked navigate={navigate}/>
         ) : planning ? (
           <PlanningShell path={path} navigate={navigate} state={state} update={update} drawer={drawer} setDrawer={setDrawer} drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} demoOpen={demoOpen} setDemoOpen={setDemoOpen} />
         ) : path === "/my-work" ? <MyWork navigate={navigate} state={state} update={update} /> : path === "/documents" ? <DocumentsCenter navigate={navigate} update={update} /> : path === "/engagements" || path === "/clients" ? <Engagements navigate={navigate} update={update} state={state} /> : clientSlug && path.endsWith("/documents") ? <DocumentsCenter initialSlug={clientSlug} navigate={navigate} update={update} /> : clientSlug ? <ClientOverview client={CLIENTS.find(c=>c.slug===clientSlug)||CLIENTS[0]} navigate={navigate} state={state} update={update} /> : path.startsWith("/engagement/") ? <ClientOverview client={CLIENTS[0]} navigate={navigate} state={state} update={update} /> : <Dashboard navigate={navigate} state={state} />}
@@ -1610,122 +1649,230 @@ function PlanningHeader({ state, update, navigate, activeView, demoOpen, setDemo
     <div className="header-actions"><span className="saved"><Check size={14}/>Saved 2:42 PM IST <i>· stored in UTC</i></span></div></div>;
 }
 
-function FieldworkShell({ path, navigate, state, update }: { path:string; navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
-  const [drawer,setDrawer]=useState("Comments"); const [drawerOpen,setDrawerOpen]=useState(false);
-  return <div className="planning-layout">
-    <section className={`planning-workspace ${drawerOpen?"with-drawer":""}`}>
-      <div className="planning-header"><div><div className="breadcrumbs"><button onClick={()=>navigate("/engagement/bbawc/planning")}>Planning</button><ChevronRight/><span>Fieldwork</span></div><div className="title-line"><h1>Fieldwork</h1><span className={`status-pill ${state.fieldworkSynced?"progress":"neutral"}`}>{state.fieldworkSynced?`Testing · ${state.fieldworkPeriod}`:"Awaiting data sync"}</span></div><p>{state.fiscalYear} · Period ended {engagement.periodEnd}</p></div>
-        <div className="header-actions"><span className="saved"><Check size={14}/>Saved 2:42 PM IST <i>· stored in UTC</i></span></div></div>
-      <div className="workspace-scroll"><FieldworkWorkspace state={state} update={update}/></div>
-    </section>
-    <ContextDrawer drawer={drawer} setDrawer={setDrawer} open={drawerOpen} setOpen={setDrawerOpen} update={update}/>
-  </div>;
-}
-
-function FieldworkWorkspace({ state, update }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
-  const [tab,setTab]=useState<"Sync"|"Testing">(state.fieldworkSynced?"Testing":"Sync");
+function FieldworkLocked({ navigate }: { navigate:(p:string)=>void }) {
   return <div className="content-pad">
-    <Banner tone="info" title="Fieldwork has its own Data Ingest sync" text="Planning TB answers 'where are the risks and what should we plan.' Fieldwork re-ingests an updated TB/GL — often an interim period such as 10 months — so testing is performed against current data, not preliminary planning figures. Data Ingest, Planning and Fieldwork all read from the same client data sources."/>
-    <div className="subtabs"><button className={tab==="Sync"?"active":""} onClick={()=>setTab("Sync")}>Data sync{!state.fieldworkSynced&&<b className="warn">1</b>}</button><button className={tab==="Testing"?"active":""} onClick={()=>setTab("Testing")}>Testing procedures</button></div>
-    {tab==="Sync"?<FieldworkSync state={state} update={update} onSynced={()=>setTab("Testing")}/>:<FieldworkTesting state={state} update={update} onGoToSync={()=>setTab("Sync")}/>}
+    <div className="work-empty locked-empty">
+      <LockKeyhole/>
+      <h3>Fieldwork unlocks after Planning is approved</h3>
+      <p>Manager and Partner sign-off lock Planning's risk assessment, assertions and materiality — Fieldwork's workpaper program is built directly from that locked baseline, so testing never starts against a plan that's still moving.</p>
+      <button className="primary-btn" onClick={()=>navigate("/engagement/bbawc/planning/review")}>Go to Planning review <ArrowRight size={15}/></button>
+    </div>
   </div>;
 }
 
-const FIELDWORK_TB_COMPARE=[
-  {area:"Cash",planning:612480,fieldwork:698340,reason:"Additional receipts posted through the interim period"},
-  {area:"Contributions receivable",planning:486200,fieldwork:512900,reason:"New pledges recorded; allowance not yet updated for the period"},
-  {area:"Investments",planning:742100,fieldwork:758600,reason:"Unrealized gains recognized at the interim mark"},
-  {area:"Contribution revenue",planning:3840000,fieldwork:4106500,reason:"Year-end grant milestone revenue recognized"},
-  {area:"Program service expenses",planning:5420000,fieldwork:5687200,reason:"Payroll accruals and program cost true-ups posted"},
-];
-function FieldworkSync({ state, update, onSynced }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; onSynced:()=>void }) {
-  const [period,setPeriod]=useState("10 months ended Oct 31, 2025");
-  const [tbProgress,setTbProgress]=useState(state.fieldworkSynced?100:0);
-  const [glProgress,setGlProgress]=useState(state.fieldworkSynced?100:0);
-  const bothUploaded=tbProgress===100&&glProgress===100;
-  const upload=(setter:(n:number)=>void)=>{setter(38);setTimeout(()=>setter(100),1000)};
-  if(state.fieldworkSynced){
-    return <>
-      <div className="synced-detail-banner"><CheckCircle2/><span><strong>Fieldwork data synced</strong>{state.fieldworkPeriod} · source facts feed the testing procedures below</span></div>
-      <div className="table-card"><table><thead><tr><th>Financial statement area</th><th>Planning TB</th><th>Fieldwork TB</th><th>Movement</th><th>Why it changed</th></tr></thead><tbody>{FIELDWORK_TB_COMPARE.map(r=><tr key={r.area}><td><strong>{r.area}</strong></td><td>{money(r.planning)}</td><td>{money(r.fieldwork)}</td><td className="variance">+{money(r.fieldwork-r.planning)}</td><td>{r.reason}</td></tr>)}</tbody></table></div>
-      <button className="secondary-btn" onClick={()=>{setTbProgress(0);setGlProgress(0);update({fieldworkSynced:false},"Fieldwork data sync reopened — upload an updated TB/GL to re-sync")}}><RefreshCw size={15}/>Re-sync with a newer period</button>
-    </>;
-  }
-  return <>
-    <div className="connector-card"><div className="connector-logo">qb</div><div><span className="card-label">Accounting system</span><h3>{engagement.accountingSystem}</h3><p>Same connection used for Data Ingest and Planning</p></div><span className="status-pill approved">{state.connector}</span></div>
-    <Field label="Fieldwork period" required><select value={period} onChange={e=>setPeriod(e.target.value)}><option>10 months ended Oct 31, 2025</option><option>11 months ended Nov 30, 2025</option><option>Final — 12 months ended Dec 31, 2025</option></select></Field>
-    <div className="upload-grid">
-      <UploadCard title="Fieldwork Trial Balance" file="BB-AWC_TB_Interim.xlsx" rows="184 accounts" status={tbProgress===100?"Ingested":"Not started"} progress={tbProgress} onUpload={()=>upload(setTbProgress)} update={update}/>
-      <UploadCard title="Fieldwork General Ledger Detail" file="BB-AWC_GL_Interim.csv" rows="1,486 transactions" status={glProgress===100?"Ingested":"Not started"} progress={glProgress} onUpload={()=>upload(setGlProgress)} update={update}/>
-    </div>
-    <div className="modal-actions"><button className="primary-btn" disabled={!bothUploaded} onClick={()=>{update({fieldworkSynced:true,fieldworkPeriod:period},`Fieldwork data synced — ${period}`);onSynced()}}><Zap size={15}/>Confirm sync & compare to Planning</button></div>
-  </>;
+function needsReReview(wp:Workpaper,state:DemoState){return wp.planningVersion<state.planningVersion}
+function displayStatus(wp:Workpaper,state:DemoState){return needsReReview(wp,state)?"Re-review Required":wp.status}
+function fieldworkStatusTone(status:string){
+  return status==="Completed"?"approved":status==="Ready for Review"?"warning":status==="In Progress"?"progress":status==="Returned"?"danger":status==="Re-review Required"?"danger":"neutral";
+}
+function fieldworkTypeIcon(type:Workpaper["type"]){return type==="AI Workbook"?Sparkles:type==="Template Workbook"?FileSpreadsheet:FileText}
+
+function FieldworkRouter({ path, navigate, state, update }: { path:string; navigate:(p:string)=>void; state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void }) {
+  const segs=path.split("/"); const i=segs.indexOf("fieldwork");
+  const sub=segs[i+1]; const id=segs[i+2];
+  if(sub==="workpaper"&&id) return <WorkpaperDetailStub id={id} state={state} navigate={navigate}/>;
+  if(sub==="ai-agent"&&id) return <AiAgentStub id={id} state={state} navigate={navigate}/>;
+  return <FieldworkLanding state={state} update={update} navigate={navigate}/>;
 }
 
-type FieldworkProcedure={id:number;title:string;area:string;risk:string;type:string;assignee:string;sampleSize:string;status:string;exceptions:string;evidenceCount:number};
-const FIELDWORK_AREAS=["Cash & revenue","Expenses & payroll","Estimates & disclosures","Completion"];
-const FIELDWORK_PROCEDURES:FieldworkProcedure[]=[
-  {id:1,title:"Test contribution cutoff around year end",area:"Cash & revenue",risk:"Revenue cutoff",type:"Substantive",assignee:"J. Alvarez",sampleSize:"25 of 412 transactions",status:"In progress",exceptions:"",evidenceCount:2},
-  {id:2,title:"Inspect restricted grant terms and performance conditions",area:"Cash & revenue",risk:"Revenue cutoff",type:"Substantive",assignee:"J. Alvarez",sampleSize:"6 of 6 grant agreements",status:"Not started",exceptions:"",evidenceCount:0},
-  {id:3,title:"Confirm cash and investment balances",area:"Cash & revenue",risk:"Cash existence",type:"Substantive",assignee:"M. Kapoor",sampleSize:"3 of 3 institutions",status:"Signed off",exceptions:"No exceptions noted.",evidenceCount:3},
-  {id:4,title:"Test payroll register for proper authorization",area:"Expenses & payroll",risk:"Payroll allocation",type:"Controls",assignee:"J. Alvarez",sampleSize:"15 of 260 pay periods",status:"Ready for review",exceptions:"One late approval noted; not considered an exception.",evidenceCount:4},
-  {id:5,title:"Test journal entries using fraud-risk criteria",area:"Expenses & payroll",risk:"Management override",type:"Substantive",assignee:"M. Kapoor",sampleSize:"18 of 1,204 entries",status:"In progress",exceptions:"",evidenceCount:1},
-  {id:6,title:"Evaluate allowance methodology and subsequent receipts",area:"Estimates & disclosures",risk:"Allowance for pledges",type:"Substantive",assignee:"J. Alvarez",sampleSize:"Full population",status:"Not started",exceptions:"",evidenceCount:0},
-  {id:7,title:"Review related-party disclosures for completeness",area:"Estimates & disclosures",risk:"Related parties",type:"Substantive",assignee:"Oscar Owner",sampleSize:"All identified relationships",status:"Not started",exceptions:"",evidenceCount:0},
-  {id:8,title:"Complete disclosure checklist and financial statement tie-out",area:"Completion",risk:"Presentation & disclosure",type:"Analytical",assignee:"M. Kapoor",sampleSize:"Full financial statements",status:"Not started",exceptions:"",evidenceCount:0},
-];
-function fieldworkTone(status:string){return status==="Signed off"?"approved":status==="Ready for review"?"warning":status==="In progress"?"progress":"neutral"}
-function FieldworkTesting({ state, update, onGoToSync }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; onGoToSync:()=>void }) {
-  const [procedures,setProcedures]=useState<FieldworkProcedure[]>(FIELDWORK_PROCEDURES);
-  const [selected,setSelected]=useState<FieldworkProcedure|null>(null);
-  const [expanded,setExpanded]=useState<Record<string,boolean>>(Object.fromEntries(FIELDWORK_AREAS.map(a=>[a,true])));
-  const signedOff=procedures.filter(p=>p.status==="Signed off").length;
-  const inProgress=procedures.filter(p=>p.status==="In progress"||p.status==="Ready for review").length;
-  const updateProcedure=(id:number,patch:Partial<FieldworkProcedure>)=>{setProcedures(ps=>ps.map(p=>p.id===id?{...p,...patch}:p));setSelected(s=>s&&s.id===id?{...s,...patch}:s)};
-  return <>
-    {!state.fieldworkSynced&&<Banner tone="warning" title="Testing against pre-sync data" text="Fieldwork data hasn't been synced yet — figures referenced below are still from the Planning trial balance." action="Sync Fieldwork data" onAction={onGoToSync}/>}
-    <div className="risk-summary"><div><strong>{procedures.length}</strong><span>Procedures</span></div><div className="moderate"><strong>{inProgress}</strong><span>In progress</span></div><div className="high"><strong>{procedures.filter(p=>p.status==="Not started").length}</strong><span>Not started</span></div><div className="low"><strong>{signedOff}</strong><span>Signed off</span></div><div><strong>{Math.round(signedOff/procedures.length*100)}%</strong><span>Complete</span></div></div>
-    <div className="planning-board-grid"><div className="workpaper-groups">{FIELDWORK_AREAS.map(area=>{
-      const rows=procedures.filter(p=>p.area===area);
-      const done=rows.filter(p=>p.status==="Signed off").length;
-      const pct=rows.length?Math.round(done/rows.length*100):0;
-      const isOpen=!!expanded[area];
-      return <section className="workpaper-stage" key={area}><button className="stage-toggle" onClick={()=>setExpanded(v=>({...v,[area]:!isOpen}))}><span><strong>{area}</strong><small>{rows.length-done} active · {done} signed off</small></span><span className="stage-progress"><b>{pct}%</b><i><em style={{width:`${pct}%`}}/></i>{isOpen?<ChevronDown/>:<ChevronRight/>}</span></button>
-        {isOpen&&<div className="stage-rows">{rows.map(row=><button className="workpaper-row-refined" key={row.id} onClick={()=>setSelected(row)}>
-          <span className={`workpaper-state ${fieldworkTone(row.status)}`}>{row.status==="Signed off"?<Check/>:row.status==="Ready for review"?<Clock3/>:<Circle/>}</span>
-          <span className="workpaper-title"><strong>{row.title}</strong><small>{row.status} · {row.sampleSize}</small></span>
-          <span className="row-meter"><i><em style={{width:`${row.status==="Signed off"?100:row.status==="Ready for review"?90:row.status==="In progress"?45:0}%`}}/></i></span>
-          <span className="review-count">{row.exceptions&&<><AlertTriangle size={13}/>1</>}</span>
-          <i className="person-avatar violet">{row.assignee.split(" ").map(n=>n[0]).join("").slice(0,2)}</i>
-          <span className="row-due"><small>Type</small>{row.type}</span>
-          <ChevronRight/>
-        </button>)}</div>}
-      </section>;
-    })}</div>
-      <aside className="planning-insight-rail"><section><div className="rail-title"><h3>Key information</h3><InfoTip title="Key information" text="Figures flow from the synced Fieldwork trial balance once available; otherwise the Planning trial balance is shown." standard="AssureAudit data lineage"/></div><dl><div><dt>Fieldwork period</dt><dd>{state.fieldworkPeriod||"Not synced"}</dd></div><div><dt>Procedures signed off</dt><dd>{signedOff} of {procedures.length}</dd></div></dl></section><section><div className="rail-title"><h3>Needs attention</h3><span className="rail-count">{procedures.filter(p=>p.exceptions).length}</span></div>{procedures.filter(p=>p.exceptions).map(p=><button key={p.id} onClick={()=>setSelected(p)}><AlertTriangle/><span><strong>Exception noted</strong><small>{p.title}</small></span><ChevronRight/></button>)}{procedures.filter(p=>p.exceptions).length===0&&<p className="panel-empty-text">No exceptions noted yet.</p>}</section></aside>
-    </div>
-    {selected&&<FieldworkProcedureDrawer procedure={selected} close={()=>setSelected(null)} onUpdate={patch=>updateProcedure(selected.id,patch)} update={update}/>}
-  </>;
+function fieldworkMetrics(workpapers:Workpaper[],state:DemoState){
+  const active=workpapers.filter(w=>!w.archived);
+  const statusOf=(w:Workpaper)=>displayStatus(w,state);
+  return {
+    total: active.length,
+    inPreparation: active.filter(w=>["Draft","In Progress"].includes(statusOf(w))).length,
+    readyForReview: active.filter(w=>statusOf(w)==="Ready for Review").length,
+    reviewNotes: active.filter(w=>statusOf(w)==="Returned").length,
+    completed: active.filter(w=>statusOf(w)==="Completed").length,
+  };
 }
 
-function FieldworkProcedureDrawer({ procedure, close, onUpdate, update }: { procedure:FieldworkProcedure; close:()=>void; onUpdate:(p:Partial<FieldworkProcedure>)=>void; update:(p:Partial<DemoState>,m?:string)=>void }) {
-  const [statusMenuOpen,setStatusMenuOpen]=useState(false);
-  const statusMenuRef=useDismiss(statusMenuOpen,()=>setStatusMenuOpen(false));
-  const [exceptions,setExceptions]=useState(procedure.exceptions);
-  const nextStatus:Record<string,string>={"Not started":"In progress","In progress":"Ready for review","Ready for review":"Signed off","Signed off":"Signed off"};
-  return <div className="detail-drawer"><div className="drawer-head"><div><span className={`status-pill ${fieldworkTone(procedure.status)}`}>{procedure.status}</span><h2>{procedure.title}</h2><p>{procedure.type} · {procedure.assignee}</p></div><button className="icon-btn" onClick={close}><X/></button></div>
-    <div className="drawer-body">
-      <InfoBlock label="Relevant risk" text={procedure.risk}/>
-      <div className="two-col"><InfoBlock label="Sample" text={procedure.sampleSize}/><InfoBlock label="Evidence attached" text={`${procedure.evidenceCount} file${procedure.evidenceCount===1?"":"s"}`}/></div>
-      <span className="drawer-label">Exceptions & conclusion</span>
-      <textarea value={exceptions} onChange={e=>setExceptions(e.target.value)} placeholder="Document what was tested, sample results and conclusion…" style={{marginBottom:14}}/>
-      {procedure.evidenceCount===0?<div className="panel-upload-empty"><p>No evidence uploaded yet.</p><button className="secondary-btn" onClick={()=>{onUpdate({evidenceCount:1});update({},`Evidence attached to "${procedure.title}"`)}}><UploadCloud size={15}/>Upload evidence</button></div>:<div className="drawer-file"><FileText/><div><strong>{procedure.evidenceCount} evidence file{procedure.evidenceCount===1?"":"s"} attached</strong><span>Workpaper support · testing documentation</span></div></div>}
+function FieldworkLanding({ state, update, navigate }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; navigate:(p:string)=>void }) {
+  const [query,setQuery]=useState("");
+  const [filterOpen,setFilterOpen]=useState(false);
+  const filterRef=useDismiss(filterOpen,()=>setFilterOpen(false));
+  const [statusFilters,setStatusFilters]=useState<string[]>([]);
+  const [addOpen,setAddOpen]=useState(false);
+  const [archiveTarget,setArchiveTarget]=useState<Workpaper|null>(null);
+  const [renameTarget,setRenameTarget]=useState<Workpaper|null>(null);
+  const [renameValue,setRenameValue]=useState("");
+  const workpapers=state.workpapers;
+  const active=workpapers.filter(w=>!w.archived);
+  const metrics=fieldworkMetrics(workpapers,state);
+  const toggleStatusFilter=(s:string)=>setStatusFilters(f=>f.includes(s)?f.filter(x=>x!==s):[...f,s]);
+  const filtered=active.filter(w=>`${w.name} ${w.fsa}`.toLowerCase().includes(query.toLowerCase())&&(statusFilters.length===0||statusFilters.includes(displayStatus(w,state))));
+  const setWorkpapers=(next:Workpaper[])=>update({workpapers:next});
+  const duplicateWorkpaper=(wp:Workpaper)=>{
+    const copy:Workpaper={...wp,id:`${wp.id}-copy-${Date.now()}`,name:`${wp.name} (Copy)`,status:"Draft",lastModified:"Today"};
+    setWorkpapers([...workpapers,copy]);
+    update({},`"${wp.name}" duplicated`);
+  };
+  const confirmRename=()=>{
+    if(!renameTarget||!renameValue.trim())return;
+    setWorkpapers(workpapers.map(w=>w.id===renameTarget.id?{...w,name:renameValue.trim(),lastModified:"Today"}:w));
+    update({},`Workpaper renamed to "${renameValue.trim()}"`);
+    setRenameTarget(null);
+  };
+  const confirmArchive=()=>{
+    if(!archiveTarget)return;
+    setWorkpapers(workpapers.map(w=>w.id===archiveTarget.id?{...w,archived:true}:w));
+    update({},`"${archiveTarget.name}" archived`);
+    setArchiveTarget(null);
+  };
+  return <div className="content-pad fieldwork-page">
+    <div className="page-heading"><div><p className="eyebrow">{state.fiscalYear} · Period ended {engagement.periodEnd}</p><h1>Fieldwork</h1><p>Workpapers built from Planning's locked risk assessment, assertions and materiality.</p></div><button className="primary-btn" onClick={()=>setAddOpen(true)}><Plus size={15}/>Add workpaper</button></div>
+    <div className="risk-summary"><div><strong>{metrics.total}</strong><span>Total workpapers</span></div><div className="moderate"><strong>{metrics.inPreparation}</strong><span>In preparation</span></div><div className="high"><strong>{metrics.readyForReview}</strong><span>Ready for review</span></div><div className="low"><strong>{metrics.reviewNotes}</strong><span>Review notes</span></div><div><strong>{metrics.completed}</strong><span>Completed</span></div></div>
+    <div className="section-title"><div><h2>Workpapers</h2><p>{active.length} of {workpapers.length} shown{workpapers.length>active.length?` · ${workpapers.length-active.length} archived`:""}</p></div><div className="table-tools"><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search workpapers or FSA"/></div><div className="topbar-popover" ref={filterRef}><button className={`filter-btn ${statusFilters.length>0?"active":""}`} onClick={()=>setFilterOpen(!filterOpen)}><Filter/>Filters{statusFilters.length>0&&<i className="filter-badge"/>}</button>{filterOpen&&<div className="dropdown-menu filter-menu">
+      <div className="dropdown-head"><strong>Filter by status</strong></div>
+      {["Draft","In Progress","Ready for Review","Returned","Re-review Required","Completed"].map(s=><label className="dropdown-check" key={s}><input type="checkbox" checked={statusFilters.includes(s)} onChange={()=>toggleStatusFilter(s)}/><span>{s}</span></label>)}
+      {statusFilters.length>0&&<button className="dropdown-item" onClick={()=>setStatusFilters([])}><X size={14}/><span>Clear filters</span></button>}
+    </div>}</div></div></div>
+    {active.length===0?<div className="work-empty"><FolderOpen/><h3>Create your first workpaper</h3><p>Start from a template, describe it to the AI Agent, or build one from scratch.</p><button className="primary-btn" onClick={()=>setAddOpen(true)}><Plus size={15}/>Add workpaper</button></div>:
+    <div className="table-card fieldwork-table"><table><thead><tr><th>Workpaper</th><th>FSA</th><th>Status</th><th>Owner / Reviewer</th><th>Due</th><th>Planning v.</th><th>Last modified</th><th></th></tr></thead><tbody>
+      {filtered.length===0&&<tr><td colSpan={8} style={{textAlign:"center",color:"var(--muted)"}}>No workpapers match the current search and filters.</td></tr>}
+      {filtered.map(w=>{
+        const Icon=fieldworkTypeIcon(w.type); const status=displayStatus(w,state);
+        return <tr key={w.id} onClick={()=>navigate(`/engagement/bbawc/fieldwork/workpaper/${w.id}`)}>
+          <td><strong>{w.name}</strong><span className="workpaper-type-tag"><Icon size={12}/>{w.type}</span></td>
+          <td>{w.fsa}</td>
+          <td><span className={`status-pill ${fieldworkStatusTone(status)}`}>{status}</span></td>
+          <td>{w.owner}<span>Reviewer: {w.reviewer}</span></td>
+          <td>{w.dueDate}</td>
+          <td>v{w.planningVersion}</td>
+          <td>{w.lastModified}</td>
+          <td onClick={e=>e.stopPropagation()}>
+            <WorkpaperRowActions
+              onOpen={()=>navigate(`/engagement/bbawc/fieldwork/workpaper/${w.id}`)}
+              onDuplicate={()=>duplicateWorkpaper(w)}
+              onRename={()=>{setRenameTarget(w);setRenameValue(w.name)}}
+              onArchive={()=>setArchiveTarget(w)}
+              onHistory={()=>update({},`History for "${w.name}" — full audit trail lands in a later phase`)}
+            />
+          </td>
+        </tr>;
+      })}
+    </tbody></table></div>}
+    {addOpen&&<AddWorkpaperModal state={state} update={update} navigate={navigate} close={()=>setAddOpen(false)}/>}
+    {renameTarget&&<div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><h2>Rename workpaper</h2><p>Update the name shown across Fieldwork and Reporting.</p></div><button className="icon-btn" onClick={()=>setRenameTarget(null)}><X/></button></div>
+      <Field label="Workpaper name" required><input value={renameValue} onChange={e=>setRenameValue(e.target.value)} autoFocus/></Field>
+      <div className="modal-actions"><button className="secondary-btn" onClick={()=>setRenameTarget(null)}>Cancel</button><button className="primary-btn" disabled={!renameValue.trim()} onClick={confirmRename}>Save name</button></div>
+    </div></div>}
+    {archiveTarget&&<ArchiveWorkpaperModal wp={archiveTarget} onConfirm={confirmArchive} onCancel={()=>setArchiveTarget(null)}/>}
+  </div>;
+}
+
+function WorkpaperRowActions({ onOpen, onDuplicate, onRename, onArchive, onHistory }: { onOpen:()=>void; onDuplicate:()=>void; onRename:()=>void; onArchive:()=>void; onHistory:()=>void }) {
+  const [open,setOpen]=useState(false);
+  const ref=useDismiss(open,()=>setOpen(false));
+  return <div className="topbar-popover" ref={ref}>
+    <button className="icon-btn" onClick={()=>setOpen(v=>!v)}><MoreHorizontal size={16}/></button>
+    {open&&<div className="dropdown-menu">
+      <button className="dropdown-item" onClick={()=>{setOpen(false);onOpen()}}><ArrowRight size={14}/><span>Open</span></button>
+      <button className="dropdown-item" onClick={()=>{setOpen(false);onDuplicate()}}><Copy size={14}/><span>Duplicate</span></button>
+      <button className="dropdown-item" onClick={()=>{setOpen(false);onRename()}}><Pencil size={14}/><span>Rename</span></button>
+      <button className="dropdown-item" onClick={()=>{setOpen(false);onHistory()}}><History size={14}/><span>View history</span></button>
+      <button className="dropdown-item danger-item" onClick={()=>{setOpen(false);onArchive()}}><Trash2 size={14}/><span>Archive</span></button>
+    </div>}
+  </div>;
+}
+
+function ArchiveWorkpaperModal({ wp, onConfirm, onCancel }: { wp:Workpaper; onConfirm:()=>void; onCancel:()=>void }) {
+  return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><h2>Archive workpaper</h2><p>Are you sure you want to archive "{wp.name}"? This can be reversed by a firm administrator, but it will disappear from this list.</p></div><button className="icon-btn" onClick={onCancel}><X/></button></div>
+    <div className="modal-actions"><button className="secondary-btn" onClick={onCancel}>Cancel</button><button className="primary-btn danger-btn" onClick={onConfirm}><Trash2 size={15}/>Archive workpaper</button></div>
+  </div></div>;
+}
+
+function TemplateCard({ template, onUse }: { template:WorkpaperTemplate; onUse:()=>void }) {
+  const Icon=template.kind==="scratch"?FileText:template.kind==="ai-agent"?Sparkles:FileSpreadsheet;
+  return <button className="template-card" onClick={onUse}>
+    <span className="template-card-icon"><Icon size={18}/></span>
+    <strong>{template.name}</strong>
+    <p>{template.description}</p>
+    <span className="text-link">Use this template <ArrowRight size={13}/></span>
+  </button>;
+}
+
+function TemplatePreview({ template, onBack, onUse }: { template:WorkpaperTemplate; onBack:()=>void; onUse:()=>void }) {
+  return <div className="template-preview">
+    <div className="modal-head"><div><h2>{template.name}</h2><p>{template.fsa} · {template.description}</p></div></div>
+    <div className="two-col">
+      <InfoBlock label="Linked Planning risks" text={(template.linkedRisks||[]).join(", ")}/>
+      <InfoBlock label="Relevant assertions" text={(template.linkedAssertions||[]).join(", ")}/>
     </div>
-    <div className="drawer-actions">
-      <div className="topbar-popover" ref={statusMenuRef}><button className="secondary-btn" onClick={()=>setStatusMenuOpen(!statusMenuOpen)}><RefreshCw size={15}/>Change status</button>{statusMenuOpen&&<div className="dropdown-menu status-menu">{["Not started","In progress","Ready for review","Signed off"].map(s=><button key={s} className="dropdown-item" onClick={()=>{setStatusMenuOpen(false);onUpdate({status:s});update({},`"${procedure.title}" marked ${s}`)}}><span className={`tone-dot ${fieldworkTone(s)}`}/><span>{s}</span></button>)}</div>}</div>
-      <button className="secondary-btn" onClick={()=>{onUpdate({exceptions});update({},"Conclusion saved to the workpaper")}}>Save conclusion</button>
-      <button className="primary-btn" disabled={procedure.status==="Signed off"} onClick={()=>{onUpdate({exceptions,status:nextStatus[procedure.status]});update({},`"${procedure.title}" moved to ${nextStatus[procedure.status]}`)}}>{procedure.status==="Ready for review"?<>Sign off <Check size={15}/></>:<>Move to {nextStatus[procedure.status]} <ArrowRight size={15}/></>}</button>
+    <span className="drawer-label">Planned procedures</span>
+    <ol className="template-procedure-list">{(template.plannedProcedures||[]).map(p=><li key={p}>{p}</li>)}</ol>
+    <span className="drawer-label">Documents required</span>
+    <div className="template-doc-list">{(template.requiredDocuments||[]).map(d=><div className="template-doc-card" key={d.name}><FileText size={15}/><div><strong>{d.name}</strong><small>Fields checked: {d.matchFields.join(", ")}</small></div><span className="match-tag">Used to match: {d.usedToMatch}</span></div>)}</div>
+    <div className="two-col">
+      <InfoBlock label="Expected output columns" text={(template.expectedOutputColumns||[]).join(", ")}/>
+      <InfoBlock label="Estimated sample size" text={template.estimatedSampleSize||"—"}/>
     </div>
+    <InfoBlock label="Exception criteria" text={template.exceptionCriteria||"—"}/>
+    <div className="modal-actions"><button className="secondary-btn" onClick={onBack}><ChevronLeft size={15}/>Back</button><button className="primary-btn" onClick={onUse}>Use this template <ArrowRight size={15}/></button></div>
+  </div>;
+}
+
+function AddWorkpaperModal({ state, update, navigate, close }: { state:DemoState; update:(p:Partial<DemoState>,m?:string)=>void; navigate:(p:string)=>void; close:()=>void }) {
+  const [tab,setTab]=useState<"AssureAudit"|"Saved">("AssureAudit");
+  const [step,setStep]=useState<"list"|"preview"|"ai-name">("list");
+  const [activeTemplate,setActiveTemplate]=useState<WorkpaperTemplate|null>(null);
+  const [aiName,setAiName]=useState("");
+  const createFromTemplate=(template:WorkpaperTemplate,createdFrom:Workpaper["createdFrom"],name?:string)=>{
+    const id=`wp-${(name||template.name).toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${Date.now()}`;
+    const wp:Workpaper={
+      id, name:name||template.name, fsa:template.fsa||"Unassigned",
+      type: template.kind==="ai-agent"?"AI Workbook":template.kind==="scratch"?"Manual Workbook":"Template Workbook",
+      status:"Draft", owner:"Oscar Owner", reviewer:"Meera Kapoor", dueDate:"Not set", lastModified:"Today",
+      planningVersion: state.planningVersion,
+      linkedRisk: template.linkedRisks?.[0]||"Not linked", linkedAssertion: template.linkedAssertions?.[0]||"Not linked",
+      linkedProcedure: template.plannedProcedures?.[0]||"To be defined", templateKey: template.key, createdFrom, archived:false,
+    };
+    update({workpapers:[...state.workpapers,wp]},`"${wp.name}" created`);
+    if(createdFrom==="ai-agent") navigate(`/engagement/bbawc/fieldwork/ai-agent/${id}`);
+    else navigate(`/engagement/bbawc/fieldwork/workpaper/${id}`);
+  };
+  const chooseTemplate=(template:WorkpaperTemplate)=>{
+    if(template.kind==="scratch") createFromTemplate(template,"scratch");
+    else if(template.kind==="ai-agent"){setActiveTemplate(template);setStep("ai-name")}
+    else {setActiveTemplate(template);setStep("preview")}
+  };
+  return <div className="modal-backdrop"><div className="modal wide-modal">
+    {step==="list"&&<>
+      <div className="modal-head"><div><h2>Add workpaper</h2><p>Pick a template to get started, or begin with a clean sheet.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+      <div className="documents-tabs"><button className={tab==="AssureAudit"?"active":""} onClick={()=>setTab("AssureAudit")}>AssureAudit templates <b>{WORKPAPER_TEMPLATES.length}</b></button><button className={tab==="Saved"?"active":""} onClick={()=>setTab("Saved")}>Saved firm templates <b>0</b></button></div>
+      {tab==="AssureAudit"?<div className="template-grid">{WORKPAPER_TEMPLATES.map(t=><TemplateCard key={t.key} template={t} onUse={()=>chooseTemplate(t)}/>)}</div>:<div className="work-empty"><FolderOpen/><h3>No saved firm templates yet</h3><p>Templates your firm builds from completed workpapers will appear here.</p></div>}
+    </>}
+    {step==="preview"&&activeTemplate&&<TemplatePreview template={activeTemplate} onBack={()=>setStep("list")} onUse={()=>createFromTemplate(activeTemplate,"template")}/>}
+    {step==="ai-name"&&<>
+      <div className="modal-head"><div><h2>Start with AI Agent</h2><p>Give this workpaper a name to get started.</p></div><button className="icon-btn" onClick={close}><X/></button></div>
+      <Field label="Workpaper name" required><input value={aiName} onChange={e=>setAiName(e.target.value)} placeholder="Untitled Workpaper" autoFocus/></Field>
+      <div className="modal-actions"><button className="secondary-btn" onClick={()=>setStep("list")}><ChevronLeft size={15}/>Back</button><button className="primary-btn" disabled={!aiName.trim()} onClick={()=>activeTemplate&&createFromTemplate(activeTemplate,"ai-agent",aiName.trim())}>Create <ArrowRight size={15}/></button></div>
+    </>}
+  </div></div>;
+}
+
+function WorkpaperDetailStub({ id, state, navigate }: { id:string; state:DemoState; navigate:(p:string)=>void }) {
+  const wp=state.workpapers.find(w=>w.id===id);
+  if(!wp) return <div className="content-pad"><div className="work-empty"><FolderOpen/><h3>Workpaper not found</h3><p>It may have been archived.</p><button className="secondary-btn" onClick={()=>navigate("/engagement/bbawc/fieldwork")}><ArrowLeft size={15}/>Back to Fieldwork</button></div></div>;
+  const status=displayStatus(wp,state);
+  return <div className="content-pad">
+    <div className="breadcrumbs"><button onClick={()=>navigate("/engagement/bbawc/fieldwork")}>Fieldwork</button><ChevronRight/><span>{wp.name}</span></div>
+    <div className="page-heading"><div><h1>{wp.name}</h1><p>{wp.fsa} · {wp.type}</p></div><span className={`status-pill ${fieldworkStatusTone(status)}`}>{status}</span></div>
+    {needsReReview(wp,state)&&<Banner tone="danger" title="Planning changed since this workpaper was created" text={`This workpaper references Planning v${wp.planningVersion}; Planning is now at v${state.planningVersion}. Review the linked risk, assertion and procedure below before continuing — nothing has been overwritten.`}/>}
+    <div className="two-col"><InfoBlock label="Linked risk" text={wp.linkedRisk}/><InfoBlock label="Linked assertion" text={wp.linkedAssertion}/></div>
+    <InfoBlock label="Linked procedure" text={wp.linkedProcedure}/>
+    <div className="two-col"><InfoBlock label="Owner" text={wp.owner}/><InfoBlock label="Reviewer" text={wp.reviewer}/></div>
+    <div className="work-empty"><FileSpreadsheet/><h3>Workpaper builder coming in Phase 2</h3><p>Setup, Support Documents and Workpaper tabs — with simulated matching and exception review — build on this record next.</p></div>
+  </div>;
+}
+
+function AiAgentStub({ id, state, navigate }: { id:string; state:DemoState; navigate:(p:string)=>void }) {
+  const wp=state.workpapers.find(w=>w.id===id);
+  if(!wp) return <div className="content-pad"><div className="work-empty"><FolderOpen/><h3>Workpaper not found</h3><button className="secondary-btn" onClick={()=>navigate("/engagement/bbawc/fieldwork")}><ArrowLeft size={15}/>Back to Fieldwork</button></div></div>;
+  return <div className="content-pad">
+    <div className="breadcrumbs"><Sparkles size={14}/><button onClick={()=>navigate("/engagement/bbawc/fieldwork")}>Fieldwork</button><ChevronRight/><span>{wp.name}</span></div>
+    <div className="page-heading"><div><h1>{wp.name}</h1><p>AI Agent workpaper</p></div></div>
+    <div className="work-empty"><Sparkles/><h3>AI Agent chat coming in a later phase</h3><p>The chat-based drafting flow — sample data, supporting documents and matching rules proposed from a plain-language request — builds on this record next.</p><button className="secondary-btn" onClick={()=>navigate("/engagement/bbawc/fieldwork")}><ArrowLeft size={15}/>Back to Fieldwork</button></div>
   </div>;
 }
 
@@ -1733,7 +1880,7 @@ function PlanningOverview({ state, update, navigate }: { state: DemoState; updat
   const declined = state.acceptanceDecision === "decline";
   return <div className="content-pad">
     {declined && <Banner tone="danger" title="Engagement declined" text="This engagement was declined during Acceptance & continuance. Planning does not proceed to Fieldwork while this decision stands."/>}
-    {state.reopened && <Banner tone="danger" title="Planning was reopened after Fieldwork began" text="8 workpapers reference affected variables and require re-review. Prior approval history is preserved."/>}
+    {state.reopened && <Banner tone="danger" title="Planning was reopened after Fieldwork began" text={`${state.workpapers.filter(w=>!w.archived).length} workpaper${state.workpapers.filter(w=>!w.archived).length===1?"":"s"} reference affected variables and require re-review. Prior approval history is preserved.`}/>}
     {state.rolledForward && <Banner tone="warning" title="Started from prior year" text="Structure and methodology were copied as editable drafts. Current-year evidence, financial data and dollar conclusions were not carried forward."/>}
     <PlanningManager state={state} update={update} navigate={navigate}/>
   </div>;
@@ -2022,8 +2169,8 @@ function ReviewView({ state, update }: { state:DemoState; update:(p:Partial<Demo
     {!canApprove&&!declined&&<Banner tone="info" title="Read-only preparer view" text="Switch the prototype role to Manager or Partner to demonstrate approval actions."/>}
     {cards.map(([title,detail,tone])=><article className={`review-card ${approved.includes(title)?"approved-card":""}`} key={title}><div className={`review-icon ${tone}`}>{approved.includes(title)?<Check/>:tone==="danger"?<AlertCircle/>:tone==="warning"?<AlertTriangle/>:<FileCheck2/>}</div><div><h3>{title}</h3><p>{detail}</p>{title==="Materiality"&&<small>Benchmark: Total Revenue (2.5%) · Source: reconciled Trial Balance</small>}{title==="Risk assessment"&&<small>{riskList.filter(r=>r.significant).length} significant · {riskList.filter(r=>r.fraud).length} fraud risks · all non-zero FSAs concluded</small>}</div><div className="review-actions">{approved.includes(title)?<span className="approved-by"><CheckCircle2/>Approved by {state.role}</span>:<><button className="secondary-btn" onClick={()=>{setNote(title);update({},"Review note opened — type a comment before returning")}}>Return</button><button className="primary-btn" onClick={()=>approve(title)}>Approve</button></>}</div></article>)}
     {note&&<div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><h2>Return {note}</h2><p>Your comment is retained in the audit trail.</p></div><button className="icon-btn" onClick={()=>setNote("")}><X/></button></div><Field label="Reviewer comment" required><textarea autoFocus placeholder="Describe the required change…"/></Field><div className="modal-actions"><button className="secondary-btn" onClick={()=>setNote("")}>Cancel</button><button className="primary-btn" onClick={()=>{setNote("");update({planningStatus:"Returned for Changes"},"Section returned to the preparer with a review note")}}>Return for changes</button></div></div></div>}
-    <div className="approval-footer"><div>{all?<CheckCircle2/>:<AlertCircle/>}<span><strong>{approved.length} of {cards.length} cards approved</strong><small>{all?"All conclusions are ready for final approval.":"Final approval remains disabled until every card is reviewed."}</small></span></div>{state.locked?<button className="danger-btn" onClick={()=>setReopen(true)}><RotateCcw/>Reopen Planning</button>:<><button className="primary-btn" disabled={!all||declined||(state.role==="Partner"&&!state.managerApproved)} onClick={()=>state.role==="Partner"?update({partnerApproved:true,locked:true,planningStatus:"Approved & Locked"},"Partner approval recorded. Planning locked and Fieldwork unlocked."):update({managerApproved:true,planningStatus:"Pending Partner Approval"},"Manager approval recorded. Sent to Partner for final approval.")}><LockKeyhole/>{state.role==="Partner"?"Approve all & lock Planning":"Approve all as Manager"}</button>{declined&&<small style={{color:"var(--red)"}}>This engagement was declined and cannot be locked.</small>}{!declined&&state.role==="Partner"&&!state.managerApproved&&<small style={{color:"var(--red)"}}>Manager approval is required before Partner approval.</small>}</>}</div>
-    {reopen&&<ReopenModal update={update} close={()=>setReopen(false)}/>} 
+    <div className="approval-footer"><div>{all?<CheckCircle2/>:<AlertCircle/>}<span><strong>{approved.length} of {cards.length} cards approved</strong><small>{all?"All conclusions are ready for final approval.":"Final approval remains disabled until every card is reviewed."}</small></span></div>{state.locked?<button className="danger-btn" onClick={()=>setReopen(true)}><RotateCcw/>Reopen Planning</button>:<><button className="primary-btn" disabled={!all||declined||(state.role==="Partner"&&!state.managerApproved)} onClick={()=>state.role==="Partner"?update({partnerApproved:true,locked:true,planningStatus:"Approved & Locked",...(state.reopened?{planningVersion:state.planningVersion+1}:{})},"Partner approval recorded. Planning locked and Fieldwork unlocked."):update({managerApproved:true,planningStatus:"Pending Partner Approval"},"Manager approval recorded. Sent to Partner for final approval.")}><LockKeyhole/>{state.role==="Partner"?"Approve all & lock Planning":"Approve all as Manager"}</button>{declined&&<small style={{color:"var(--red)"}}>This engagement was declined and cannot be locked.</small>}{!declined&&state.role==="Partner"&&!state.managerApproved&&<small style={{color:"var(--red)"}}>Manager approval is required before Partner approval.</small>}</>}</div>
+    {reopen&&<ReopenModal state={state} update={update} close={()=>setReopen(false)}/>}
   </div>;
 }
 
@@ -2172,6 +2319,10 @@ function GlobalGuide({path,open,setOpen}:{path:string;open:boolean;setOpen:(v:bo
     ["Follow the eight steps","The left rail keeps collection, transformation, mapping, reconciliation and Materiality in one traceable sequence."],
     ["Resolve exceptions","Warnings must be reviewed before source data can be locked for Workpapers."],
     ["Complete the handoff","Materiality & handoff locks the reconciled ingest package and opens downstream Workpapers."],
+  ]}:path.includes("/fieldwork")?{title:"Fieldwork",steps:[
+    ["Unlocks after Planning is locked","Manager and Partner approval on Planning is what opens Fieldwork — workpapers are built directly from that locked risk assessment, assertions and materiality."],
+    ["Start from a template or a blank sheet","Add workpaper offers AssureAudit templates (Revenue, Fixed Assets, Expenses, Cash, Journal Entries), an AI Agent that drafts one from a plain-language request, or a scratch workbook."],
+    ["Re-review, not overwrite","If Planning is reopened and re-approved, workpapers built on the earlier version show 'Re-review Required' — nothing already completed is silently changed."],
   ]}:path.includes("/planning")?{title:"Planning",steps:[
     ["Work by phase","Open the Workpapers branch to move through Commence, Understand, Risk assessment and response work."],
     ["Use contextual support","The Context rail contains comments, review notes, activity and attachments. This Guide remains the single product tour."],
@@ -2211,7 +2362,7 @@ function ContextDrawer({ drawer,setDrawer,open,setOpen,update }: any) {
     {drawer==="Attachments"&&<><DrawerFile update={update} name="2025 Grant Agreement.pdf" meta="1.8 MB · Linked to entity understanding"/><DrawerFile update={update} name="Accounting Policy Handbook.pdf" meta="Client upload · In review"/><button className="secondary-btn full" onClick={()=>update({},"policy-handbook-addendum.pdf attached (simulated)")}><UploadCloud/>Attach evidence</button></>}
   </div></aside> }
 
-function DemoControls({ state,update,close }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;close:()=>void}) { const action=(label:string,patch:Partial<DemoState>)=>update(patch,label); return <div className="demo-panel"><div className="demo-head"><div><span>Prototype only</span><h3>Demo controls</h3><p>Change the engagement state to test validations and transitions.</p></div><button className="icon-btn" onClick={close}><X/></button></div><label className="demo-role"><span>Preview experience as</span><select aria-label="Prototype role" value={state.role} onChange={e=>update({role:e.target.value as Role},`Viewing as ${e.target.value}`)}>{roleNames.map(r=><option key={r}>{r}</option>)}</select></label><div className="demo-actions"><button onClick={()=>action("All outstanding blockers cleared for the current phase",{independenceOutstanding:0,mapped:100,controlTotals:"Pass",transformationConfirmed:true,questionnaireStatus:"Validated",materialityLocked:true,responseGap:false})}><CheckCircle2/>Complete current step</button><button onClick={()=>action("Connector token expired — ingested data preserved",{connector:"Expired"})}><Cloud/>Simulate connector expiry</button><button onClick={()=>action("Control totals forced to failed state",{controlTotals:"Fail",transformationConfirmed:false})}><AlertCircle/>Force failed control totals</button><button onClick={()=>action("Prior-year structure loaded as editable drafts",{rolledForward:true})}><History/>Load rolled-forward engagement</button><button onClick={()=>action("Group-audit fields enabled",{groupAudit:true})}><Building2/>Switch to group audit</button><button onClick={()=>action("Preliminary materiality published",{publishVersion:state.publishVersion+1})}><Zap/>Publish preliminary materiality</button><button onClick={()=>action("Changed Final TB ingested — downstream steps stale",{finalTb:true,reopened:true,locked:false,managerApproved:false,partnerApproved:false,materialityLocked:false})}><FileSpreadsheet/>Ingest changed Final TB</button><button onClick={()=>action("Planning submitted for Manager review",{planningStatus:"Pending Manager Approval"})}><Send/>Submit for review</button><button onClick={()=>action("Manager approval recorded",{managerApproved:true,planningStatus:"Pending Partner Approval"})}><UserRound/>Approve as Manager</button><button disabled={!state.managerApproved} onClick={()=>state.managerApproved?action("Partner approval recorded — Fieldwork unlocked",{partnerApproved:true,locked:true,planningStatus:"Approved & Locked"}):update({},"Manager approval is required before Partner approval")}><ShieldCheck/>Approve as Partner</button><button onClick={()=>action("Planning reopened — 8 workpapers require re-review",{reopened:true,locked:false,managerApproved:false,partnerApproved:false,planningStatus:"Reopened"})}><RotateCcw/>Reopen Planning</button></div><button className="reset-demo" onClick={()=>{localStorage.removeItem("assureaudit-planning-demo");update(defaultState,"Demo engagement reset")}}><RefreshCw/>Reset engagement</button></div> }
+function DemoControls({ state,update,close }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;close:()=>void}) { const action=(label:string,patch:Partial<DemoState>)=>update(patch,label); const activeWorkpapers=state.workpapers.filter(w=>!w.archived).length; return <div className="demo-panel"><div className="demo-head"><div><span>Prototype only</span><h3>Demo controls</h3><p>Change the engagement state to test validations and transitions.</p></div><button className="icon-btn" onClick={close}><X/></button></div><label className="demo-role"><span>Preview experience as</span><select aria-label="Prototype role" value={state.role} onChange={e=>update({role:e.target.value as Role},`Viewing as ${e.target.value}`)}>{roleNames.map(r=><option key={r}>{r}</option>)}</select></label><div className="demo-actions"><button onClick={()=>action("All outstanding blockers cleared for the current phase",{independenceOutstanding:0,mapped:100,controlTotals:"Pass",transformationConfirmed:true,questionnaireStatus:"Validated",materialityLocked:true,responseGap:false})}><CheckCircle2/>Complete current step</button><button onClick={()=>action("Connector token expired — ingested data preserved",{connector:"Expired"})}><Cloud/>Simulate connector expiry</button><button onClick={()=>action("Control totals forced to failed state",{controlTotals:"Fail",transformationConfirmed:false})}><AlertCircle/>Force failed control totals</button><button onClick={()=>action("Prior-year structure loaded as editable drafts",{rolledForward:true})}><History/>Load rolled-forward engagement</button><button onClick={()=>action("Group-audit fields enabled",{groupAudit:true})}><Building2/>Switch to group audit</button><button onClick={()=>action("Preliminary materiality published",{publishVersion:state.publishVersion+1})}><Zap/>Publish preliminary materiality</button><button onClick={()=>action("Changed Final TB ingested — downstream steps stale",{finalTb:true,reopened:true,locked:false,managerApproved:false,partnerApproved:false,materialityLocked:false})}><FileSpreadsheet/>Ingest changed Final TB</button><button onClick={()=>action("Planning submitted for Manager review",{planningStatus:"Pending Manager Approval"})}><Send/>Submit for review</button><button onClick={()=>action("Manager approval recorded",{managerApproved:true,planningStatus:"Pending Partner Approval"})}><UserRound/>Approve as Manager</button><button disabled={!state.managerApproved} onClick={()=>state.managerApproved?action("Partner approval recorded — Fieldwork unlocked",{partnerApproved:true,locked:true,planningStatus:"Approved & Locked",...(state.reopened?{planningVersion:state.planningVersion+1}:{})}):update({},"Manager approval is required before Partner approval")}><ShieldCheck/>Approve as Partner</button><button onClick={()=>action(`Planning reopened — ${activeWorkpapers} workpaper${activeWorkpapers===1?"":"s"} require re-review`,{reopened:true,locked:false,managerApproved:false,partnerApproved:false,planningStatus:"Reopened"})}><RotateCcw/>Reopen Planning</button></div><button className="reset-demo" onClick={()=>{localStorage.removeItem("assureaudit-planning-demo");update(defaultState,"Demo engagement reset")}}><RefreshCw/>Reset engagement</button></div> }
 
 function ClientPortal({ state,update,onExit }: {state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;onExit:()=>void}) {
   const [selectedTitle,setSelectedTitle]=useState<string|null>(null); const [answer,setAnswer]=useState(state.clientAnswer);
@@ -2378,7 +2529,7 @@ function StatusCountBadges({ complete, inProgress, attention, compact }: { compl
     <span className="count-dot green" title={`${complete} complete`}><i/>{complete}{!compact && " complete"}</span>
   </div>;
 }
-function ReopenModal({update,close}:{update:(p:Partial<DemoState>,m?:string)=>void;close:()=>void}) { const [reason,setReason]=useState(""); const [confirm,setConfirm]=useState(false); return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="status-pill danger">High-impact action</span><h2>Reopen Planning?</h2><p>Earlier approvals remain in history, but affected conclusions become editable.</p></div><button className="icon-btn" onClick={close}><X/></button></div><Banner tone="danger" title="8 Fieldwork workpapers will require re-review" text="3 workpapers reference Materiality v1 and 5 reference risk-register variables."/><Field label="Reason for reopening" required><textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue discovered in Fieldwork…"/></Field><label className="checkbox-row"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)}/><span>I understand that downstream workpapers will be flagged for re-review.</span></label><div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="danger-btn" disabled={!reason||!confirm} onClick={()=>{update({reopened:true,locked:false,managerApproved:false,partnerApproved:false,planningStatus:"Reopened"},"Planning reopened; 8 workpapers flagged for re-review");close()}}>Confirm reopen</button></div></div></div> }
+function ReopenModal({state,update,close}:{state:DemoState;update:(p:Partial<DemoState>,m?:string)=>void;close:()=>void}) { const [reason,setReason]=useState(""); const [confirm,setConfirm]=useState(false); const activeWorkpapers=state.workpapers.filter(w=>!w.archived).length; return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="status-pill danger">High-impact action</span><h2>Reopen Planning?</h2><p>Earlier approvals remain in history, but affected conclusions become editable.</p></div><button className="icon-btn" onClick={close}><X/></button></div><Banner tone="danger" title={`${activeWorkpapers} Fieldwork workpaper${activeWorkpapers===1?"":"s"} will require re-review`} text="Once Planning is re-approved, workpapers created against the current Planning version will be flagged for re-review without losing their existing work."/><Field label="Reason for reopening" required><textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe the issue discovered in Fieldwork…"/></Field><label className="checkbox-row"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)}/><span>I understand that downstream workpapers will be flagged for re-review.</span></label><div className="modal-actions"><button className="secondary-btn" onClick={close}>Cancel</button><button className="danger-btn" disabled={!reason||!confirm} onClick={()=>{update({reopened:true,locked:false,managerApproved:false,partnerApproved:false,planningStatus:"Reopened"},`Planning reopened; ${activeWorkpapers} workpaper${activeWorkpapers===1?"":"s"} flagged for re-review`);close()}}>Confirm reopen</button></div></div></div> }
 
 function statusClass(s:string){ if(["Complete","Approved","Done","Validated","Resolved"].includes(s))return"approved";if(["Needs Attention","In Progress","In Review","Clarification Needed","Review","Client Responded","Investigate"].includes(s))return s==="In Progress"||s==="Client Responded"?"progress":"warning";if(["Access Not Granted","Returned","Stale","Declined"].includes(s))return"danger";if(s==="Sent to Client")return"progress";return"neutral" }
 function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>}

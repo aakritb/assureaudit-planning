@@ -564,3 +564,23 @@ button.engagements-table-row:hover{background:#faf9ff}
 .documents-requests-list{border-top:0;border-radius:0 0 13px 13px}
 .documents-requests-list>button{grid-template-columns:38px 1fr 16px auto 18px}
 @media(max-width:640px){.documents-requests-list>button{grid-template-columns:35px 1fr 16px}.documents-requests-list>button>.status-pill{grid-column:2}.documents-requests-list>button>svg:last-child{grid-column:3;grid-row:1}}
+
+/* Fieldwork: workpaper landing table, Add Workpaper template picker, and its preview step. */
+.locked-empty svg{color:var(--muted-2)}
+.fieldwork-page .page-heading{margin-bottom:16px}
+.fieldwork-table td strong{display:inline}
+.workpaper-type-tag{display:flex;align-items:center;gap:5px;margin-top:4px;font-size:11px;color:var(--muted)}
+.wide-modal{width:min(880px,100%)}
+.template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px}
+.template-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;border:1px solid var(--line);border-radius:13px;padding:16px;background:#fff}
+.template-card:hover{border-color:#cfc5f9;background:#fbfaff}
+.template-card-icon{width:34px;height:34px;border-radius:10px;background:var(--violet-soft);color:var(--violet);display:grid;place-items:center}
+.template-card p{color:var(--muted);font-size:12px;flex:1}
+.template-preview{display:flex;flex-direction:column;gap:14px}
+.template-procedure-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.template-doc-list{display:flex;flex-direction:column;gap:8px}
+.template-doc-card{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:#faf9fc}
+.template-doc-card>svg{color:var(--violet);flex:none;margin-top:2px}
+.template-doc-card strong{font-size:13px}
+.template-doc-card small{color:var(--muted);font-size:11px;display:block;margin-top:2px}
+.match-tag{margin-left:auto;flex:none;background:var(--violet-soft);color:var(--violet-dark);border-radius:999px;padding:4px 10px;font-size:10.5px;font-weight:650;white-space:nowrap}

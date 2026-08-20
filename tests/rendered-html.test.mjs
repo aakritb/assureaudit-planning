@@ -216,3 +216,32 @@ test("searches across the platform and keeps the signed-in identity role based",
   assert.doesNotMatch(page, /className="global-search" onClick=\{\(\)=>navigate\("\/clients"\)\}/);
   assert.match(css, /\.global-search-menu/);
 });
+
+test("gates Fieldwork behind Planning approval and builds workpapers from real Planning data", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  // Old Fieldwork ("Data sync" / "Testing procedures") is fully replaced, not left dangling.
+  assert.doesNotMatch(page, /function FieldworkShell\(/);
+  assert.doesNotMatch(page, /function FieldworkTesting\(/);
+  assert.doesNotMatch(page, /function FieldworkProcedureDrawer\(/);
+  assert.match(page, /function FieldworkLocked\(/);
+  assert.match(page, /function FieldworkRouter\(/);
+  assert.match(page, /function FieldworkLanding\(/);
+  assert.match(page, /function AddWorkpaperModal\(/);
+  assert.match(page, /function TemplatePreview\(/);
+  assert.match(page, /function WorkpaperDetailStub\(/);
+  assert.match(page, /function AiAgentStub\(/);
+  // Fieldwork nav is gated on the same `locked` flag Partner approval already sets.
+  assert.match(page, /state\.locked \? <FieldworkRouter/);
+  // Seeded workpapers reference real Planning risks/procedures, not an invented parallel dataset.
+  assert.match(page, /Revenue Cutoff Testing/);
+  assert.match(page, /Fixed Asset Additions/);
+  assert.match(page, /Journal Entry Testing/);
+  assert.match(page, /linkedRisk: "Revenue cutoff"/);
+  assert.match(page, /linkedProcedure: "Test journal entries using fraud-risk criteria"/);
+  // Templates and staleness tracking.
+  assert.match(page, /Start with AI Agent/);
+  assert.match(page, /Start from scratch/);
+  assert.match(page, /Re-review Required/);
+  assert.match(page, /planningVersion/);
+  assert.match(page, /needsReReview/);
+});
