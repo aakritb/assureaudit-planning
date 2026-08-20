@@ -1016,8 +1016,6 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const [onlyClientUploads,setOnlyClientUploads]=useState(false);
   const [packCreated,setPackCreated]=useState(false);
   const [fileKind,setFileKind]=useState<"All"|"Requested"|"Internal">("All");
-  const [assureProOpen,setAssureProOpen]=useState(false);
-  const assureProRef=useDismiss(assureProOpen,()=>setAssureProOpen(false));
   const goToTimelineTarget=(entry:TimelineEntry)=>{
     if(!entry.target)return;
     if(entry.target.tab==="Files"){setTab("Files");setSelectedId(entry.target.id)}
@@ -1107,14 +1105,6 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
           </div>
           <button className="icon-btn notification" title="Engagement Timeline" onClick={()=>setTimelineOpen(true)}><History size={16}/><i>1</i></button>
           {!packCreated&&<button className="secondary-btn" onClick={createDefaultRequests}><Plus size={15}/>Create Default Requests</button>}
-          <button className="icon-btn" title="Export documents.csv" onClick={()=>update({},`Documents for ${client.name} exported as documents.csv (simulated)`)}><Download size={16}/></button>
-          <div className="topbar-popover" ref={assureProRef}>
-            <button className="secondary-btn" onClick={()=>setAssureProOpen(v=>!v)}><BriefcaseBusiness size={14}/>Assure Pro<ChevronDown size={14}/></button>
-            {assureProOpen&&<div className="dropdown-menu">
-              <div className="dropdown-head"><strong>Source</strong><span>Where this folder's files are managed</span></div>
-              <button className="dropdown-item" onClick={()=>{setAssureProOpen(false);update({},`Opening ${selectedFolder||client.name}'s documents in AssurePro`)}}><BriefcaseBusiness size={14}/><span>AssurePro</span></button>
-            </div>}
-          </div>
           <button className="secondary-btn" onClick={()=>setRequestOpen(true)}><Plus size={15}/>Request</button>
           <button className="secondary-btn" onClick={()=>update({},"Import brings files in from AssurePro or a connected source (simulated).")}><Download size={15}/>Import</button>
           <button className="primary-btn" onClick={()=>update({},"File upload happens here — wire to your OS file picker in production.")}><UploadCloud size={15}/>Upload</button>
@@ -2198,7 +2188,7 @@ function GlobalGuide({path,open,setOpen}:{path:string;open:boolean;setOpen:(v:bo
     ["Switch clients from one place","One document center serves every client — use the list on the left to move between libraries without leaving the page."],
     ["Files vs. Requests","Files groups documents by category with status and comment counts. Requests tracks what's still outstanding from the client — the pending count on the tab always matches what's in the list."],
     ["All, Requested, Internal","Inside Files, split the current folder by what's been requested from the client versus what the firm prepared internally — each count updates as you select a different folder."],
-    ["Request, Import, Upload, or hand off to AssurePro","Request asks the client for a new document, Import brings files in from a connected source, and Upload adds one from this device. The AssurePro dropdown opens the same folder in AssurePro."],
+    ["Request, Import, or Upload","Request asks the client for a new document, Import brings files in from a connected source, and Upload adds one from this device."],
     ["Trace back to the source workpaper","The numbered chips (201–205) link each document category to the Data Ingest or Workpapers step that produced it — click one to jump straight there."],
   ]}:clientPath?{title:"Client overview",steps:[
     ["Review the client first","This page combines engagement details, attention items, documents and the approval hierarchy for one client."],
