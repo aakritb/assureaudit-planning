@@ -1005,7 +1005,6 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   // AssureAudit's own Documents section: category chips, bulk selection, paging, a Filters
   // popover and the default-request pack. Kept as features, restyled to AssurePro's language.
   const [checked,setChecked]=useState<number[]>([]);
-  const [chipsOpen,setChipsOpen]=useState(true);
   const [pageSize,setPageSize]=useState(20);
   const [page,setPage]=useState(1);
   const [sizeOpen,setSizeOpen]=useState(false);
@@ -1015,7 +1014,6 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
   const [onlyFlagged,setOnlyFlagged]=useState(false);
   const [onlyClientUploads,setOnlyClientUploads]=useState(false);
   const [packCreated,setPackCreated]=useState(false);
-  const [fileKind,setFileKind]=useState<"All"|"Requested"|"Internal">("All");
   const goToTimelineTarget=(entry:TimelineEntry)=>{
     if(!entry.target)return;
     if(entry.target.tab==="Files"){setTab("Files");setSelectedId(entry.target.id)}
@@ -1026,13 +1024,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
     &&(!onlyFlagged||doc.tone==="danger"||doc.tone==="warning")
     &&(!onlyClientUploads||doc.clientUpload)
     &&`${doc.name} ${doc.type} ${doc.category}`.toLowerCase().includes(query.toLowerCase()));
-  const visibleAll=visible;
   const grouped:Record<string,DocRecord[]>={};
   visible.forEach(doc=>{(grouped[doc.category]=grouped[doc.category]||[]).push(doc)});
   const displayedDocs=selectedFolder?visible.filter(d=>d.category===selectedFolder):visible;
-  const requestedCount=displayedDocs.filter(d=>d.status==="Requested").length;
-  const internalCount=displayedDocs.filter(d=>!d.clientUpload&&d.status!=="Requested").length;
-  const kindFilteredDocs=fileKind==="All"?displayedDocs:fileKind==="Requested"?displayedDocs.filter(d=>d.status==="Requested"):displayedDocs.filter(d=>!d.clientUpload&&d.status!=="Requested");
   const toggleTone=(tone:string)=>setToneFilters(f=>f.includes(tone)?f.filter(t=>t!==tone):[...f,tone]);
   const toggleGroup=(cat:string)=>setCollapsedGroups(g=>({...g,[cat]:!g[cat]}));
   const updateDoc=(id:number,patch:Partial<DocRecord>)=>setDocuments(docs=>docs.map(d=>d.id===id?{...d,...patch}:d));
@@ -1055,10 +1049,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
     setPackCreated(true);
     update({},`Created ${DEFAULT_REQUEST_PACK.length} categories and ${added.length} requests.`);
   };
-  const catOrder=Array.from(new Set(visibleAll.map(d=>d.category)));
-  const pageCount=Math.max(1,Math.ceil(kindFilteredDocs.length/pageSize));
+  const pageCount=Math.max(1,Math.ceil(displayedDocs.length/pageSize));
   const safePage=Math.min(page,pageCount);
-  const pagedDocs=kindFilteredDocs.slice((safePage-1)*pageSize,safePage*pageSize);
+  const pagedDocs=displayedDocs.slice((safePage-1)*pageSize,safePage*pageSize);
   const pagedGrouped:Record<string,DocRecord[]>={};
   pagedDocs.forEach(doc=>{(pagedGrouped[doc.category]=pagedGrouped[doc.category]||[]).push(doc)});
   const allChecked=pagedDocs.length>0&&pagedDocs.every(d=>checked.includes(d.id));
@@ -1070,27 +1063,9 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
     {!embedded&&<div className="documents-center-main-head"><i>{client.initials}</i><span><strong>{client.name}</strong><small>{client.industry} · {client.subIndustry}</small></span><button className="text-link" onClick={()=>navigate(`/clients/${client.slug}`)}>Open client workspace <ArrowRight size={14}/></button></div>}
     <div className="chip-row-label"><span>Linked workpapers</span><InfoTip title="Linked workpapers" text="Numbered cross-references (201–205) to the specific Data Ingest and Workpapers step that produced or relies on this client's documents. Click a chip to jump straight to that step." standard="Cross-reference · Planning workflow"/></div>
     <div className="workpaper-chip-row">{WORKPAPER_REFS.map(w=><button key={w.id} onClick={()=>navigate(`/engagement/${client.slug}/ingest/${w.route}`)}><b>{w.id}</b><span>{w.title}</span></button>)}</div>
-      <p className="documents-breadcrumb">Documents <ChevronRight size={11}/> {selectedFolder||"All documents"}</p>
       {filesRequestsTabs}
       {tab==="Files"?<>
-        <div className="documents-kind-tabs">
-          <button className={fileKind==="All"?"active":""} onClick={()=>{setFileKind("All");setPage(1)}}>All <b>{displayedDocs.length}</b></button>
-          <button className={fileKind==="Requested"?"active":""} onClick={()=>{setFileKind("Requested");setPage(1)}}>Requested <b>{requestedCount}</b></button>
-          <button className={fileKind==="Internal"?"active":""} onClick={()=>{setFileKind("Internal");setPage(1)}}>Internal <b>{internalCount}</b></button>
-        </div>
-        {/* Category summary chips: each category's request IDs as bubbles, collapsible from the
-            toolbar caret — AssureAudit's own pattern, restyled to AssurePro's chip language. */}
-        {chipsOpen&&catOrder.length>0&&<div className="doc-category-chips">
-          {catOrder.map(cat=>{
-            const docs=grouped[cat]||[];
-            return <button key={cat} className={`doc-category-chip ${selectedFolder===cat?"active":""}`} onClick={()=>{setSelectedFolder(selectedFolder===cat?null:cat);setSelectedId(null);setPage(1)}} title={`${cat} — ${docs.length} item${docs.length===1?"":"s"}`}>
-              <span className="doc-chip-bubbles">{docs.slice(0,8).map(d=><i key={d.id}>{d.id}</i>)}{docs.length>8&&<em>+{docs.length-8}</em>}</span>
-              <span className="doc-chip-label">{cat}</span>
-            </button>;
-          })}
-        </div>}
         <div className="documents-toolbar-row">
-          <button className="icon-btn" title={chipsOpen?"Hide categories":"Show categories"} aria-expanded={chipsOpen} onClick={()=>setChipsOpen(v=>!v)}><ChevronDown size={15} className={chipsOpen?"":"collapsed"}/></button>
           <div className="search no-margin"><Search/><input value={query} onChange={e=>{setQuery(e.target.value);setPage(1)}} placeholder="Search documents or type"/></div>
           <span className="toolbar-label">Status:</span>
           <div className="tone-filter-row">{DOC_TONES.map(t=><button key={t} title={TONE_LABEL[t]} aria-label={`Filter: ${TONE_LABEL[t]}`} className={`tone-dot ${t} ${toneFilters.includes(t)?"active":""}`} onClick={()=>{toggleTone(t);setPage(1)}}/>)}</div>
@@ -1150,14 +1125,14 @@ function ClientDocumentsMain({client,navigate,update,embedded}:{client:ClientRec
                   </button>
                 </div>)}
               </section>)}
-              {kindFilteredDocs.length===0&&selectedFolder&&!grouped[selectedFolder]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document and use "Move" to file it here.</p>}
-              {kindFilteredDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>{packCreated||documents.length>0?"Clear the filters or search to see the full client library.":'Use "Create Default Requests" to seed the standard request pack, or "Request" for a one-off.'}</p></div>}
+              {displayedDocs.length===0&&selectedFolder&&!grouped[selectedFolder]&&<p className="panel-empty-text" style={{padding:"10px 17px"}}>No documents yet — open any document and use "Move" to file it here.</p>}
+              {displayedDocs.length===0&&!(selectedFolder&&!grouped[selectedFolder])&&<div className="work-empty"><FolderOpen/><h3>No documents found</h3><p>{packCreated||documents.length>0?"Clear the filters or search to see the full client library.":'Use "Create Default Requests" to seed the standard request pack, or "Request" for a one-off.'}</p></div>}
               {displayedDocs.length>0&&<div className="doc-pagination">
                 <div className="topbar-popover" ref={sizeRef}>
                   <span>Showing</span>
                   <button className="secondary-btn" onClick={()=>setSizeOpen(v=>!v)}>{pageSize}<ChevronDown size={13}/></button>
                   {sizeOpen&&<div className="dropdown-menu">{DOC_PAGE_SIZES.map(s=><button key={s} className="dropdown-item" onClick={()=>{setPageSize(s);setPage(1);setSizeOpen(false)}}>{s}</button>)}</div>}
-                  <span>of {kindFilteredDocs.length} documents</span>
+                  <span>of {displayedDocs.length} documents</span>
                 </div>
                 <div className="doc-pagination-pages">
                   <button className="icon-btn" disabled={safePage===1} onClick={()=>setPage(1)}><ChevronLeft size={14}/></button>
@@ -2187,7 +2162,6 @@ function GlobalGuide({path,open,setOpen}:{path:string;open:boolean;setOpen:(v:bo
   ]}:path==="/documents"||(clientPath&&path.endsWith("/documents"))?{title:"Documents",steps:[
     ["Switch clients from one place","One document center serves every client — use the list on the left to move between libraries without leaving the page."],
     ["Files vs. Requests","Files groups documents by category with status and comment counts. Requests tracks what's still outstanding from the client — the pending count on the tab always matches what's in the list."],
-    ["All, Requested, Internal","Inside Files, split the current folder by what's been requested from the client versus what the firm prepared internally — each count updates as you select a different folder."],
     ["Request, Import, or Upload","Request asks the client for a new document, Import brings files in from a connected source, and Upload adds one from this device."],
     ["Trace back to the source workpaper","The numbered chips (201–205) link each document category to the Data Ingest or Workpapers step that produced it — click one to jump straight there."],
   ]}:clientPath?{title:"Client overview",steps:[
