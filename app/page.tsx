@@ -104,9 +104,9 @@ const WORKPAPER_TEMPLATES: WorkpaperTemplate[] = [
 
 const defaultState: DemoState = {
   role: "Auditor / Preparer", fiscalYear: "FY 2025", connector: "Connected", controlTotals: "Pass", mapped: 96,
-  groupAudit: false, rolledForward: false, planningStatus: "In Progress", materialityPct: 2.5,
+  groupAudit: false, rolledForward: false, planningStatus: "Approved & Locked", materialityPct: 2.5,
   benchmark: 9600000, performancePct: 75, trivialPct: 5, materialityOverride: false, materialityRationale: "", materialityBenchmarkType: "Total Revenue", materialityLocked: false, transformationConfirmed: false, responseGap: true, independenceOutstanding: 2, finalTb: false,
-  publishVersion: 1, managerApproved: false, partnerApproved: false, locked: false,
+  publishVersion: 1, managerApproved: true, partnerApproved: true, locked: true,
   reopened: false, completedRequests: 3,
   entityRisk: "Normal", questionnaireStatus: "Draft",
   questionnairePrompt: "Describe the organization’s business model, primary revenue streams, significant changes during the year, and the controls management uses to ensure complete and accurate reporting.",
